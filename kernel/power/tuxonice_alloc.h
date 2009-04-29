@@ -11,7 +11,7 @@
 #define TOI_ATOMIC_GFP (GFP_ATOMIC | __GFP_NOWARN)
 
 #define toi_kzalloc(FAIL, SIZE, FLAGS) (kzalloc(SIZE, FLAGS))
-#define toi_kfree(FAIL, ALLOCN) (kfree(ALLOCN))
+#define toi_kfree(FAIL, ALLOCN, SIZE) (kfree(ALLOCN))
 
 #define toi_get_free_pages(FAIL, FLAGS, ORDER) __get_free_pages(FLAGS, ORDER)
 #define toi_get_free_page(FAIL, FLAGS) __get_free_page(FLAGS)
