@@ -71,11 +71,10 @@
 
    Compression support is implemented via the cryptoapi. You will therefore want
    to select any Cryptoapi transforms that you want to use on your image from
-   the Cryptoapi menu while configuring your kernel. Part of the TuxOnIce patch
-   adds a new cryptoapi compression called LZF. We recommend the use of this
-   compression method - it is very fast and still achieves good compression.
+   the Cryptoapi menu while configuring your kernel. We recommend the use of the
+   LZO compression method - it is very fast and still achieves good compression.
 
-   You can also tell TuxOnIce to write it's image to an encrypted and/or
+   You can also tell TuxOnIce to write its image to an encrypted and/or
    compressed filesystem/swap partition. In that case, you don't need to do
    anything special for TuxOnIce when it comes to kernel configuration.
 
@@ -333,6 +332,25 @@
    configure sudo to allow you to invoke your hibernate script as an ordinary
    user.
 
+   - alt_resume_param
+
+   Instead of powering down after writing a hibernation image, TuxOnIce
+   supports resuming from a different image. This entry lets you set the
+   location of the signature for that image (the resume= value you'd use
+   for it). Using an alternate image and keep_image mode, you can do things
+   like using an alternate image to power down an uninterruptible power
+   supply.
+
+   - block_io/target_outstanding_io
+
+   This value controls the amount of memory that the block I/O code says it
+   needs when the core code is calculating how much memory is needed for
+   hibernating and for resuming. It doesn't directly control the amount of
+   I/O that is submitted at any one time - that depends on the amount of
+   available memory (we may have more available than we asked for), the
+   throughput that is being achieved and the ability of the CPU to keep up
+   with disk throughput (particularly where we're compressing pages).
+
    - checksum/enabled
 
    Use cryptoapi hashing routines to verify that Pageset2 pages don't change
@@ -359,6 +377,16 @@
 
    This file returns information about your configuration that may be helpful
    in diagnosing problems with hibernating.
+
+   - did_suspend_to_both:
+
+   This file can be used when you hibernate with powerdown method 3 (ie suspend
+   to ram after writing the image). There can be two outcomes in this case. We
+   can resume from the suspend-to-ram before the battery runs out, or we can run
+   out of juice and and up resuming like normal. This entry lets you find out,
+   post resume, which way we went. If the value is 1, we resumed from suspend
+   to ram. This can be useful when actions need to be run post suspend-to-ram
+   that don't need to be run if we did the normal resume from power off.
 
    - do_hibernate:
 
@@ -400,6 +428,37 @@
    an image without actually doing a hibernation cycle. It is useful for
    diagnosing freezing and image preparation issues.
 
+   - full_pageset2
+
+   TuxOnIce divides the pages that are stored in an image into two sets. The
+   difference between the two sets is that pages in pageset 1 are atomically
+   copied, and pages in pageset 2 are written to disk without being copied
+   first. A page CAN be written to disk without being copied first if and only
+   if its contents will not be modified or used at any time after userspace
+   processes are frozen. A page MUST be in pageset 1 if its contents are
+   modified or used at any time after userspace processes have been frozen.
+
+   Normally (ie if this option is enabled), TuxOnIce will put all pages on the
+   per-zone LRUs in pageset2, then remove those pages used by any userspace
+   user interface helper and TuxOnIce storage manager that are running,
+   together with pages used by the GEM memory manager introduced around 2.6.28
+   kernels.
+
+   If this option is disabled, a much more conservative approach will be taken.
+   The only pages in pageset2 will be those belonging to userspace processes,
+   with the exclusion of those belonging to the TuxOnIce userspace helpers
+   mentioned above. This will result in a much smaller pageset2, and will
+   therefore result in smaller images than are possible with this option
+   enabled.
+
+   - ignore_rootfs
+
+   TuxOnIce records which device is mounted as the root filesystem when
+   writing the hibernation image. It will normally check at resume time that
+   this device isn't already mounted - that would be a cause of filesystem
+   corruption. In some particular cases (RAM based root filesystems), you
+   might want to disable this check. This option allows you to do that.
+
    - image_exists:
 
    Can be used in a script to determine whether a valid image exists at the
@@ -419,6 +478,23 @@
    include/linux/suspend-debug.h with the values SUSPEND_ABORTED to
    SUSPEND_KEPT_IMAGE. This is a bitmask.
 
+   - late_cpu_hotplug:
+
+   This sysfs entry controls whether cpu hotplugging is done - as normal - just
+   before (unplug) and after (replug) the atomic copy/restore (so that all
+   CPUs/cores are available for multithreaded I/O). The alternative is to
+   unplug all secondary CPUs/cores at the start of hibernating/resuming, and
+   replug them at the end of resuming. No multithreaded I/O will be possible in
+   this configuration, but the odd machine has been reported to require it.
+
+   - lid_file:
+
+   This determines which ACPI button file we look in to determine whether the
+   lid is open or closed after resuming from suspend to disk or power off.
+   If the entry is set to "lid/LID", we'll open /proc/acpi/button/lid/LID/state
+   and check its contents at the appropriate moment. See post_wake_state below
+   for more details on how this entry is used.
+
    - log_everything (CONFIG_PM_DEBUG):
 
    Setting this option results in all messages printed being logged. Normally,
@@ -426,10 +502,61 @@
    logs. Useful for debugging. It can be toggled during a cycle by pressing
    'L'.
 
+   - no_load_direct:
+
+   This is a debugging option. If, when loading the atomically copied pages of
+   an image, TuxOnIce finds that the destination address for a page is free,
+   it will normally allocate the image, load the data directly into that
+   address and skip it in the atomic restore. If this option is disabled, the
+   page will be loaded somewhere else and atomically restored like other pages.
+
+   - no_flusher_thread:
+
+   When doing multithreaded I/O (see below), the first online CPU can be used
+   to _just_ submit compressed pages when writing the image, rather than
+   compressing and submitting data. This option is normally disabled, but has
+   been included because Nigel would like to see whether it will be more useful
+   as the number of cores/cpus in computers increases.
+
+   - no_multithreaded_io:
+
+   TuxOnIce will normally create one thread per cpu/core on your computer,
+   each of which will then perform I/O. This will generally result in
+   throughput that's the maximum the storage medium can handle. There
+   shouldn't be any reason to disable multithreaded I/O now, but this option
+   has been retained for debugging purposes.
+
+   - no_pageset2
+
+   See the entry for full_pageset2 above for an explanation of pagesets.
+   Enabling this option causes TuxOnIce to do an atomic copy of all pages,
+   thereby limiting the maximum image size to 1/2 of memory, as swsusp does.
+
+   - no_pageset2_if_unneeded
+
+   See the entry for full_pageset2 above for an explanation of pagesets.
+   Enabling this option causes TuxOnIce to act like no_pageset2 was enabled
+   if and only it isn't needed anyway. This option may still make TuxOnIce
+   less reliable because pageset2 pages are normally used to store the
+   atomic copy - drivers that want to do allocations of larger amounts of
+   memory in one shot will be more likely to find that those amounts aren't
+   available if this option is enabled.
+
    - pause_between_steps (CONFIG_PM_DEBUG):
 
    This option is used during debugging, to make TuxOnIce pause between
    each step of the process. It is ignored when the nice display is on.
+
+   - post_wake_state:
+
+   TuxOnIce provides support for automatically waking after a user-selected
+   delay, and using a different powerdown method if the lid is still closed.
+   (Yes, we're assuming a laptop).  This entry lets you choose what state
+   should be entered next. The values are those described under
+   powerdown_method, below. It can be used to suspend to RAM after hibernating,
+   then powerdown properly (say) 20 minutes. It can also be used to power down
+   properly, then wake at (say) 6.30am and suspend to RAM until you're ready
+   to use the machine.
 
    - powerdown_method:
 
@@ -477,6 +604,28 @@
    at the end of saving an image. It can be toggled during a cycle by pressing
    'R'.
 
+   - resume:
+
+   This sysfs entry can be used to read and set the location in which TuxOnIce
+   will look for the signature of an image - the value set using resume= at
+   boot time or CONFIG_PM_STD_PARTITION ("Default resume partition"). By
+   writing to this file as well as modifying your bootloader's configuration
+   file (eg menu.lst), you can set or reset the location of your image or the
+   method of storing the image without rebooting.
+
+   - replace_swsusp (CONFIG_TOI_REPLACE_SWSUSP):
+
+   This option makes
+
+     echo disk > /sys/power/state
+
+   activate TuxOnIce instead of swsusp. Regardless of whether this option is
+   enabled, any invocation of swsusp's resume time trigger will cause TuxOnIce
+   to check for an image too. This is due to the fact that at resume time, we
+   can't know whether this option was enabled until we see if an image is there
+   for us to resume from. (And when an image exists, we don't care whether we
+   did replace swsusp anyway - we just want to resume).
+
    - resume_commandline:
 
    This entry can be read after resuming to see the commandline that was used
@@ -511,12 +660,23 @@
    currently have activated. It is particularly useful when you only want to
    use a swap file to store your image. See above for further details.
 
-   - userui_program
+   - test_bio
 
-   This entry is used to tell TuxOnice what userspace program to use for
-   providing a user interface while hibernating. The program uses a netlink
-   socket to pass messages back and forward to the kernel, allowing all of the
-   functions formerly implemented in the kernel user interface components.
+   This is a debugging option. When enabled, TuxOnIce will not hibernate.
+   Instead, when asked to write an image, it will skip the atomic copy,
+   just doing the writing of the image and then returning control to the
+   user at the point where it would have powered off. This is useful for
+   testing throughput in different configurations.
+
+   - test_filter_speed
+
+   This is a debugging option. When enabled, TuxOnIce will not hibernate.
+   Instead, when asked to write an image, it will not write anything or do
+   an atomic copy, but will only run any enabled compression algorithm on the
+   data that would have been written (the source pages of the atomic copy in
+   the case of pageset 1). This is useful for comparing the performance of
+   compression algorithms and for determining the extent to which an upgrade
+   to your storage method would improve hibernation speed.
 
    - user_interface/debug_sections (CONFIG_PM_DEBUG):
 
@@ -546,16 +706,40 @@
    Setting this to "1" will enable you abort a hibernation cycle or resuming by
    pressing escape, "0" (default) disables this feature. Note that enabling
    this option means that you cannot initiate a hibernation cycle and then walk
-away
-   from your computer, expecting it to be secure. With feature disabled,
+   away from your computer, expecting it to be secure. With feature disabled,
    you can validly have this expectation once TuxOnice begins to write the
    image to disk. (Prior to this point, it is possible that TuxOnice might
    about because of failure to freeze all processes or because constraints
    on its ability to save the image are not met).
 
+   - user_interface/program
+
+   This entry is used to tell TuxOnice what userspace program to use for
+   providing a user interface while hibernating. The program uses a netlink
+   socket to pass messages back and forward to the kernel, allowing all of the
+   functions formerly implemented in the kernel user interface components.
+
    - version:
 
    The version of TuxOnIce you have compiled into the currently running kernel.
+
+   - wake_alarm_dir:
+
+   As mentioned above (post_wake_state), TuxOnIce supports automatically waking
+   after some delay. This entry allows you to select which wake alarm to use.
+   It should contain the value "rtc0" if you're wanting to use
+   /sys/class/rtc/rtc0.
+
+   - wake_delay:
+
+   This value determines the delay from the end of writing the image until the
+   wake alarm is triggered. You can set an absolute time by writing the desired
+   time into /sys/class/rtc/<wake_alarm_dir>/wakealarm and leaving these values
+   empty.
+
+   Note that for the wakeup to actually occur, you may need to modify entries
+   in /proc/acpi/wakeup. This is done by echoing the name of the button in the
+   first column (eg PBTN) into the file.
 
 7. How do you get support?
 
