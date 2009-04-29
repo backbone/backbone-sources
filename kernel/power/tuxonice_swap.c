@@ -124,7 +124,7 @@ static void close_bdev(int i)
 		return;
 
 	blkdev_put(this->bdev, FMODE_READ | FMODE_NDELAY);
-	toi_kfree(8, this);
+	toi_kfree(8, this, sizeof(*this));
 	bdevs_opened[i] = NULL;
 }
 
