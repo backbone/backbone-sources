@@ -332,6 +332,20 @@
    configure sudo to allow you to invoke your hibernate script as an ordinary
    user.
 
+   - alloc/failure_test
+
+   This debugging option provides a way of testing TuxOnIce's handling of
+   memory allocation failures. Each allocation type that TuxOnIce makes has
+   been given a unique number (see the source code). Echo the appropriate
+   number into this entry, and when TuxOnIce attempts to do that allocation,
+   it will pretend there was a failure and act accordingly.
+
+   - alloc/find_max_mem_allocated
+
+   This debugging option will cause TuxOnIce to find the maximum amount of
+   memory it used during a cycle, and report that information in debugging
+   information at the end of the cycle.
+
    - alt_resume_param
 
    Instead of powering down after writing a hibernation image, TuxOnIce
