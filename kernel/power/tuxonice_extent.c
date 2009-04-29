@@ -38,7 +38,7 @@ void toi_put_extent_chain(struct hibernate_extent_chain *chain)
 
 	while (this) {
 		struct hibernate_extent *next = this->next;
-		toi_kfree(2, this);
+		toi_kfree(2, this, sizeof(*this));
 		chain->num_extents--;
 		this = next;
 	}
@@ -79,7 +79,7 @@ int toi_add_to_extent_chain(struct hibernate_extent_chain *chain,
 			if (next_ext && cur_ext->end + 1 == next_ext->start) {
 				cur_ext->end = next_ext->end;
 				cur_ext->next = next_ext->next;
-				toi_kfree(2, next_ext);
+				toi_kfree(2, next_ext, sizeof(*next_ext));
 				chain->num_extents--;
 			}
 
