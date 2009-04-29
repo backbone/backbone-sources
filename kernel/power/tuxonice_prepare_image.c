@@ -62,7 +62,7 @@ void free_attention_list(void)
 	while (attention_list) {
 		last = attention_list;
 		attention_list = attention_list->next;
-		toi_kfree(6, last);
+		toi_kfree(6, last, sizeof(*last));
 	}
 }
 
@@ -275,7 +275,7 @@ void toi_free_extra_pagedir_memory(void)
 			ClearPageNosave(this->page + i);
 
 		toi_free_pages(9, this->page, this->order);
-		toi_kfree(7, this);
+		toi_kfree(7, this, sizeof(*this));
 	}
 
 	extra_pages_allocated = 0;
@@ -321,7 +321,7 @@ static int toi_allocate_extra_pagedir_memory(int extra_pages_needed)
 		}
 
 		if (!virt) {
-			toi_kfree(7, extras_entry);
+			toi_kfree(7, extras_entry, sizeof(*extras_entry));
 			return extra_pages_allocated;
 		}
 
