@@ -1177,10 +1177,10 @@ int toi_launch_userspace_program(char *command, int channel_no,
 		int i;
 		for (i = 0; i < arg; i++)
 			if (argv[i] && argv[i] != channel)
-				toi_kfree(5, argv[i]);
+				toi_kfree(5, argv[i], sizeof (*argv[i]));
 	}
 
-	toi_kfree(4, channel);
+	toi_kfree(4, channel, sizeof(*channel));
 
 	return retval;
 }
