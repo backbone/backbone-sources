@@ -799,8 +799,6 @@ static void update_image(int ps2_recalc)
 	int wanted, got, old_header_req;
 	long seek;
 
-	toi_recalculate_image_contents(0);
-
 	/* Include allowance for growth in pagedir1 while writing pagedir 2 */
 	wanted = pagedir1.size +  extra_pd1_pages_allowance -
 		get_lowmem_size(pagedir2);
@@ -905,7 +903,6 @@ static void eat_memory(void)
 	 * to freeze fail, we give up and abort.
 	 */
 
-	toi_recalculate_image_contents(0);
 	amount_wanted = amount_needed(1);
 
 	switch (image_size_limit) {
@@ -919,7 +916,6 @@ static void eat_memory(void)
 		drop_pagecache();
 		toi_recalculate_image_contents(0);
 		amount_wanted = amount_needed(1);
-		did_eat_memory = 1;
 		break;
 	default:
 		break;
@@ -1005,6 +1001,8 @@ int toi_prepare_image(void)
 		return 1;
 	}
 
+	toi_recalculate_image_contents(0);
+
 	do {
 		toi_prepare_status(CLEAR_BAR,
 				"Preparing Image. Try %d.", tries);
@@ -1034,6 +1032,7 @@ int toi_prepare_image(void)
 			if (!need_pageset2() &&
 				  test_action_state(TOI_NO_PS2_IF_UNNEEDED)) {
 				no_ps2_needed = 1;
+				toi_recalculate_image_contents(0);
 				update_image(1);
 			}
 
