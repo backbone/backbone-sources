@@ -12,7 +12,7 @@
 
 #ifdef CONFIG_PM_DEBUG
 extern void *toi_kzalloc(int fail_num, size_t size, gfp_t flags);
-extern void toi_kfree(int fail_num, const void *arg);
+extern void toi_kfree(int fail_num, const void *arg, int size);
 
 extern unsigned long toi_get_free_pages(int fail_num, gfp_t mask,
 		unsigned int order);
