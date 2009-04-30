@@ -725,14 +725,28 @@ static int toi_swap_allocate_storage(int request)
 	}
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
-		if (!to_add[i] || !toi_add_to_extent_chain(&swapextents,
-					extent_min[i], extent_max[i]))
+		int this_result;
+
+		/* Anything to do for this swap entry? */
+		if (!to_add[i])
 			continue;
+
+		this_result = toi_add_to_extent_chain(&swapextents,
+				extent_min[i], extent_max[i]);
+
+		/* Added okay? */
+		if (!this_result)
+			continue;
+
+		/* 
+		 * Nope. Remember an error occured, free the swap and subtract
+		 * from the amount of swap allocated.
+		 */
+		result = this_result;
 
 		free_swap_range(extent_min[i], extent_max[i]);
 		if (!devinfo[i].ignored)
 			gotten -= (extent_max[i] - extent_min[i] + 1);
-		break;
 	}
 
 	if (gotten < pages_to_get) {
