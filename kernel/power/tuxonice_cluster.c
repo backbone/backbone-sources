@@ -360,7 +360,7 @@ static void del_member(int index, __be32 addr)
 
 	if (this) {
 		list_del_init(&this->list);
-		toi_kfree(36, this);
+		toi_kfree(36, this, sizeof(*this));
 		node_array[index].peer_count--;
 	}
 
