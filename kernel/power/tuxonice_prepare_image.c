@@ -924,7 +924,7 @@ static void eat_memory(void)
 
 	if (amount_wanted > 0 && !test_result_state(TOI_ABORTED) &&
 			image_size_limit != -1) {
-		long request = amount_wanted;
+		long request = amount_wanted + 50;
 
 		toi_prepare_status(CLEAR_BAR,
 				"Seeking to free %ldMB of memory.",
@@ -936,7 +936,7 @@ static void eat_memory(void)
 		 * Ask for too many because shrink_all_memory doesn't
 		 * currently return enough most of the time.
 		 */
-		shrink_all_memory(amount_wanted + 50);
+		shrink_all_memory(request);
 
 		did_eat_memory = 1;
 
