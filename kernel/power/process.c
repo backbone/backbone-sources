@@ -118,7 +118,7 @@ int freeze_processes(void)
 	error = try_to_freeze_tasks(true);
 	if (error)
 		goto Exit;
-	printk(KERN_INFO "done.\n");
+	printk("done.\n");
 
 	sys_sync();
 	printk(KERN_INFO "Stopping normal filesystems.\n");
@@ -163,17 +163,12 @@ void thaw_processes(void)
 	if (old_state == FREEZER_OFF)
 		return;
 
-	/*
-	 * Change state beforehand because thawed tasks might submit I/O
-	 * immediately.
-	 */
 	freezer_state = FREEZER_OFF;
 
 	printk(KERN_INFO "Restarting all filesystems ...\n");
 	thaw_filesystems(FS_FREEZER_ALL);
 
 	printk(KERN_INFO "Restarting tasks ... ");
-
 	if (old_state == FREEZER_FULLY_ON)
 		thaw_tasks(true);
 	thaw_tasks(false);
