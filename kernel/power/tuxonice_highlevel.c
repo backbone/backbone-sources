@@ -966,12 +966,12 @@ EXPORT_SYMBOL_GPL(do_toi_step);
 /* -- Functions for kickstarting a hibernate or resume --- */
 
 /**
- * __toi_try_resume - try to do the steps in resuming
+ * toi_try_resume - try to do the steps in resuming
  *
  * Check if we have an image and if so try to resume. Clear the status
  * flags too.
  **/
-void __toi_try_resume(void)
+void toi_try_resume(void)
 {
 	set_toi_state(TOI_TRYING_TO_RESUME);
 	resume_attempted = 1;
@@ -1012,7 +1012,7 @@ static void _toi_try_resume(void)
 	if (toi_start_anything(SYSFS_RESUMING))
 		goto out;
 
-	__toi_try_resume();
+	toi_try_resume();
 
 	/*
 	 * For initramfs, we have to clear the boot time
