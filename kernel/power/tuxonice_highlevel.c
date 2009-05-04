@@ -94,8 +94,6 @@ EXPORT_SYMBOL_GPL(pagedir2);
 static mm_segment_t oldfs;
 static DEFINE_MUTEX(tuxonice_in_use);
 static int block_dump_save;
-static char pre_hibernate_command[256];
-static char post_hibernate_command[256];
 
 /* Binary signature if an image is present */
 char *tuxonice_signature = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
@@ -154,11 +152,6 @@ void toi_finish_anything(int hibernate_or_resume)
 		block_dump = block_dump_save;
 		set_cpus_allowed(current, CPU_MASK_ALL);
 		toi_alloc_print_debug_stats();
-
-		if (hibernate_or_resume == SYSFS_HIBERNATE &&
-				strlen(post_hibernate_command))
-			toi_launch_userspace_program(post_hibernate_command,
-					0, UMH_WAIT_PROC, 0);
 		atomic_inc(&snapshot_device_available);
 		mutex_unlock(&pm_mutex);
 	}
@@ -177,8 +170,6 @@ void toi_finish_anything(int hibernate_or_resume)
  **/
 int toi_start_anything(int hibernate_or_resume)
 {
-	int starting_cycle = (hibernate_or_resume == SYSFS_HIBERNATE);
-
 	mutex_lock(&tuxonice_in_use);
 
 	oldfs = get_fs();
@@ -189,17 +180,6 @@ int toi_start_anything(int hibernate_or_resume)
 
 		if (!atomic_add_unless(&snapshot_device_available, -1, 0))
 			goto snapshotdevice_unavailable;
-	}
-
-	if (starting_cycle && strlen(pre_hibernate_command)) {
-		int result = toi_launch_userspace_program(pre_hibernate_command,
-				0, UMH_WAIT_PROC, 0);
-		if (result) {
-			printk(KERN_INFO "Pre-hibernate command '%s' returned"
-					" %d. Aborting.\n",
-					pre_hibernate_command, result);
-			goto prehibernate_err;
-		}
 	}
 
 	if (hibernate_or_resume == SYSFS_HIBERNATE)
@@ -1234,10 +1214,6 @@ static struct toi_sysfs_data sysfs_params[] = {
 			TOI_NO_PS2_IF_UNNEEDED, 0),
 	SYSFS_BIT("late_cpu_hotplug", SYSFS_RW, &toi_bkd.toi_action,
 			TOI_LATE_CPU_HOTPLUG, 0),
-	SYSFS_STRING("pre_hibernate_command", SYSFS_RW, pre_hibernate_command,
-			0, 255, NULL),
-	SYSFS_STRING("post_hibernate_command", SYSFS_RW, post_hibernate_command,
-			0, 255, NULL),
 #ifdef CONFIG_TOI_KEEP_IMAGE
 	SYSFS_BIT("keep_image", SYSFS_RW , &toi_bkd.toi_action, TOI_KEEP_IMAGE,
 			0),
@@ -1265,8 +1241,6 @@ static __init int core_load(void)
 
 	printk(KERN_INFO "TuxOnIce " TOI_CORE_VERSION
 			" (http://tuxonice.net)\n");
-	strncpy(pre_hibernate_command, CONFIG_TOI_DEFAULT_PRE_HIBERNATE, 255);
-	strncpy(post_hibernate_command, CONFIG_TOI_DEFAULT_POST_HIBERNATE, 255);
 
 	if (toi_sysfs_init())
 		return 1;
