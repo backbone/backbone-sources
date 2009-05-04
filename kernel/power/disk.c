@@ -646,7 +646,7 @@ int software_resume(void)
 	 * We can't know (until an image header - if any - is loaded), whether
 	 * we did override swsusp. We therefore ensure that both are tried.
 	 */
-	toi_try_resume();
+	try_tuxonice_resume();
 
 	/*
 	 * If the user said "noresume".. bail out early.
