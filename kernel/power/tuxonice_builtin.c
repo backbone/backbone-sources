@@ -221,7 +221,7 @@ static int ignore_late_initcall = 1;
 static int ignore_late_initcall;
 #endif
 
-void toi_try_resume(void)
+void try_tuxonice_resume(void)
 {
 	/* Don't let it wrap around eventually */
 	if (num_resume_calls < 2)
