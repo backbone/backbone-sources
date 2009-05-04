@@ -992,12 +992,12 @@ void toi_try_resume(void)
 }
 
 /**
- * _toi_try_resume - wrapper calling __toi_try_resume from do_mounts
+ * toi_sys_power_disk_try_resume - wrapper calling toi_try_resume
  *
- * Wrapper for when __toi_try_resume is called from init/do_mounts.c,
+ * Wrapper for when __toi_try_resume is called from swsusp resume path,
  * rather than from echo > /sys/power/tuxonice/do_resume.
  **/
-static void _toi_try_resume(void)
+static void toi_sys_power_disk_try_resume(void)
 {
 	resume_attempted = 1;
 
@@ -1224,7 +1224,7 @@ static struct toi_core_fns my_fns = {
 	.get_nonconflicting_page = __toi_get_nonconflicting_page,
 	.post_context_save = __toi_post_context_save,
 	.try_hibernate = _toi_try_hibernate,
-	.try_resume = _toi_try_resume,
+	.try_resume = toi_sys_power_disk_try_resume,
 };
 
 /**
