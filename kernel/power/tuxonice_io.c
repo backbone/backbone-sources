@@ -379,6 +379,144 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
 }
 
 /**
+ * write_next_page - write the next page in a pageset
+ * @data_pfn: The pfn where the next data to write is located.
+ * @my_io_index: The index of the page in the pageset.
+ * @write_pfn: The pfn number to write in the image (where the data belongs).
+ * @first_filter: Where to send the page (optimisation).
+ *
+ * Get the pfn of the next page to write, map the page if necessary and do the
+ * write.
+ **/
+static int write_next_page(unsigned long *data_pfn, int *my_io_index,
+		unsigned long *write_pfn, struct toi_module_ops *first_filter)
+{
+	struct page *page;
+	char **my_checksum_locn = &__get_cpu_var(checksum_locn);
+	int result = 0, was_present;
+
+	*data_pfn = memory_bm_next_pfn(io_map);
+
+	/* Another thread could have beaten us to it. */
+	if (*data_pfn == BM_END_OF_MAP) {
+		if (atomic_read(&io_count)) {
+			printk(KERN_INFO "Ran out of pfns but io_count is "
+					"still %d.\n", atomic_read(&io_count));
+			BUG();
+		}
+		return -ENODATA;
+	}
+
+	*my_io_index = io_finish_at - atomic_sub_return(1, &io_count);
+
+	memory_bm_clear_bit(io_map, *data_pfn);
+	page = pfn_to_page(*data_pfn);
+
+	was_present = kernel_page_present(page);
+	if (!was_present)
+		kernel_map_pages(page, 1, 1);
+
+	if (io_pageset == 1)
+		*write_pfn = memory_bm_next_pfn(pageset1_map);
+	else {
+		*write_pfn = *data_pfn;
+		*my_checksum_locn = tuxonice_get_next_checksum();
+	}
+
+	mutex_unlock(&io_mutex);
+
+	if (io_pageset == 2 && tuxonice_calc_checksum(page, *my_checksum_locn))
+		return 1;
+
+	result = first_filter->write_page(*write_pfn, page, PAGE_SIZE);
+
+	if (!was_present)
+		kernel_map_pages(page, 1, 0);
+
+	return result;
+}
+
+/**
+ * read_next_page - read the next page in a pageset
+ * @my_io_index: The index of the page in the pageset.
+ * @write_pfn: The pfn in which the data belongs.
+ *
+ * Read a page of the image into our buffer.
+ **/
+
+static int read_next_page(int *my_io_index, unsigned long *write_pfn,
+		struct page *buffer, struct toi_module_ops *first_filter)
+{
+	unsigned int buf_size;
+	int result;
+
+	*my_io_index = io_finish_at - atomic_sub_return(1, &io_count);
+	mutex_unlock(&io_mutex);
+
+	/*
+	 * Are we aborting? If so, don't submit any more I/O as
+	 * resetting the resume_attempted flag (from ui.c) will
+	 * clear the bdev flags, making this thread oops.
+	 */
+	if (unlikely(test_toi_state(TOI_STOP_RESUME))) {
+		atomic_dec(&toi_io_workers);
+		if (!atomic_read(&toi_io_workers))
+			set_toi_state(TOI_IO_STOPPED);
+		while (1)
+			schedule();
+	}
+
+	/* See toi_bio_read_page in tuxonice_block_io.c:
+	 * read the next page in the image.
+	 */
+	result = first_filter->read_page(write_pfn, buffer, &buf_size);
+	if (buf_size != PAGE_SIZE) {
+		abort_hibernate(TOI_FAILED_IO,
+			"I/O pipeline returned %d bytes instead"
+			" of %ud.\n", buf_size, PAGE_SIZE);
+		mutex_lock(&io_mutex);
+		return -ENODATA;
+	}
+
+	return result;
+}
+
+/**
+ * 
+ **/
+static void use_read_page(unsigned long write_pfn, struct page *buffer)
+{
+	struct page *final_page = pfn_to_page(write_pfn),
+		    *copy_page = final_page;
+	char *virt, *buffer_virt;
+
+	if (io_pageset == 1 && !load_direct(final_page)) {
+		copy_page = copy_page_from_orig_page(final_page);
+		BUG_ON(!copy_page);
+	}
+
+	if (memory_bm_test_bit(io_map, write_pfn)) {
+		int was_present;
+
+		virt = kmap(copy_page);
+		buffer_virt = kmap(buffer);
+		was_present = kernel_page_present(copy_page);
+		if (!was_present)
+			kernel_map_pages(copy_page, 1, 1);
+		memcpy(virt, buffer_virt, PAGE_SIZE);
+		if (!was_present)
+			kernel_map_pages(copy_page, 1, 0);
+		kunmap(copy_page);
+		kunmap(buffer);
+		memory_bm_clear_bit(io_map, write_pfn);
+	} else {
+		mutex_lock(&io_mutex);
+		atomic_inc(&io_count);
+		mutex_unlock(&io_mutex);
+	}
+}
+
+/**
  * worker_rw_loop - main loop to read/write pages
  *
  * The main I/O loop for reading or writing pages. The io_map bitmap is used to
@@ -399,9 +537,6 @@ static int worker_rw_loop(void *data)
 	mutex_lock(&io_mutex);
 
 	do {
-		unsigned int buf_size;
-		int was_present = 1;
-
 		if (data && jiffies > next_jiffies) {
 			next_jiffies += HZ / 2;
 			if (toiActiveAllocator->update_throughput_throttle)
@@ -416,83 +551,15 @@ static int worker_rw_loop(void *data)
 		 * use the copy (Pageset1) or original page (Pageset2), but
 		 * always write the pfn of the original page.
 		 */
-		if (io_write) {
-			struct page *page;
-			char **my_checksum_locn = &__get_cpu_var(checksum_locn);
+		if (io_write)
+			result = write_next_page(&data_pfn, &my_io_index,
+					&write_pfn, first_filter);
+		else /* Reading */
+			result = read_next_page(&my_io_index, &write_pfn,
+					buffer, first_filter);
 
-			data_pfn = memory_bm_next_pfn(io_map);
-
-			/* Another thread could have beaten us to it. */
-			if (data_pfn == BM_END_OF_MAP) {
-				if (atomic_read(&io_count)) {
-					printk(KERN_INFO "Ran out of pfns but "
-						"io_count is still %d.\n",
-						atomic_read(&io_count));
-					BUG();
-				}
-				break;
-			}
-
-			my_io_index = io_finish_at -
-				atomic_sub_return(1, &io_count);
-
-			memory_bm_clear_bit(io_map, data_pfn);
-			page = pfn_to_page(data_pfn);
-
-			was_present = kernel_page_present(page);
-			if (!was_present)
-				kernel_map_pages(page, 1, 1);
-
-			if (io_pageset == 1)
-				write_pfn = memory_bm_next_pfn(pageset1_map);
-			else {
-				write_pfn = data_pfn;
-				*my_checksum_locn =
-					tuxonice_get_next_checksum();
-			}
-
-			mutex_unlock(&io_mutex);
-
-			if (io_pageset == 2 &&
-			    tuxonice_calc_checksum(page, *my_checksum_locn))
-					return 1;
-
-			result = first_filter->write_page(write_pfn, page,
-					PAGE_SIZE);
-
-			if (!was_present)
-				kernel_map_pages(page, 1, 0);
-		} else { /* Reading */
-			my_io_index = io_finish_at -
-				atomic_sub_return(1, &io_count);
-			mutex_unlock(&io_mutex);
-
-			/*
-			 * Are we aborting? If so, don't submit any more I/O as
-			 * resetting the resume_attempted flag (from ui.c) will
-			 * clear the bdev flags, making this thread oops.
-			 */
-			if (unlikely(test_toi_state(TOI_STOP_RESUME))) {
-				atomic_dec(&toi_io_workers);
-				if (!atomic_read(&toi_io_workers))
-					set_toi_state(TOI_IO_STOPPED);
-				while (1)
-					schedule();
-			}
-
-			/* See toi_bio_read_page in tuxonice_block_io.c:
-			 * read the next page in the image.
-			 */
-			result = first_filter->read_page(&write_pfn, buffer,
-					&buf_size);
-			if (buf_size != PAGE_SIZE) {
-				abort_hibernate(TOI_FAILED_IO,
-					"I/O pipeline returned %d bytes instead"
-					" of %ud.\n", buf_size, PAGE_SIZE);
-				mutex_lock(&io_mutex);
-				break;
-			}
-		}
+		if (result == -ENODATA)
+			break;
 
 		if (result) {
 			io_result = result;
@@ -512,35 +579,8 @@ static int worker_rw_loop(void *data)
 		 * Discard reads of resaved pages while reading ps2
 		 * and unwanted pages while rereading ps2 when aborting.
 		 */
-		if (!io_write && !PageResave(pfn_to_page(write_pfn))) {
-			struct page *final_page = pfn_to_page(write_pfn),
-				    *copy_page = final_page;
-			char *virt, *buffer_virt;
-
-			if (io_pageset == 1 && !load_direct(final_page)) {
-				copy_page =
-					copy_page_from_orig_page(final_page);
-				BUG_ON(!copy_page);
-			}
-
-			if (memory_bm_test_bit(io_map, write_pfn)) {
-				virt = kmap(copy_page);
-				buffer_virt = kmap(buffer);
-				was_present = kernel_page_present(copy_page);
-				if (!was_present)
-					kernel_map_pages(copy_page, 1, 1);
-				memcpy(virt, buffer_virt, PAGE_SIZE);
-				if (!was_present)
-					kernel_map_pages(copy_page, 1, 0);
-				kunmap(copy_page);
-				kunmap(buffer);
-				memory_bm_clear_bit(io_map, write_pfn);
-			} else {
-				mutex_lock(&io_mutex);
-				atomic_inc(&io_count);
-				mutex_unlock(&io_mutex);
-			}
-		}
+		if (!io_write && !PageResave(pfn_to_page(write_pfn)))
+			use_read_page(write_pfn, buffer);
 
 		if (my_io_index + io_base == io_nextupdate)
 			io_nextupdate = toi_update_status(my_io_index +
