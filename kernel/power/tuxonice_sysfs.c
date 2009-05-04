@@ -221,7 +221,7 @@ static struct toi_sysfs_data sysfs_params[] = {
 	SYSFS_CUSTOM("do_hibernate", SYSFS_WRITEONLY, NULL, NULL,
 		SYSFS_HIBERNATING, toi_main_wrapper),
 	SYSFS_CUSTOM("do_resume", SYSFS_WRITEONLY, NULL, NULL,
-		SYSFS_RESUMING, __toi_try_resume)
+		SYSFS_RESUMING, toi_try_resume)
 };
 
 void remove_toi_sysdir(struct kobject *kobj)
