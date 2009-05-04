@@ -182,7 +182,7 @@ extern int save_image_part1(void);
 extern int toi_atomic_restore(void);
 
 extern int _toi_try_hibernate(void);
-extern void __toi_try_resume(void);
+extern void toi_try_resume(void);
 
 extern int __toi_post_context_save(void);
 
