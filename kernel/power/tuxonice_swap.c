@@ -561,7 +561,7 @@ void si_swapinfo_no_compcache(struct sysinfo *val)
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si = get_swap_info_struct(i);
-		if ((si->flags & SWP_USED) &&
+		if ((si->flags & SWP_USED) && si->swap_map &&
 		    (si->flags & SWP_WRITEOK) &&
 		    (strncmp(si->bdev->bd_disk->disk_name, "ram", 3))) {
 			val->totalswap += si->inuse_pages;
@@ -660,7 +660,8 @@ static int toi_swap_allocate_storage(int request)
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si = get_swap_info_struct(i);
 		to_add[i] = 0;
-		if (!si->bdev)
+		if (!(si->flags & SWP_USED) || !si->swap_map ||
+		    !(si->flags & SWP_WRITEOK))
 			continue;
 		if (!strncmp(si->bdev->bd_disk->disk_name, "ram", 3)) {
 			devinfo[i].ignored = 1;
@@ -790,7 +791,8 @@ static int toi_swap_write_header_init(void)
 	/* Forward one page will be done prior to the read */
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		si = get_swap_info_struct(i);
-		if (si->swap_file)
+		if (si->flags & SWP_USED && si->swap_map &&
+		    si->flags & SWP_WRITEOK)
 			devinfo[i].dev_t = si->bdev->bd_dev;
 		else
 			devinfo[i].dev_t = (dev_t) 0;
@@ -1213,7 +1215,8 @@ static int header_locations_read_sysfs(const char *page, int count)
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si =  get_swap_info_struct(i);
 
-		if (!si->swap_file)
+		if ((!si->flags & SWP_USED) || si->swap_map ||
+		    !(si->flags & SWP_WRITEOK))
 			continue;
 
 		if (S_ISBLK(si->swap_file->f_mapping->host->i_mode)) {
