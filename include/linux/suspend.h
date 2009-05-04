@@ -355,9 +355,9 @@ static inline int toi_try_hibernate(void) { return 0; }
 
 #ifdef CONFIG_HIBERNATION
 #ifdef CONFIG_TOI
-extern void toi_try_resume(void);
+extern void try_tuxonice_resume(void);
 #else
-#define toi_try_resume() do { } while (0)
+#define try_tuxonice_resume() do { } while (0)
 #endif
 
 extern int resume_attempted;
