@@ -1026,8 +1026,7 @@ out:
 }
 
 /**
- * _toi_try_hibernate - try to start a hibernation cycle
- * @have_pmsem:	Whether the pm_sem is already taken.
+ * toi_try_hibernate - try to start a hibernation cycle
  *
  * Start a hibernation cycle, coming in from either
  * echo > /sys/power/tuxonice/do_suspend
@@ -1039,7 +1038,7 @@ out:
  * In the later case, we come in without pm_sem taken; in the
  * former, it has been taken.
  **/
-int _toi_try_hibernate(void)
+int toi_try_hibernate(void)
 {
 	int result = 0, sys_power_disk = 0, retries = 0;
 
@@ -1223,7 +1222,7 @@ static struct toi_sysfs_data sysfs_params[] = {
 static struct toi_core_fns my_fns = {
 	.get_nonconflicting_page = __toi_get_nonconflicting_page,
 	.post_context_save = __toi_post_context_save,
-	.try_hibernate = _toi_try_hibernate,
+	.try_hibernate = toi_try_hibernate,
 	.try_resume = toi_sys_power_disk_try_resume,
 };
 
