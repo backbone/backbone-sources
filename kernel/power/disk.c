@@ -557,7 +557,7 @@ int hibernate(void)
 	int error;
 
 	if (test_action_state(TOI_REPLACE_SWSUSP))
-		return toi_try_hibernate();
+		return try_tuxonice_hibernate();
 
 	mutex_lock(&pm_mutex);
 	/* The snapshot device should not be opened while we're running */
