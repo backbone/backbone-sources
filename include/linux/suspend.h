@@ -338,7 +338,7 @@ extern unsigned long toi_state;
 extern int toi_running;
 
 #define test_action_state(bit) (test_bit(bit, &toi_bkd.toi_action))
-extern int toi_try_hibernate(void);
+extern int try_tuxonice_hibernate(void);
 
 #else /* !CONFIG_TOI */
 
@@ -348,7 +348,7 @@ extern int toi_try_hibernate(void);
 #define test_toi_state(bit) (0)
 #define toi_running (0)
 
-static inline int toi_try_hibernate(void) { return 0; }
+static inline int try_tuxonice_hibernate(void) { return 0; }
 #define test_action_state(bit) (0)
 
 #endif /* CONFIG_TOI */
