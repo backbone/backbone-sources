@@ -28,7 +28,7 @@ static struct toi_sysfs_data sysfs_params[];
 
 static void toi_main_wrapper(void)
 {
-	_toi_try_hibernate();
+	toi_try_hibernate();
 }
 
 static ssize_t toi_attr_show(struct kobject *kobj, struct attribute *attr,
