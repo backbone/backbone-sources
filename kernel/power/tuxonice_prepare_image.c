@@ -32,7 +32,6 @@
 #include "tuxonice_ui.h"
 #include "tuxonice_extent.h"
 #include "tuxonice_prepare_image.h"
-#include "tuxonice_block_io.h"
 #include "tuxonice.h"
 #include "tuxonice_sysfs.h"
 #include "tuxonice_alloc.h"
