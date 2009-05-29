@@ -224,8 +224,6 @@ static int create_image(int platform_mode)
 	if (error)
 		return error;
 
-	device_pm_lock();
-
 	/* At this point, device_suspend() has been called, but *not*
 	 * device_power_down(). We *must* call device_power_down() now.
 	 * Otherwise, drivers for some devices (e.g. interrupt controllers)
@@ -236,7 +234,7 @@ static int create_image(int platform_mode)
 	if (error) {
 		printk(KERN_ERR "PM: Some devices failed to power down, "
 			"aborting hibernation\n");
-		goto Unlock;
+		return error;
 	}
 
 	error = platform_pre_snapshot(platform_mode);
@@ -288,9 +286,6 @@ static int create_image(int platform_mode)
 
 	device_power_up(in_suspend ?
 		(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
-
- Unlock:
-	device_pm_unlock();
 
 	return error;
 }
@@ -353,13 +348,11 @@ static int resume_target_kernel(bool platform_mode)
 {
 	int error;
 
-	device_pm_lock();
-
 	error = device_power_down(PMSG_QUIESCE);
 	if (error) {
 		printk(KERN_ERR "PM: Some devices failed to power down, "
 			"aborting resume\n");
-		goto Unlock;
+		return error;
 	}
 
 	error = platform_pre_restore(platform_mode);
@@ -411,9 +404,6 @@ static int resume_target_kernel(bool platform_mode)
 	platform_restore_cleanup(platform_mode);
 
 	device_power_up(PMSG_RECOVER);
-
- Unlock:
-	device_pm_unlock();
 
 	return error;
 }
@@ -474,11 +464,9 @@ int hibernation_platform_enter(void)
 		goto Resume_devices;
 	}
 
-	device_pm_lock();
-
 	error = device_power_down(PMSG_HIBERNATE);
 	if (error)
-		goto Unlock;
+		goto Resume_devices;
 
 	error = hibernation_ops->prepare();
 	if (error)
@@ -502,9 +490,6 @@ int hibernation_platform_enter(void)
 	hibernation_ops->finish();
 
 	device_power_up(PMSG_RESTORE);
-
- Unlock:
-	device_pm_unlock();
 
  Resume_devices:
 	entering_platform_hibernation = false;
