@@ -328,8 +328,6 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		return 1;
 	}
 
-	device_pm_lock();
-
 	/* At this point, device_suspend() has been called, but *not*
 	 * device_power_down(). We *must* device_power_down() now.
 	 * Otherwise, drivers for some devices (e.g. interrupt controllers)
@@ -339,7 +337,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 
 	if (device_power_down(state)) {
 		set_abort_result(TOI_DEVICE_REFUSED);
-		toi_end_atomic(ATOMIC_STEP_UNLOCK, suspend_time, 1);
+		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 1);
 		return 1;
 	}
 
@@ -398,8 +396,6 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 		platform_finish(1);
 		device_power_up(suspend_time ?
 			(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
-	case ATOMIC_STEP_UNLOCK:
-		device_pm_unlock();
 	case ATOMIC_STEP_DEVICE_RESUME:
 		if (suspend_time && (error & 2))
 			platform_recover(1);
