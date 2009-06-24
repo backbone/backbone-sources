@@ -10,9 +10,11 @@
 #include <linux/bootmem.h>		/* max_low_pfn			*/
 #include <linux/kprobes.h>		/* __kprobes, ...		*/
 #include <linux/mmiotrace.h>		/* kmmio_handler, ...		*/
+#include <linux/perf_counter.h>		/* perf_swcounter_event		*/
 
 #include <asm/traps.h>			/* dotraplinkage, ...		*/
 #include <asm/pgalloc.h>		/* pgd_*(), ...			*/
+#include <asm/kmemcheck.h>		/* kmemcheck_*(), ...		*/
 
 /*
  * Page fault error code bits:
@@ -950,10 +952,16 @@ do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	tsk = current;
 	mm = tsk->mm;
 
-	prefetchw(&mm->mmap_sem);
-
 	/* Get the faulting address: */
 	address = read_cr2();
+
+	/*
+	 * Detect and handle instructions that would cause a page fault for
+	 * both a tracked kernel page and a userspace page.
+	 */
+	if (kmemcheck_active(regs))
+		kmemcheck_hide(regs);
+	prefetchw(&mm->mmap_sem);
 
 	if (unlikely(kmmio_fault(regs, address)))
 		return;
@@ -972,9 +980,13 @@ do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	 * protection error (error_code & 9) == 0.
 	 */
 	if (unlikely(fault_in_kernel_space(address))) {
-		if (!(error_code & (PF_RSVD|PF_USER|PF_PROT)) &&
-		    vmalloc_fault(address) >= 0)
-			return;
+		if (!(error_code & (PF_RSVD | PF_USER | PF_PROT))) {
+			if (vmalloc_fault(address) >= 0)
+				return;
+
+			if (kmemcheck_fault(regs, address, error_code))
+				return;
+		}
 
 		/* Can handle a stale RO->RW TLB: */
 		if (spurious_fault(error_code, address))
@@ -1012,6 +1024,8 @@ do_page_fault(struct pt_regs *regs, unsigned long error_code)
 
 	if (unlikely(error_code & PF_RSVD))
 		pgtable_bad(regs, error_code, address);
+
+	perf_swcounter_event(PERF_COUNT_SW_PAGE_FAULTS, 1, 0, regs, address);
 
 	/*
 	 * If we're in an interrupt, have no user context or are running
@@ -1099,17 +1113,22 @@ good_area:
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault:
 	 */
-	fault = handle_mm_fault(mm, vma, address, write);
+	fault = handle_mm_fault(mm, vma, address, write ? FAULT_FLAG_WRITE : 0);
 
 	if (unlikely(fault & VM_FAULT_ERROR)) {
 		mm_fault_error(regs, error_code, address, fault);
 		return;
 	}
 
-	if (fault & VM_FAULT_MAJOR)
+	if (fault & VM_FAULT_MAJOR) {
 		tsk->maj_flt++;
-	else
+		perf_swcounter_event(PERF_COUNT_SW_PAGE_FAULTS_MAJ, 1, 0,
+				     regs, address);
+	} else {
 		tsk->min_flt++;
+		perf_swcounter_event(PERF_COUNT_SW_PAGE_FAULTS_MIN, 1, 0,
+				     regs, address);
+	}
 
 	check_v8086_mode(regs, address, tsk);
 
