@@ -10,6 +10,7 @@
 
 
 #include <linux/suspend.h>
+#include <linux/sched.h>
 #include "tuxonice_netlink.h"
 #include "tuxonice.h"
 #include "tuxonice_modules.h"
@@ -99,7 +100,7 @@ void toi_send_netlink_message(struct user_helper_data *uhd,
 	netlink_unicast(uhd->nl, skb, uhd->pid, 0);
 
 	read_lock(&tasklist_lock);
-	t = find_task_by_pid_type_ns(PIDTYPE_PID, uhd->pid, &init_pid_ns);
+	t = find_task_by_pid_ns(uhd->pid, &init_pid_ns);
 	if (!t) {
 		read_unlock(&tasklist_lock);
 		if (uhd->pid > -1)
@@ -144,7 +145,7 @@ static int nl_set_nofreeze(struct user_helper_data *uhd, __u32 pid)
 		printk(KERN_ERR "nl_set_nofreeze for pid %d.\n", pid);
 
 	read_lock(&tasklist_lock);
-	t = find_task_by_pid_type_ns(PIDTYPE_PID, pid, &init_pid_ns);
+	t = find_task_by_pid_ns(pid, &init_pid_ns);
 	if (!t) {
 		read_unlock(&tasklist_lock);
 		printk(KERN_INFO "Strange. Can't find the userspace task %d.\n",
@@ -302,7 +303,7 @@ void toi_netlink_close(struct user_helper_data *uhd)
 	struct task_struct *t;
 
 	read_lock(&tasklist_lock);
-	t = find_task_by_pid_type_ns(PIDTYPE_PID, uhd->pid, &init_pid_ns);
+	t = find_task_by_pid_ns(uhd->pid, &init_pid_ns);
 	if (t)
 		t->flags &= ~PF_NOFREEZE;
 	read_unlock(&tasklist_lock);
