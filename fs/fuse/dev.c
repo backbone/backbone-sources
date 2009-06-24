@@ -48,6 +48,7 @@ struct fuse_req *fuse_request_alloc(void)
 		fuse_request_init(req);
 	return req;
 }
+EXPORT_SYMBOL_GPL(fuse_request_alloc);
 
 struct fuse_req *fuse_request_alloc_nofs(void)
 {
@@ -126,6 +127,7 @@ struct fuse_req *fuse_get_req(struct fuse_conn *fc)
 	atomic_dec(&fc->num_waiting);
 	return ERR_PTR(err);
 }
+EXPORT_SYMBOL_GPL(fuse_get_req);
 
 /*
  * Return request in fuse_file->reserved_req.  However that may
@@ -210,6 +212,7 @@ void fuse_put_request(struct fuse_conn *fc, struct fuse_req *req)
 			fuse_request_free(req);
 	}
 }
+EXPORT_SYMBOL_GPL(fuse_put_request);
 
 static unsigned len_args(unsigned numargs, struct fuse_arg *args)
 {
@@ -284,7 +287,7 @@ __releases(&fc->lock)
 			wake_up_all(&fc->blocked_waitq);
 		}
 		if (fc->num_background == FUSE_CONGESTION_THRESHOLD &&
-		    fc->connected) {
+		    fc->connected && fc->bdi_initialized) {
 			clear_bdi_congested(&fc->bdi, READ);
 			clear_bdi_congested(&fc->bdi, WRITE);
 		}
@@ -402,6 +405,7 @@ void fuse_request_send(struct fuse_conn *fc, struct fuse_req *req)
 	}
 	spin_unlock(&fc->lock);
 }
+EXPORT_SYMBOL_GPL(fuse_request_send);
 
 static void fuse_request_send_nowait_locked(struct fuse_conn *fc,
 					    struct fuse_req *req)
@@ -410,7 +414,8 @@ static void fuse_request_send_nowait_locked(struct fuse_conn *fc,
 	fc->num_background++;
 	if (fc->num_background == FUSE_MAX_BACKGROUND)
 		fc->blocked = 1;
-	if (fc->num_background == FUSE_CONGESTION_THRESHOLD) {
+	if (fc->num_background == FUSE_CONGESTION_THRESHOLD &&
+	    fc->bdi_initialized) {
 		set_bdi_congested(&fc->bdi, READ);
 		set_bdi_congested(&fc->bdi, WRITE);
 	}
@@ -441,6 +446,7 @@ void fuse_request_send_background(struct fuse_conn *fc, struct fuse_req *req)
 	req->isreply = 1;
 	fuse_request_send_nowait(fc, req);
 }
+EXPORT_SYMBOL_GPL(fuse_request_send_background);
 
 /*
  * Called under fc->lock
@@ -1112,8 +1118,9 @@ void fuse_abort_conn(struct fuse_conn *fc)
 	}
 	spin_unlock(&fc->lock);
 }
+EXPORT_SYMBOL_GPL(fuse_abort_conn);
 
-static int fuse_dev_release(struct inode *inode, struct file *file)
+int fuse_dev_release(struct inode *inode, struct file *file)
 {
 	struct fuse_conn *fc = fuse_get_conn(file);
 	if (fc) {
@@ -1127,6 +1134,7 @@ static int fuse_dev_release(struct inode *inode, struct file *file)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(fuse_dev_release);
 
 static int fuse_dev_fasync(int fd, struct file *file, int on)
 {
@@ -1149,6 +1157,7 @@ const struct file_operations fuse_dev_operations = {
 	.release	= fuse_dev_release,
 	.fasync		= fuse_dev_fasync,
 };
+EXPORT_SYMBOL_GPL(fuse_dev_operations);
 
 static struct miscdevice fuse_miscdevice = {
 	.minor = FUSE_MINOR,
