@@ -304,8 +304,8 @@ Failed:
 
 /**
  * toi_go_atomic - do the actual atomic copy/restore
- * @state:		The state to use for device_suspend & power_down calls.
- * @suspend_time: 	Whether we're suspending or resuming.
+ * @state:	   The state to use for dpm_suspend_start & power_down calls.
+ * @suspend_time:  Whether we're suspending or resuming.
  **/
 int toi_go_atomic(pm_message_t state, int suspend_time)
 {
@@ -316,7 +316,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 
 	suspend_console();
 
-	if (device_suspend(state)) {
+	if (dpm_suspend_start(state)) {
 		set_abort_result(TOI_DEVICE_REFUSED);
 		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 3);
 		return 1;
@@ -328,14 +328,14 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		return 1;
 	}
 
-	/* At this point, device_suspend() has been called, but *not*
-	 * device_power_down(). We *must* device_power_down() now.
+	/* At this point, dpm_suspend_start() has been called, but *not*
+	 * dpm_suspend_noirq(). We *must* dpm_suspend_noirq() now.
 	 * Otherwise, drivers for some devices (e.g. interrupt controllers)
 	 * become desynchronized with the actual state of the hardware
 	 * at resume time, and evil weirdness ensues.
 	 */
 
-	if (device_power_down(state)) {
+	if (dpm_suspend_noirq(state)) {
 		set_abort_result(TOI_DEVICE_REFUSED);
 		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 1);
 		return 1;
@@ -394,12 +394,12 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 		platform_restore_cleanup(1);
 	case ATOMIC_STEP_PLATFORM_FINISH:
 		platform_finish(1);
-		device_power_up(suspend_time ?
+		dpm_resume_noirq(suspend_time ?
 			(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
 	case ATOMIC_STEP_DEVICE_RESUME:
 		if (suspend_time && (error & 2))
 			platform_recover(1);
-		device_resume(suspend_time ?
+		dpm_resume_end(suspend_time ?
 			((error & 1) ? PMSG_RECOVER : PMSG_THAW) :
 			PMSG_RESTORE);
 		resume_console();

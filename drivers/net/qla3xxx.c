@@ -2617,7 +2617,6 @@ static int ql3xxx_send(struct sk_buff *skb, struct net_device *ndev)
 			    &port_regs->CommonRegs.reqQProducerIndex,
 			    qdev->req_producer_index);
 
-	ndev->trans_start = jiffies;
 	if (netif_msg_tx_queued(qdev))
 		printk(KERN_DEBUG PFX "%s: tx queued, slot %d, len %d\n",
 		       ndev->name, qdev->req_producer_index, skb->len);
@@ -3838,7 +3837,9 @@ static void ql_reset_work(struct work_struct *work)
 						      16) | ISP_CONTROL_RI));
 			}
 
+			spin_unlock_irqrestore(&qdev->hw_lock, hw_flags);
 			ssleep(1);
+			spin_lock_irqsave(&qdev->hw_lock, hw_flags);
 		} while (--max_wait_time);
 		spin_unlock_irqrestore(&qdev->hw_lock, hw_flags);
 
