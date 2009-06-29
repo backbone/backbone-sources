@@ -580,7 +580,7 @@ static int worker_rw_loop(void *data)
 				MB(io_base+my_io_index+1), MB(io_barmax));
 
 		if (my_io_index == io_pc) {
-			printk(KERN_ERR "...%d%%.\n", 20 * io_pc_step);
+			printk(KERN_CONT "...%d%%", 20 * io_pc_step);
 			io_pc_step++;
 			io_pc = io_finish_at * io_pc_step / 5;
 		}
@@ -609,6 +609,7 @@ static int worker_rw_loop(void *data)
 		toi_bio_queue_flusher_should_finish = 1;
 		wake_up(&toi_io_queue_flusher);
 		result = toiActiveAllocator->finish_all_io();
+		printk(KERN_CONT "\n");
 	}
 
 	toi__free_page(28, buffer);
