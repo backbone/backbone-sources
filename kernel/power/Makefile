@@ -3,7 +3,7 @@ ifeq ($(CONFIG_PM_DEBUG),y)
 EXTRA_CFLAGS	+=	-DDEBUG
 endif
 
-tuxonice_core-objs := tuxonice_modules.o tuxonice_sysfs.o tuxonice_highlevel.o \
+tuxonice_core-y := tuxonice_modules.o tuxonice_sysfs.o tuxonice_highlevel.o \
 		tuxonice_io.o tuxonice_pagedir.o tuxonice_prepare_image.o \
 		tuxonice_extent.o tuxonice_pageflags.o tuxonice_ui.o \
 		tuxonice_power_off.o tuxonice_atomic_copy.o
