@@ -130,9 +130,12 @@ int freeze_processes(void)
 		goto Exit;
 	printk("done.");
 	freezer_state = FREEZER_FULLY_ON;
+
+	oom_killer_disable();
  Exit:
 	BUG_ON(in_atomic());
 	printk("\n");
+
 	return error;
 }
 EXPORT_SYMBOL_GPL(freeze_processes);
@@ -166,12 +169,16 @@ void thaw_processes(void)
 
 	freezer_state = FREEZER_OFF;
 
+	oom_killer_enable();
+
 	printk(KERN_INFO "Restarting all filesystems ...\n");
 	thaw_filesystems(FS_FREEZER_ALL);
 
 	printk(KERN_INFO "Restarting tasks ... ");
 	if (old_state == FREEZER_FULLY_ON)
 		thaw_tasks(true);
+
+	printk("Restarting tasks ... ");
 	thaw_tasks(false);
 	schedule();
 	printk("done.\n");
