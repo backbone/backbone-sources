@@ -10,9 +10,7 @@ tuxonice_core-y := tuxonice_modules.o tuxonice_sysfs.o tuxonice_highlevel.o \
 
 obj-$(CONFIG_TOI)		+= tuxonice_builtin.o
 
-ifdef CONFIG_NET
-tuxonice_core-objs		+= tuxonice_storage.o tuxonice_netlink.o
-endif
+tuxonice_core-$(CONFIG_NET)	+= tuxonice_storage.o tuxonice_netlink.o
 
 obj-$(CONFIG_TOI_CORE)		+= tuxonice_core.o
 obj-$(CONFIG_TOI_CRYPTO)	+= tuxonice_compress.o
