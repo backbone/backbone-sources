@@ -1560,6 +1560,7 @@ static struct inode *shmem_get_inode(struct super_block *sb, int mode,
 		if (flags & VM_ATOMIC_COPY)
 			inode->i_flags |= S_ATOMIC_COPY;
 		INIT_LIST_HEAD(&info->swaplist);
+		cache_no_acl(inode);
 
 		switch (mode & S_IFMT) {
 		default:
@@ -2390,7 +2391,6 @@ static void shmem_destroy_inode(struct inode *inode)
 		/* only struct inode is valid if it's an inline symlink */
 		mpol_free_shared_policy(&SHMEM_I(inode)->policy);
 	}
-	shmem_acl_destroy_inode(inode);
 	kmem_cache_free(shmem_inode_cachep, SHMEM_I(inode));
 }
 
@@ -2399,10 +2399,6 @@ static void init_once(void *foo)
 	struct shmem_inode_info *p = (struct shmem_inode_info *) foo;
 
 	inode_init_once(&p->vfs_inode);
-#ifdef CONFIG_TMPFS_POSIX_ACL
-	p->i_acl = NULL;
-	p->i_default_acl = NULL;
-#endif
 }
 
 static int init_inodecache(void)
