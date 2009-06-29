@@ -25,8 +25,6 @@ static int fuse_send_open(struct fuse_conn *fc, u64 nodeid, struct file *file,
 	struct fuse_req *req;
 	int err;
 
-	FUSE_MIGHT_FREEZE(inode->i_sb, "fuse_send_open");
-
 	req = fuse_get_req(fc);
 	if (IS_ERR(req))
 		return PTR_ERR(req);
@@ -112,6 +110,8 @@ int fuse_do_open(struct fuse_conn *fc, u64 nodeid, struct file *file,
 	struct fuse_file *ff;
 	int err;
 	int opcode = isdir ? FUSE_OPENDIR : FUSE_OPEN;
+
+	FUSE_MIGHT_FREEZE(file->f_path.dentry->d_inode->i_sb, "fuse_send_open");
 
 	ff = fuse_file_alloc(fc);
 	if (!ff)
