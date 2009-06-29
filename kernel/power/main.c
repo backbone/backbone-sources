@@ -44,6 +44,7 @@ int pm_notifier_call_chain(unsigned long val)
 	return (blocking_notifier_call_chain(&pm_chain_head, val, NULL)
 			== NOTIFY_BAD) ? -EINVAL : 0;
 }
+EXPORT_SYMBOL_GPL(pm_notifier_call_chain);
 
 #ifdef CONFIG_PM_DEBUG
 int pm_test_level = TEST_NONE;

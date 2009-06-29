@@ -30,6 +30,7 @@
 
 static int noresume = 0;
 char resume_file[256] = CONFIG_PM_STD_PARTITION;
+EXPORT_SYMBOL_GPL(resume_file);
 dev_t swsusp_resume_device;
 sector_t swsusp_resume_block;
 
@@ -120,6 +121,7 @@ int platform_begin(int platform_mode)
 	return (platform_mode && hibernation_ops) ?
 		hibernation_ops->begin() : 0;
 }
+EXPORT_SYMBOL_GPL(platform_begin);
 
 /**
  *	platform_end - tell the platform driver that we've entered the
@@ -131,6 +133,7 @@ void platform_end(int platform_mode)
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->end();
 }
+EXPORT_SYMBOL_GPL(platform_end);
 
 /**
  *	platform_pre_snapshot - prepare the machine for hibernation using the
@@ -142,6 +145,7 @@ int platform_pre_snapshot(int platform_mode)
 	return (platform_mode && hibernation_ops) ?
 		hibernation_ops->pre_snapshot() : 0;
 }
+EXPORT_SYMBOL_GPL(platform_pre_snapshot);
 
 /**
  *	platform_leave - prepare the machine for switching to the normal mode
@@ -153,6 +157,7 @@ void platform_leave(int platform_mode)
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->leave();
 }
+EXPORT_SYMBOL_GPL(platform_leave);
 
 /**
  *	platform_finish - switch the machine to the normal mode of operation
@@ -164,6 +169,7 @@ void platform_finish(int platform_mode)
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->finish();
 }
+EXPORT_SYMBOL_GPL(platform_finish);
 
 /**
  *	platform_pre_restore - prepare the platform for the restoration from a
@@ -176,6 +182,7 @@ int platform_pre_restore(int platform_mode)
 	return (platform_mode && hibernation_ops) ?
 		hibernation_ops->pre_restore() : 0;
 }
+EXPORT_SYMBOL_GPL(platform_pre_restore);
 
 /**
  *	platform_restore_cleanup - switch the platform to the normal mode of
@@ -189,6 +196,7 @@ void platform_restore_cleanup(int platform_mode)
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->restore_cleanup();
 }
+EXPORT_SYMBOL_GPL(platform_restore_cleanup);
 
 /**
  *	platform_recover - recover the platform from a failure to suspend
@@ -200,6 +208,7 @@ void platform_recover(int platform_mode)
 	if (platform_mode && hibernation_ops && hibernation_ops->recover)
 		hibernation_ops->recover();
 }
+EXPORT_SYMBOL_GPL(platform_recover);
 
 /**
  *	create_image - freeze devices that need to be frozen with interrupts
@@ -491,6 +500,7 @@ int hibernation_platform_enter(void)
 
 	return error;
 }
+EXPORT_SYMBOL_GPL(hibernation_platform_enter);
 
 /**
  *	power_down - Shut the machine down for hibernation.
