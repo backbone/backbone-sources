@@ -178,7 +178,6 @@ void thaw_processes(void)
 		thaw_tasks(true);
 
 	printk("Restarting tasks ... ");
-	thaw_tasks(true);
 	thaw_tasks(false);
 	schedule();
 	printk("done.\n");
