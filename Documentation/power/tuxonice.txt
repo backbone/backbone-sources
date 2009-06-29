@@ -124,7 +124,7 @@
    something along the lines of:
 
    echo "TuxOnIce" > /hibernation-file
-   dd if=/dev/zero bs=1M count=512 >> hibernation-file
+   dd if=/dev/zero bs=1M count=512 >> /hibernation-file
 
    This will create a 512MB file called /hibernation-file. To get TuxOnIce to use
    it:
