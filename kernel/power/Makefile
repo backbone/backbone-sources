@@ -10,13 +10,9 @@ tuxonice_core-y := tuxonice_modules.o tuxonice_sysfs.o tuxonice_highlevel.o \
 
 obj-$(CONFIG_TOI)		+= tuxonice_builtin.o
 
-ifdef CONFIG_PM_DEBUG
-tuxonice_core-objs		+= tuxonice_alloc.o
-endif
+tuxonice_core-$(CONFIG_PM_DEBUG)	+= tuxonice_alloc.o
 
-ifdef CONFIG_TOI_CHECKSUM
-tuxonice_core-objs		+= tuxonice_checksum.o
-endif
+tuxonice_core-$(CONFIG_TOI_CHECKSUM)	+= tuxonice_checksum.o
 
 ifdef CONFIG_NET
 tuxonice_core-objs		+= tuxonice_storage.o tuxonice_netlink.o
