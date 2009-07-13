@@ -14,6 +14,7 @@
 #include <linux/swapops.h>
 #include <linux/swap.h>
 #include <linux/syscalls.h>
+#include <scsi/scsi_scan.h>
 
 #include "tuxonice.h"
 #include "tuxonice_sysfs.h"
@@ -249,8 +250,12 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
 	struct kstat stat;
 	int error = 0;
 
-	wait_for_device_probe();
 	resume_swap_dev_t = name_to_dev_t(commandline);
+	if (!resume_swap_dev_t) {
+		wait_for_device_probe();
+		scsi_complete_async_scans();
+		resume_swap_dev_t = name_to_dev_t(commandline);
+	}
 
 	if (!resume_swap_dev_t) {
 		struct file *file = filp_open(commandline,
