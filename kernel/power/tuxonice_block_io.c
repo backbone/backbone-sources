@@ -58,7 +58,6 @@ static DEFINE_SPINLOCK(bio_queue_lock);
 static int free_mem_throttle, throughput_throttle;
 static int more_readahead = 1;
 static struct page *readahead_list_head, *readahead_list_tail;
-static DECLARE_WAIT_QUEUE_HEAD(readahead_list_wait);
 
 static struct page *waiting_on;
 
@@ -365,7 +364,6 @@ static int toi_do_io(int writing, struct block_device *bdev, long block0,
 			readahead_list_head = page;
 
 		readahead_list_tail = page;
-		wake_up(&readahead_list_wait);
 	}
 
 	/* Done before submitting to avoid races. */
