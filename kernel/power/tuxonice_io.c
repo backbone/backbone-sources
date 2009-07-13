@@ -432,7 +432,7 @@ static int write_next_page(unsigned long *data_pfn, int *my_io_index,
 static int read_next_page(int *my_io_index, unsigned long *write_pfn,
 		struct page *buffer, struct toi_module_ops *first_filter)
 {
-	unsigned int buf_size;
+	unsigned int buf_size = PAGE_SIZE;
 	int result;
 
 	*my_io_index = io_finish_at - atomic_sub_return(1, &io_count);
