@@ -867,7 +867,14 @@ static int toi_bio_get_next_page_read(int no_readahead)
 	}
 
 	if (unlikely(!readahead_list_head)) {
-		BUG_ON(!more_readahead);
+		/* 
+		 * If the last page finishes exactly on the page
+		 * boundary, we will be called one extra time and
+		 * have no data to return. In this case, we should
+		 * not BUG(), like we used to!
+		 */
+		if (!more_readahead)
+			return -ENODATA;
 		if (unlikely(toi_start_one_readahead(0))) {
 			printk(KERN_DEBUG "No readahead and "
 			 "toi_start_one_readahead returned non-zero.\n");
