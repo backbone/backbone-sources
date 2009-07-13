@@ -270,7 +270,7 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
 			return 1;
 
 		if (test_toi_state(TOI_TRYING_TO_RESUME))
-			toi_early_boot_message(1, TOI_CONTINUE_REQ,
+			toi_early_boot_message(1, toi_translate_err_default,
 			  "Failed to translate \"%s\" into a device id.\n",
 			  commandline);
 		else
