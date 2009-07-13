@@ -39,6 +39,7 @@
 #include <linux/namei.h>
 #include <linux/fs.h>
 #include <linux/root_dev.h>
+#include <scsi/scsi_scan.h>
 
 #include "tuxonice.h"
 #include "tuxonice_sysfs.h"
@@ -372,16 +373,20 @@ static void toi_file_get_target_info(char *target, int get_size,
 	target_file = filp_open(target, O_RDONLY|O_LARGEFILE, 0);
 
 	if (IS_ERR(target_file) || !target_file) {
+		wait_for_device_probe();
+		scsi_complete_async_scans();
+		target_file = filp_open(target, O_RDONLY|O_LARGEFILE, 0);
+	}
+
+	if (IS_ERR(target_file) || !target_file) {
+		target_file = NULL;
 
 		if (!resume_param) {
 			printk(KERN_INFO "Open file %s returned %p.\n",
 					target, target_file);
-			target_file = NULL;
 			return;
 		}
 
-		target_file = NULL;
-		wait_for_device_probe();
 		resume_file_dev_t = name_to_dev_t(target);
 		if (!resume_file_dev_t) {
 			struct kstat stat;
