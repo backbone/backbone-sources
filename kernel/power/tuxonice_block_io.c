@@ -1046,7 +1046,7 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	 * Only call start_new_readahead if we don't have a dedicated thread
 	 * and we're the queue flusher.
 	 */
-	if (current == toi_queue_flusher) {
+	if (current == toi_queue_flusher && more_readahead) {
 		int result2 = toi_start_new_readahead(0);
 		if (result2) {
 			printk(KERN_DEBUG "Queue flusher and "
@@ -1164,7 +1164,7 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 			buffer_size, unowned);
 	}
 
-	if (!writing && !no_readahead)
+	if (!writing && !no_readahead && more_readahead)
 		result = toi_start_new_readahead(0);
 
 	if (!result)
