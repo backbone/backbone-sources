@@ -213,6 +213,9 @@ static int ignore_late_initcall = 1;
 static int ignore_late_initcall;
 #endif
 
+int toi_translate_err_default = TOI_CONTINUE_REQ;
+EXPORT_SYMBOL_GPL(toi_translate_err_default);
+
 void try_tuxonice_resume(void)
 {
 	/* Don't let it wrap around eventually */
@@ -281,6 +284,14 @@ static int __init toi_wait_setup(char *str)
 }
 
 __setup("toi_wait", toi_wait_setup);
+
+static int __init toi_translate_retry_setup(char *str)
+{
+	toi_translate_err_default = 0;
+	return 1;
+}
+
+__setup("toi_translate_retry", toi_translate_retry_setup);
 
 static int __init toi_ignore_late_initcall_setup(char *str)
 {
