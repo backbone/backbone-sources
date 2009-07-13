@@ -717,12 +717,12 @@ static int toi_swap_allocate_storage(int request)
 			/* Don't try to add again below */
 			to_add[swapfilenum] = 0;
 			break;
-		} else {
-			extent_min[swapfilenum] = new_value;
-			extent_max[swapfilenum] = new_value;
-			if (!devinfo[swapfilenum].ignored)
-				gotten++;
 		}
+
+		extent_min[swapfilenum] = new_value;
+		extent_max[swapfilenum] = new_value;
+		if (!devinfo[swapfilenum].ignored)
+			gotten++;
 	}
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
