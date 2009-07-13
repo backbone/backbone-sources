@@ -18,6 +18,9 @@
 int freezer_state;
 EXPORT_SYMBOL_GPL(freezer_state);
 
+int freezer_sync;
+EXPORT_SYMBOL_GPL(freezer_sync);
+
 /* 
  * Timeout for stopping processes
  */
@@ -120,7 +123,8 @@ int freeze_processes(void)
 		goto Exit;
 	printk("done.\n");
 
-	sys_sync();
+	if (freezer_sync)
+		sys_sync();
 	printk(KERN_INFO "Stopping normal filesystems.\n");
 	freeze_filesystems(FS_FREEZER_NORMAL);
 	freezer_state = FREEZER_USERSPACE_FROZEN;
