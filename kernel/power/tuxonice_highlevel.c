@@ -1174,11 +1174,14 @@ int toi_launch_userspace_program(char *command, int channel_no,
 	return retval;
 }
 
+extern int freezer_sync;
+
 /*
  * This array contains entries that are automatically registered at
  * boot. Modules and the console code register their own entries separately.
  */
 static struct toi_sysfs_data sysfs_params[] = {
+	SYSFS_INT("freezer_sync", SYSFS_RW, &freezer_sync, 0, 1, 0, NULL),
 	SYSFS_LONG("extra_pages_allowance", SYSFS_RW,
 			&extra_pd1_pages_allowance, 0, LONG_MAX, 0),
 	SYSFS_CUSTOM("image_exists", SYSFS_RW, image_exists_read,
