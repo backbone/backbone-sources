@@ -441,7 +441,6 @@ static int read_next_page(int *my_io_index, unsigned long *write_pfn,
 		struct page *buffer, struct toi_module_ops *first_filter)
 {
 	unsigned int buf_size = PAGE_SIZE;
-	int result;
 
 	*my_io_index = io_finish_at - atomic_sub_return(1, &io_count);
 	mutex_unlock(&io_mutex);
@@ -459,19 +458,11 @@ static int read_next_page(int *my_io_index, unsigned long *write_pfn,
 			schedule();
 	}
 
-	/* See toi_bio_read_page in tuxonice_block_io.c:
+	/*
+	 * See toi_bio_read_page in tuxonice_block_io.c:
 	 * read the next page in the image.
 	 */
-	result = first_filter->read_page(write_pfn, buffer, &buf_size);
-	if (buf_size != PAGE_SIZE) {
-		abort_hibernate(TOI_FAILED_IO,
-			"I/O pipeline returned %d bytes instead"
-			" of %ud.\n", buf_size, PAGE_SIZE);
-		mutex_lock(&io_mutex);
-		return -ENODATA;
-	}
-
-	return result;
+	return first_filter->read_page(write_pfn, buffer, &buf_size);
 }
 
 /**
@@ -551,18 +542,22 @@ static int worker_rw_loop(void *data)
 			result = read_next_page(&my_io_index, &write_pfn,
 					buffer, first_filter);
 
-		if (result == -ENODATA)
-			break;
-
 		if (result) {
 			io_result = result;
+			mutex_lock(&io_mutex);
+
 			if (io_write) {
 				printk(KERN_INFO "Write chunk returned %d.\n",
 						result);
 				abort_hibernate(TOI_FAILED_IO,
 					"Failed to write a chunk of the "
 					"image.");
-				mutex_lock(&io_mutex);
+				break;
+			}
+
+			if (io_pageset == 1) {
+				printk(KERN_ERR "\nBreaking out of I/O loop "
+					"because of result code %d.\n", result);
 				break;
 			}
 			panic("Read chunk returned (%d)", result);
@@ -730,7 +725,9 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 					finish_at, atomic_read(&io_count));
 			printk(KERN_INFO "I/O bitmap still records work to do."
 					"%ld.\n", next);
-			BUG();
+			do {
+				cpu_relax();
+			} while(0);
 		}
 	}
 
