@@ -240,8 +240,6 @@ static int toi_compress_read_page(unsigned long *index,
 	 * data that hasn't been read yet.
 	 */
 
-	*buf_size = PAGE_SIZE;
-
 	ret = next_driver->read_page(index, buffer_page, &len);
 
 	/* Error or uncompressed data */
