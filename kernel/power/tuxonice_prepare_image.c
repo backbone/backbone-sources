@@ -117,7 +117,7 @@ static void pageset2_full(void)
 	unsigned long flags;
 	int i;
 
-	for_each_zone(zone) {
+	for_each_populated_zone(zone) {
 		spin_lock_irqsave(&zone->lru_lock, flags);
 		for_each_lru(i) {
 			if (!zone_page_state(zone, NR_LRU_BASE + i))
