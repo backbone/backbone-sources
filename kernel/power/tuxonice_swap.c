@@ -80,10 +80,10 @@ static char swapfilename[32] = "";
 static int toi_swapon_status;
 
 /* Header Page Information */
-static long header_pages_reserved;
+static unsigned long header_pages_reserved;
 
 /* Swap Pages */
-static long swap_pages_allocated;
+static unsigned long swap_pages_allocated;
 
 /* User Specified Parameters. */
 
@@ -445,23 +445,33 @@ static int write_modified_signature(int modification)
  */
 static int apply_header_reservation(void)
 {
-	int i;
+	unsigned long i;
 
 	toi_extent_state_goto_start(&toi_writer_posn);
 
+	printk("Applying header reservation for %lu pages.\n",
+			header_pages_reserved);
+
+	if (!header_pages_reserved)
+		return 0;
+
 	for (i = 0; i < header_pages_reserved; i++)
-		if (toi_bio_ops.forward_one_page(1, 0))
+		if (toi_bio_ops.forward_one_page(1, 0)) {
+			printk("Failed to advance to page %lu in reserving "
+					"space for the header.\n", i);
 			return -ENOSPC;
+		}
 
 	/* The end of header pages will be the start of pageset 2;
 	 * we are now sitting on the first pageset2 page. */
 	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
+	printk("Done.\n");
 	return 0;
 }
 
-static void toi_swap_reserve_header_space(int request)
+static void toi_swap_reserve_header_space(unsigned long request)
 {
-	header_pages_reserved = (long) request;
+	header_pages_reserved = request;
 }
 
 static void free_block_chains(void)
@@ -473,10 +483,10 @@ static void free_block_chains(void)
 			toi_put_extent_chain(&block_chain[i]);
 }
 
-static int add_blocks_to_extent_chain(int chain, int start, int end)
+static int add_blocks_to_extent_chain(int chain, unsigned long start, unsigned long end)
 {
 	if (test_action_state(TOI_TEST_BIO))
-		printk(KERN_INFO "Adding extent chain %d %d-%d.\n", chain,
+		printk(KERN_INFO "Adding extent chain %d %lu-%lu.\n", chain,
 				start << devinfo[chain].bmap_shift,
 				end << devinfo[chain].bmap_shift);
 
@@ -492,8 +502,8 @@ static int add_blocks_to_extent_chain(int chain, int start, int end)
 static int get_main_pool_phys_params(void)
 {
 	struct hibernate_extent *extentpointer = NULL;
-	unsigned long address;
-	int extent_min = -1, extent_max = -1, last_chain = -1;
+	unsigned long address, extent_min = 0, extent_max = 0;
+	int last_chain = -1;
 
 	free_block_chains();
 
@@ -508,13 +518,13 @@ static int get_main_pool_phys_params(void)
 		if (devinfo[swapfilenum].ignored)
 			continue;
 
-		if ((new_sector == extent_max + 1) &&
-		    (last_chain == swapfilenum)) {
+		if (last_chain >= 0 && new_sector == extent_max + 1 &&
+		    last_chain == swapfilenum) {
 			extent_max++;
 			continue;
 		}
 
-		if (extent_min > -1 && add_blocks_to_extent_chain(last_chain,
+		if (last_chain >= 0 && add_blocks_to_extent_chain(last_chain,
 					extent_min, extent_max)) {
 			printk(KERN_ERR "Out of memory while making block "
 					"chains.\n");
@@ -526,7 +536,7 @@ static int get_main_pool_phys_params(void)
 		last_chain = swapfilenum;
 	}
 
-	if (extent_min > -1 && add_blocks_to_extent_chain(last_chain,
+	if (last_chain > -1 && add_blocks_to_extent_chain(last_chain,
 				extent_min, extent_max)) {
 		printk(KERN_ERR "Out of memory while making block chains.\n");
 		return -ENOMEM;
@@ -535,9 +545,9 @@ static int get_main_pool_phys_params(void)
 	return apply_header_reservation();
 }
 
-static long raw_to_real(long raw)
+static unsigned long raw_to_real(unsigned long raw)
 {
-	long result;
+	unsigned long result;
 
 	result = raw - (raw * (sizeof(unsigned long) + sizeof(int)) +
 		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int) + 1)) /
@@ -546,9 +556,9 @@ static long raw_to_real(long raw)
 	return result < 0 ? 0 : result;
 }
 
-static int toi_swap_storage_allocated(void)
+static unsigned long toi_swap_storage_allocated(void)
 {
-	return (int) raw_to_real(swap_pages_allocated - header_pages_reserved);
+	return raw_to_real(swap_pages_allocated - header_pages_reserved);
 }
 
 /*
@@ -578,10 +588,10 @@ void si_swapinfo_no_compcache(struct sysinfo *val)
  * We can't just remember the value from allocation time, because other
  * processes might have allocated swap in the mean time.
  */
-static int toi_swap_storage_available(void)
+static unsigned long toi_swap_storage_available(void)
 {
 	si_swapinfo_no_compcache(&swapinfo);
-	return (int) raw_to_real((long) swapinfo.freeswap +
+	return raw_to_real(swapinfo.freeswap +
 			swap_pages_allocated - header_pages_reserved);
 }
 
@@ -648,16 +658,22 @@ static void free_swap_range(unsigned long min, unsigned long max)
  * could make this very inefficient, so we track extents allocated on
  * a per-swapfile basis.
  */
-static int toi_swap_allocate_storage(int request)
+static int toi_swap_allocate_storage(unsigned long request)
 {
-	int i, result = 0, to_add[MAX_SWAPFILES], pages_to_get, extra_pages,
-	    gotten = 0, result2;
+	int i, result = 0, to_add[MAX_SWAPFILES];
+	unsigned long pages_to_get, extra_pages, gotten = 0, result2, needed;
 	unsigned long extent_min[MAX_SWAPFILES], extent_max[MAX_SWAPFILES];
 
 	extra_pages = DIV_ROUND_UP(request * (sizeof(unsigned long)
 			       + sizeof(int)), PAGE_SIZE);
-	pages_to_get = request + extra_pages - swapextents.size +
-		header_pages_reserved;
+	needed = request + extra_pages + header_pages_reserved;
+
+	pages_to_get = needed > swapextents.size ?
+		needed - swapextents.size : 0;
+
+	printk("Swap allocate storage: Request was %lu pages. Extra pages is %lu,"
+		"swapextents size is %lu. Header pages reserved is %lu.\n", request,
+		extra_pages, swapextents.size, header_pages_reserved);
 
 	if (pages_to_get < 1)
 		return apply_header_reservation();
@@ -757,7 +773,7 @@ static int toi_swap_allocate_storage(int request)
 
 	if (gotten < pages_to_get) {
 		printk("Got fewer pages than required "
-				"(%d wanted, %d gotten).\n",
+				"(%lu wanted, %lu gotten).\n",
 				pages_to_get, gotten);
 		result = -ENOSPC;
 	}
@@ -983,8 +999,8 @@ static int toi_swap_print_debug_stats(char *buffer, int size)
 	si_swapinfo_no_compcache(&sysinfo);
 
 	len += scnprintf(buffer+len, size-len,
-			"  Swap available for image: %d pages.\n",
-			(int) sysinfo.freeswap + toi_swap_storage_allocated());
+			"  Swap available for image: %lu pages.\n",
+			sysinfo.freeswap + toi_swap_storage_allocated());
 
 	return len;
 }
@@ -1007,7 +1023,8 @@ static int toi_swap_storage_needed(void)
 		sizeof(devinfo);
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
-		result += 2 * sizeof(int);
+		result += sizeof(block_chain[i].size) +
+			  sizeof(block_chain[i].num_extents);
 		result += (2 * sizeof(unsigned long) *
 			block_chain[i].num_extents);
 	}
