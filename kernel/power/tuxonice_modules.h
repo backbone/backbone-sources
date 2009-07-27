@@ -88,10 +88,10 @@ struct toi_module_ops {
 	 * how much storage is available.
 	 */
 
-	int (*storage_available) (void);
-	void (*reserve_header_space) (int space_requested);
-	int (*allocate_storage) (int space_requested);
-	int (*storage_allocated) (void);
+	unsigned long (*storage_available) (void);
+	void (*reserve_header_space) (unsigned long space_requested);
+	int (*allocate_storage) (unsigned long space_requested);
+	unsigned long (*storage_allocated) (void);
 
 	/*
 	 * Routines used in image I/O.

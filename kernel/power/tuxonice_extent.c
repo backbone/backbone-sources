@@ -128,14 +128,14 @@ int toi_serialise_extent_chain(struct toi_module_ops *owner,
 	int ret, i = 0;
 
 	ret = toiActiveAllocator->rw_header_chunk(WRITE, owner, (char *) chain,
-			2 * sizeof(int));
+			sizeof(chain->size) + sizeof(chain->num_extents));
 	if (ret)
 		return ret;
 
 	this = chain->first;
 	while (this) {
 		ret = toiActiveAllocator->rw_header_chunk(WRITE, owner,
-				(char *) this, 2 * sizeof(unsigned long));
+				(char *) this, 2 * sizeof(this->start));
 		if (ret)
 			return ret;
 		this = this->next;
@@ -165,7 +165,8 @@ int toi_load_extent_chain(struct hibernate_extent_chain *chain)
 
 	/* Get the next page */
 	ret = toiActiveAllocator->rw_header_chunk_noreadahead(READ, NULL,
-			(char *) chain, 2 * sizeof(int));
+			(char *) chain, sizeof(chain->size) +
+			sizeof(chain->num_extents));
 	if (ret) {
 		printk(KERN_ERR "Failed to read the size of extent chain.\n");
 		return 1;
@@ -181,7 +182,7 @@ int toi_load_extent_chain(struct hibernate_extent_chain *chain)
 		this->next = NULL;
 		/* Get the next page */
 		ret = toiActiveAllocator->rw_header_chunk_noreadahead(READ,
-				NULL, (char *) this, 2 * sizeof(unsigned long));
+				NULL, (char *) this, 2 * sizeof(this->start));
 		if (ret) {
 			printk(KERN_INFO "Failed to read an extent.\n");
 			return 1;
