@@ -385,7 +385,7 @@ static int get_toi_debug_info(const char *buffer, int count)
 		SNPRINTF(".\n");
 	} else
 		SNPRINTF("- No I/O speed stats available.\n");
-	SNPRINTF("- Extra pages    : %ld used/%ld.\n",
+	SNPRINTF("- Extra pages    : %lu used/%lu.\n",
 			extra_pd1_pages_used, extra_pd1_pages_allowance);
 
 	for (i = 0; i < TOI_NUM_RESULT_STATES; i++)

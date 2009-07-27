@@ -80,10 +80,10 @@ struct toi_file_header {
 };
 
 /* Header Page Information */
-static int header_pages_reserved;
+static unsigned long header_pages_reserved;
 
 /* Main Storage Pages */
-static int main_pages_allocated, main_pages_requested;
+static unsigned long main_pages_allocated, main_pages_requested;
 
 #define target_is_normal_file() (S_ISREG(target_inode->i_mode))
 
@@ -142,9 +142,9 @@ static void set_devinfo(struct block_device *bdev, int target_blkbits)
 	}
 }
 
-static long raw_to_real(long raw)
+static unsigned long raw_to_real(unsigned long raw)
 {
-	long result;
+	unsigned long result;
 
 	result = raw - (raw * (sizeof(unsigned long) + sizeof(int)) +
 		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int) + 1)) /
@@ -153,7 +153,7 @@ static long raw_to_real(long raw)
 	return result < 0 ? 0 : result;
 }
 
-static int toi_file_storage_available(void)
+static unsigned long toi_file_storage_available(void)
 {
 	int result = 0;
 	struct block_device *bdev = toi_file_target_bdev;
@@ -503,15 +503,15 @@ static int prepare_signature(struct toi_file_header *current_header,
 	return 0;
 }
 
-static int toi_file_storage_allocated(void)
+static unsigned long toi_file_storage_allocated(void)
 {
 	if (!target_inode)
 		return 0;
 
 	if (target_is_normal_file())
-		return (int) raw_to_real(target_storage_available);
+		return raw_to_real(target_storage_available);
 	else
-		return (int) raw_to_real(main_pages_requested);
+		return raw_to_real(main_pages_requested);
 }
 
 /**
@@ -527,23 +527,24 @@ static int toi_file_release_storage(void)
 	return 0;
 }
 
-static void toi_file_reserve_header_space(int request)
+static void toi_file_reserve_header_space(unsigned long request)
 {
 	header_pages_reserved = request;
 }
 
-static int toi_file_allocate_storage(int main_space_requested)
+static int toi_file_allocate_storage(unsigned long main_space_requested)
 {
 	int result = 0;
 
-	int extra_pages = DIV_ROUND_UP(main_space_requested *
-			(sizeof(unsigned long) + sizeof(int)), PAGE_SIZE);
-	int pages_to_get = main_space_requested + extra_pages +
-		header_pages_reserved;
-	int blocks_to_get = pages_to_get - block_chain.size;
+	unsigned long extra_pages = DIV_ROUND_UP(main_space_requested *
+			(sizeof(unsigned long) + sizeof(int)), PAGE_SIZE),
+		      pages_to_get = main_space_requested + extra_pages +
+			      header_pages_reserved,
+		      blocks_to_get = (pages_to_get > block_chain.size) ?
+			      pages_to_get - block_chain.size : 0;
 
 	/* Only release_storage reduces the size */
-	if (blocks_to_get < 1)
+	if (!blocks_to_get)
 		return apply_header_reservation();
 
 	result = populate_block_list();
@@ -556,8 +557,8 @@ static int toi_file_allocate_storage(int main_space_requested)
 		block_chain.size);
 
 	if (block_chain.size < pages_to_get) {
-		printk(KERN_INFO "Block chain size (%d) < header pages (%d) + "
-				 "extra pages (%d) + main pages (%d) (=%d "
+		printk(KERN_INFO "Block chain size (%lu) < header pages (%lu) + "
+				 "extra pages (%lu) + main pages (%lu) (=%lu "
 				 "pages).\n",
 				 block_chain.size, header_pages_reserved,
 				 extra_pages, main_space_requested,
@@ -817,7 +818,7 @@ static int toi_file_print_debug_stats(char *buffer, int size)
 	len = scnprintf(buffer, size, "- FileAllocator active.\n");
 
 	len += scnprintf(buffer+len, size-len, "  Storage available for "
-			"image: %d pages.\n",
+			"image: %lu pages.\n",
 			toi_file_storage_allocated());
 
 	return len;
@@ -838,7 +839,7 @@ static int toi_file_storage_needed(void)
 	return strlen(toi_file_target) + 1 +
 		sizeof(toi_writer_posn_save) +
 		sizeof(devinfo) +
-		2 * sizeof(int) +
+		sizeof(block_chain.size) + sizeof(block_chain.num_extents) +
 		(2 * sizeof(unsigned long) * block_chain.num_extents);
 }
 

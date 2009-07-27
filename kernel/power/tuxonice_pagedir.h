@@ -18,9 +18,9 @@
 
 struct pagedir {
 	int id;
-	long size;
+	unsigned long size;
 #ifdef CONFIG_HIGHMEM
-	long size_high;
+	unsigned long size_high;
 #endif
 };
 
