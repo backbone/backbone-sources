@@ -191,7 +191,7 @@ extern char alt_resume_param[256];
 
 extern void copyback_post(void);
 extern int toi_hibernate(void);
-extern long extra_pd1_pages_used;
+extern unsigned long extra_pd1_pages_used;
 
 #define SECTOR_SIZE 512
 
