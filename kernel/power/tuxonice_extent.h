@@ -22,7 +22,7 @@ struct hibernate_extent {
 };
 
 struct hibernate_extent_chain {
-	int size; /* size of the chain ie sum (max-min+1) */
+	unsigned long size; /* size of the chain ie sum (max-min+1) */
 	int num_extents;
 	struct hibernate_extent *first, *last_touched;
 };
