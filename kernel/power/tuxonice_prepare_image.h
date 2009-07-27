@@ -11,10 +11,10 @@
 
 extern int toi_prepare_image(void);
 extern void toi_recalculate_image_contents(int storage_available);
-extern long real_nr_free_pages(unsigned long zone_idx_mask);
+extern unsigned long real_nr_free_pages(unsigned long zone_idx_mask);
 extern int image_size_limit;
 extern void toi_free_extra_pagedir_memory(void);
-extern long extra_pd1_pages_allowance;
+extern unsigned long extra_pd1_pages_allowance;
 extern void free_attention_list(void);
 
 #define MIN_FREE_RAM 100
@@ -33,4 +33,4 @@ extern void free_attention_list(void);
 #define ZONE_HIGHMEM (MAX_NR_ZONES + 1)
 #endif
 
-long get_header_storage_needed(void);
+unsigned long get_header_storage_needed(void);
