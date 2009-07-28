@@ -452,7 +452,7 @@ static unsigned long lowpages_usable_for_highmem_copy(void)
 
 static unsigned long highpages_ps1_to_free(void)
 {
-	unsigned long need = get_highmem_size(pageset1),
+	unsigned long need = get_highmem_size(pagedir1),
 		      available = get_highmem_size(pagedir2) +
 			      real_nr_free_high_pages() +
 			      lowpages_usable_for_highmem_copy();
