@@ -660,9 +660,10 @@ static void free_swap_range(unsigned long min, unsigned long max)
  */
 static int toi_swap_allocate_storage(unsigned long request)
 {
-	int i, result = 0, to_add[MAX_SWAPFILES];
+	int i, result = 0, to_add = 0;
 	unsigned long pages_to_get, extra_pages, gotten = 0, result2, needed;
-	unsigned long extent_min[MAX_SWAPFILES], extent_max[MAX_SWAPFILES];
+	unsigned long extent_min = 0, extent_max = 0;
+	unsigned swapfilenum = MAX_SWAPFILES;
 
 	extra_pages = DIV_ROUND_UP(request * (sizeof(unsigned long)
 			       + sizeof(int)), PAGE_SIZE);
@@ -680,12 +681,11 @@ static int toi_swap_allocate_storage(unsigned long request)
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si = get_swap_info_struct(i);
-		to_add[i] = 0;
+		devinfo[i].ignored = 1;
 		if (!(si->flags & SWP_USED) || !si->swap_map ||
 		    !(si->flags & SWP_WRITEOK))
 			continue;
 		if (!strncmp(si->bdev->bd_disk->disk_name, "ram", 3)) {
-			devinfo[i].ignored = 1;
 			continue;
 		}
 		devinfo[i].ignored = 0;
@@ -693,82 +693,77 @@ static int toi_swap_allocate_storage(unsigned long request)
 		devinfo[i].dev_t = si->bdev->bd_dev;
 		devinfo[i].bmap_shift = 3;
 		devinfo[i].blocks_per_page = 1;
+		if (swapfilenum == MAX_SWAPFILES)
+			swapfilenum = i;
 	}
+
+	if (swapfilenum == MAX_SWAPFILES)
+		return apply_header_reservation();
 
 	while (gotten < pages_to_get) {
 		swp_entry_t entry;
 		unsigned long new_value;
-		unsigned swapfilenum;
 
-		entry = get_swap_page();
-		if (!entry.val)
-			break;
+		entry = get_swap_page_of_type(swapfilenum);
+		if (!entry.val) {
+			if (to_add) {
+				result = toi_add_to_extent_chain(&swapextents,
+						extent_min, extent_max);
+				if (result) {
+					free_swap_range(extent_min, extent_max);
+					gotten -= (extent_max - extent_min + 1);
+					break;
+				}
+			}
+			swapfilenum++;
+			while (swapfilenum < MAX_SWAPFILES &&
+					devinfo[swapfilenum].ignored)
+				swapfilenum++;
+			if (swapfilenum == MAX_SWAPFILES)
+				break;
+		}
 
-		swapfilenum = swp_type(entry);
 		new_value = entry.val;
+		gotten++;
 
-		if (!to_add[swapfilenum]) {
-			to_add[swapfilenum] = 1;
-			extent_min[swapfilenum] = new_value;
-			extent_max[swapfilenum] = new_value;
-			if (!devinfo[swapfilenum].ignored)
-				gotten++;
+		if (!to_add) {
+			to_add = 1;
+			extent_min = new_value;
+			extent_max = new_value;
 			continue;
 		}
 
-		if (new_value == extent_max[swapfilenum] + 1) {
-			extent_max[swapfilenum]++;
-			if (!devinfo[swapfilenum].ignored)
-				gotten++;
+		if (new_value == extent_max + 1) {
+			extent_max++;
 			continue;
 		}
 
-		if (toi_add_to_extent_chain(&swapextents,
-					extent_min[swapfilenum],
-					extent_max[swapfilenum])) {
+		if (toi_add_to_extent_chain(&swapextents, extent_min,
+					extent_max)) {
 			printk(KERN_INFO "Failed to allocate extent for "
-					"%lu-%lu.\n", extent_min[swapfilenum],
-					extent_max[swapfilenum]);
-			free_swap_range(extent_min[swapfilenum],
-					extent_max[swapfilenum]);
+					"%lu-%lu.\n", extent_min, extent_max);
+			free_swap_range(extent_min, extent_max);
 			swap_free(entry);
-			if (!devinfo[swapfilenum].ignored)
-				gotten -= (extent_max[swapfilenum] -
-					extent_min[swapfilenum] + 1);
+			gotten -= (extent_max - extent_min);
 			/* Don't try to add again below */
-			to_add[swapfilenum] = 0;
+			to_add = 0;
 			break;
 		}
 
-		extent_min[swapfilenum] = new_value;
-		extent_max[swapfilenum] = new_value;
-		if (!devinfo[swapfilenum].ignored)
-			gotten++;
+		extent_min = new_value;
+		extent_max = new_value;
 	}
 
-	for (i = 0; i < MAX_SWAPFILES; i++) {
-		int this_result;
+	if (to_add) {
+		int this_result = toi_add_to_extent_chain(&swapextents,
+				extent_min, extent_max);
 
-		/* Anything to do for this swap entry? */
-		if (!to_add[i])
-			continue;
+		if (this_result) {
+			result = this_result;
 
-		this_result = toi_add_to_extent_chain(&swapextents,
-				extent_min[i], extent_max[i]);
-
-		/* Added okay? */
-		if (!this_result)
-			continue;
-
-		/* 
-		 * Nope. Remember an error occured, free the swap and subtract
-		 * from the amount of swap allocated.
-		 */
-		result = this_result;
-
-		free_swap_range(extent_min[i], extent_max[i]);
-		if (!devinfo[i].ignored)
-			gotten -= (extent_max[i] - extent_min[i] + 1);
+			free_swap_range(extent_min, extent_max);
+			gotten -= (extent_max - extent_min + 1);
+		}
 	}
 
 	if (gotten < pages_to_get) {
