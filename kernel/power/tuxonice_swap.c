@@ -449,23 +449,16 @@ static int apply_header_reservation(void)
 
 	toi_extent_state_goto_start(&toi_writer_posn);
 
-	printk("Applying header reservation for %lu pages.\n",
-			header_pages_reserved);
-
 	if (!header_pages_reserved)
 		return 0;
 
 	for (i = 0; i < header_pages_reserved; i++)
-		if (toi_bio_ops.forward_one_page(1, 0)) {
-			printk("Failed to advance to page %lu in reserving "
-					"space for the header.\n", i);
+		if (toi_bio_ops.forward_one_page(1, 0))
 			return -ENOSPC;
-		}
 
 	/* The end of header pages will be the start of pageset 2;
 	 * we are now sitting on the first pageset2 page. */
 	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
-	printk("Done.\n");
 	return 0;
 }
 
@@ -671,10 +664,6 @@ static int toi_swap_allocate_storage(unsigned long request)
 
 	pages_to_get = needed > swapextents.size ?
 		needed - swapextents.size : 0;
-
-	printk("Swap allocate storage: Request was %lu pages. Extra pages is %lu,"
-		"swapextents size is %lu. Header pages reserved is %lu.\n", request,
-		extra_pages, swapextents.size, header_pages_reserved);
 
 	if (pages_to_get < 1)
 		return apply_header_reservation();
