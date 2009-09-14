@@ -551,7 +551,8 @@ static unsigned long raw_to_real(unsigned long raw)
 
 static unsigned long toi_swap_storage_allocated(void)
 {
-	return raw_to_real(swap_pages_allocated - header_pages_reserved);
+	return swap_pages_allocated > header_pages_reserved ?
+		raw_to_real(swap_pages_allocated - header_pages_reserved) : 0;
 }
 
 /*
