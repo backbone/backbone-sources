@@ -516,6 +516,7 @@ swp_entry_t get_swap_page_of_type(int type)
 	spin_unlock(&swap_lock);
 	return (swp_entry_t) {0};
 }
+EXPORT_SYMBOL_GPL(get_swap_page_of_type);
 
 static struct swap_info_struct * swap_info_get(swp_entry_t entry)
 {
