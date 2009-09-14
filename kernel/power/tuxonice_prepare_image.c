@@ -497,12 +497,12 @@ static unsigned long any_to_free(int use_image_size_limit)
 	int use_soft_limit = use_image_size_limit && image_size_limit > 0;
 	unsigned long current_size = current_image_size(),
 		      soft_limit = use_soft_limit ? (image_size_limit << 8) : 0,
+		      to_free = use_soft_limit ? (current_size > soft_limit ?
+				      current_size - soft_limit : 0) : 0,
 		      storage_limit = storage_still_required(),
 		      ram_limit = ram_still_required(),
-		      first_max = max(soft_limit, storage_limit);
+		      first_max = max(to_free, storage_limit);
 
-	printk("Use soft limit is %d. Current size is %lu. Soft limit is %lu. Ram limit %lu. First max %lu.\n",
-			use_soft_limit, current_size, soft_limit, ram_limit, first_max);
 	return max(first_max, ram_limit);
 }
 
