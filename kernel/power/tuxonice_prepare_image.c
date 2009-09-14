@@ -526,8 +526,8 @@ static unsigned long amount_needed(int use_image_size_limit)
 static int image_not_ready(int use_image_size_limit)
 {
 	toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
-		"Amount still needed (%ld) > 0:%d,"
-		" Storage allocd: %ld < %ld: %d.\n",
+		"Amount still needed (%lu) > 0:%u,"
+		" Storage allocd: %lu < %lu: %u.\n",
 			amount_needed(use_image_size_limit),
 			(amount_needed(use_image_size_limit) > 0),
 			main_storage_allocated,
@@ -604,9 +604,9 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 {
 	char buffer[255];
 	snprintf(buffer, 254,
-		"Free:%ld(%ld). Sets:%ld(%ld),%ld(%ld). "
-		"Nosave:%ld-%ld=%ld. Storage:%lu/%lu(%lu=>%lu). "
-		"Needed:%ld,%ld,%ld(%d,%ld,%ld,%ld) (PS2:%s)\n",
+		"Free:%lu(%lu). Sets:%lu(%lu),%lu(%lu). "
+		"Nosave:%lu-%lu=%lu. Storage:%lu/%lu(%lu=>%lu). "
+		"Needed:%lu,%lu,%lu(%u,%lu,%lu,%lu) (PS2:%s)\n",
 
 		/* Free */
 		real_nr_free_pages(all_zones_mask),
