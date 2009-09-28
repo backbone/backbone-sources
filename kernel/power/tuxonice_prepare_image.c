@@ -679,9 +679,11 @@ static void generate_free_page_map(void)
 			struct per_cpu_pageset *pset = zone_pcp(zone, cpu);
 			struct per_cpu_pages *pcp = &pset->pcp;
 			struct page *page;
+			int t;
 
-			list_for_each_entry(page, &pcp->list, lru)
-				SetPageNosaveFree(page);
+			for (t = 0; t < MIGRATE_PCPTYPES; t++)
+				list_for_each_entry(page, &pcp->lists[t], lru)
+					SetPageNosaveFree(page);
 		}
 
 		spin_unlock_irqrestore(&zone->lock, flags);

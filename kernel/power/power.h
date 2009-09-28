@@ -81,7 +81,7 @@ extern asmlinkage int swsusp_arch_resume(void);
 
 extern int create_basic_memory_bitmaps(void);
 extern void free_basic_memory_bitmaps(void);
-extern int swsusp_shrink_memory(void);
+extern int hibernate_preallocate_memory(void);
 
 /**
  *	Auxiliary structure used for reading the snapshot image data and
@@ -277,7 +277,7 @@ struct nosave_region {
 
 #define BM_END_OF_MAP	(~0UL)
 
-#define BM_BITS_PER_BLOCK	(PAGE_SIZE << 3)
+#define BM_BITS_PER_BLOCK	(PAGE_SIZE * BITS_PER_BYTE)
 
 struct bm_block {
 	struct list_head hook;		/* hook into a list of bitmap blocks */

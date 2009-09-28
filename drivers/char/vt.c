@@ -253,7 +253,6 @@ static void notify_update(struct vc_data *vc)
 	struct vt_notifier_param param = { .vc = vc };
 	atomic_notifier_call_chain(&vt_notifier_list, VT_UPDATE, &param);
 }
-
 /*
  *	Low-Level Functions
  */
@@ -936,6 +935,7 @@ static int vc_do_resize(struct tty_struct *tty, struct vc_data *vc,
 
 	if (CON_IS_VISIBLE(vc))
 		update_screen(vc);
+	vt_event_post(VT_EVENT_RESIZE, vc->vc_num, vc->vc_num);
 	return err;
 }
 
@@ -2130,11 +2130,7 @@ static int do_con_write(struct tty_struct *tty, const unsigned char *buf, int co
 	currcons = vc->vc_num;
 	if (!vc_cons_allocated(currcons)) {
 	    /* could this happen? */
-	    static int error = 0;
-	    if (!error) {
-		error = 1;
-		printk("con_write: tty %d not allocated\n", currcons+1);
-	    }
+		printk_once("con_write: tty %d not allocated\n", currcons+1);
 	    release_console_sem();
 	    return 0;
 	}
@@ -2911,6 +2907,9 @@ static const struct tty_operations con_ops = {
 	.flush_chars = con_flush_chars,
 	.chars_in_buffer = con_chars_in_buffer,
 	.ioctl = vt_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = vt_compat_ioctl,
+#endif
 	.stop = con_stop,
 	.start = con_start,
 	.throttle = con_throttle,
@@ -2949,9 +2948,6 @@ int __init vty_init(const struct file_operations *console_fops)
 		panic("Couldn't register console driver\n");
 	kbd_init();
 	console_map_init();
-#ifdef CONFIG_PROM_CONSOLE
-	prom_con_init();
-#endif
 #ifdef CONFIG_MDA_CONSOLE
 	mda_console_init();
 #endif
@@ -2959,7 +2955,6 @@ int __init vty_init(const struct file_operations *console_fops)
 }
 
 #ifndef VT_SINGLE_DRIVER
-#include <linux/device.h>
 
 static struct class *vtconsole_class;
 
@@ -3642,6 +3637,7 @@ void do_blank_screen(int entering_gfx)
 		blank_state = blank_vesa_wait;
 		mod_timer(&console_timer, jiffies + vesa_off_interval);
 	}
+	vt_event_post(VT_EVENT_BLANK, vc->vc_num, vc->vc_num);
 }
 EXPORT_SYMBOL(do_blank_screen);
 
@@ -3686,6 +3682,7 @@ void do_unblank_screen(int leaving_gfx)
 		console_blank_hook(0);
 	set_palette(vc);
 	set_cursor(vc);
+	vt_event_post(VT_EVENT_UNBLANK, vc->vc_num, vc->vc_num);
 }
 EXPORT_SYMBOL(do_unblank_screen);
 
