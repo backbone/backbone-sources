@@ -374,6 +374,7 @@ static int write_modified_signature(int modification)
 	struct swap_info_struct *si;
 	int result;
 	char *orig_sig;
+	struct hibernate_extent_chain *cur_chain;
 
 	/* In case we haven't already */
 	result = get_current_signature();
@@ -400,10 +401,13 @@ static int write_modified_signature(int modification)
 
 		si = get_swap_info_struct(toi_writer_posn.current_chain);
 
+		cur_chain = toi_writer_posn.chains +
+			toi_writer_posn.current_chain;
+
 		/* Prepare the signature */
 		swap_header_page.pointer->sig_data.device = si->bdev->bd_dev;
 		swap_header_page.pointer->sig_data.sector =
-			toi_writer_posn.current_offset;
+			cur_chain->current_offset;
 		swap_header_page.pointer->sig_data.resume_attempted = 0;
 		swap_header_page.pointer->sig_data.orig_sig_type =
 			parse_signature();

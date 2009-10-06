@@ -45,6 +45,7 @@ void toi_put_extent_chain(struct hibernate_extent_chain *chain)
 
 	chain->first = NULL;
 	chain->last_touched = NULL;
+	chain->current_extent = NULL;
 	chain->size = 0;
 }
 EXPORT_SYMBOL_GPL(toi_put_extent_chain);
@@ -190,10 +191,20 @@ int toi_load_extent_chain(struct hibernate_extent_chain *chain)
 			printk(KERN_INFO "Failed to read an extent.\n");
 			return 1;
 		}
+
 		if (last)
 			last->next = this;
-		else
+		else {
 			chain->first = this;
+
+			/* 
+			 * Couldn't do this earlier, but can't do
+			 * goto_start now - we may have already used blocks
+			 * in the first chain.
+			 */
+			chain->current_extent = this;
+			chain->current_offset = this->start;
+		}
 		last = this;
 	}
 	return 0;
@@ -201,7 +212,84 @@ int toi_load_extent_chain(struct hibernate_extent_chain *chain)
 EXPORT_SYMBOL_GPL(toi_load_extent_chain);
 
 /**
+ *
+ **/
+void toi_extent_chain_next(struct toi_extent_iterate_state *state)
+{
+	struct hibernate_extent_chain *this = state->chains +
+		state->current_chain;
+
+	if (!this->current_extent)
+		return;
+
+	if (this->current_offset == this->current_extent->end) {
+		if (this->current_extent->next) {
+			this->current_extent = this->current_extent->next;
+			this->current_offset = this->current_extent->start;
+		} else {
+			this->current_extent = NULL;
+			this->current_offset = 0;
+		}
+	} else
+		this->current_offset++;
+}
+
+/**
+ *
+ */
+
+static void find_next_chain_unstripped(struct toi_extent_iterate_state *state)
+{
+	struct hibernate_extent_chain *this = state->chains +
+		state->current_chain;
+
+	while (!this->current_extent) {
+		int chain_num = ++(state->current_chain);
+
+		if (chain_num == state->num_chains)
+			return;
+
+		this = state->chains + state->current_chain;
+
+		if (this->first) {
+			this->current_extent = this->first;
+			this->current_offset = this->current_extent->start;
+		}
+	}
+}
+
+static void find_next_chain_stripped(struct toi_extent_iterate_state *state)
+{
+	int start_chain = state->current_chain;
+	struct hibernate_extent_chain *this;
+
+	do {
+		int chain_num = ++(state->current_chain);
+
+		if (chain_num == state->num_chains)
+			state->current_chain = 0;
+
+		/* Back on original chain? Use it again. */
+		if (start_chain == state->current_chain)
+			return;
+
+		this = state->chains + state->current_chain;
+	} while (!this->current_extent);
+}
+
+static void find_next_chain(struct toi_extent_iterate_state *state,
+		int stripped)
+{
+	if (stripped)
+		find_next_chain_stripped(state);
+	else
+		find_next_chain_unstripped(state);
+}
+
+/**
  * toi_extent_state_next - go to the next extent
+ * @blocks: The number of values to progress.
+ * @stripe_mode: Whether to spread usage across all chains.
  *
  * Given a state, progress to the next valid entry. We may begin in an
  * invalid state, as we do when invoked after extent_state_goto_start below.
@@ -209,41 +297,26 @@ EXPORT_SYMBOL_GPL(toi_load_extent_chain);
  * When using compression and expected_compression > 0, we let the image size
  * be larger than storage, so we can validly run out of data to return.
  **/
-unsigned long toi_extent_state_next(struct toi_extent_iterate_state *state)
+unsigned long toi_extent_state_next(struct toi_extent_iterate_state *state,
+		int blocks, int stripe_mode)
 {
+	int i;
+
 	if (state->current_chain == state->num_chains)
 		return 0;
 
-	if (state->current_extent) {
-		if (state->current_offset == state->current_extent->end) {
-			if (state->current_extent->next) {
-				state->current_extent =
-					state->current_extent->next;
-				state->current_offset =
-					state->current_extent->start;
-			} else {
-				state->current_extent = NULL;
-				state->current_offset = 0;
-			}
-		} else
-			state->current_offset++;
-	}
+	/* Assume chains always have lengths that are multiples of @blocks */
+	for (i = 0; i < blocks; i++)
+		toi_extent_chain_next(state);
 
-	while (!state->current_extent) {
-		int chain_num = ++(state->current_chain);
+	if (stripe_mode ||
+	    !((state->chains + state->current_chain)->current_extent))
+		find_next_chain(state, stripe_mode);
 
-		if (chain_num == state->num_chains)
-			return 0;
-
-		state->current_extent = (state->chains + chain_num)->first;
-
-		if (!state->current_extent)
-			continue;
-
-		state->current_offset = state->current_extent->start;
-	}
-
-	return state->current_offset;
+	if (state->current_chain == state->num_chains)
+		return 0;
+	else
+		return (state->chains + state->current_chain)->current_offset;
 }
 EXPORT_SYMBOL_GPL(toi_extent_state_next);
 
@@ -253,9 +326,16 @@ EXPORT_SYMBOL_GPL(toi_extent_state_next);
  **/
 void toi_extent_state_goto_start(struct toi_extent_iterate_state *state)
 {
-	state->current_chain = -1;
-	state->current_extent = NULL;
-	state->current_offset = 0;
+	int i;
+
+	for (i = 0; i < state->num_chains; i++) {
+		struct hibernate_extent_chain *this = state->chains + i;
+		this->current_extent = this->first;
+		if (this->current_extent)
+			this->current_offset = this->current_extent->start;
+	}
+
+	state->current_chain = 0;
 }
 EXPORT_SYMBOL_GPL(toi_extent_state_goto_start);
 
@@ -272,19 +352,26 @@ void toi_extent_state_save(struct toi_extent_iterate_state *state,
 		struct hibernate_extent_iterate_saved_state *saved_state)
 {
 	struct hibernate_extent *extent;
+	struct hibernate_extent_chain *cur_chain;
+	int i;
 
 	saved_state->chain_num = state->current_chain;
-	saved_state->extent_num = 0;
-	saved_state->offset = state->current_offset;
 
 	if (saved_state->chain_num == -1)
 		return;
 
-	extent = (state->chains + state->current_chain)->first;
+	for (i = 0; i < state->num_chains; i++) {
+		cur_chain = state->chains + i;
 
-	while (extent != state->current_extent) {
-		saved_state->extent_num++;
-		extent = extent->next;
+		saved_state->extent_num[i] = 0;
+		saved_state->offset[i] = cur_chain->current_offset;
+
+		extent = cur_chain->first;
+
+		while (extent != cur_chain->current_extent) {
+			saved_state->extent_num[i]++;
+			extent = extent->next;
+		}
 	}
 }
 EXPORT_SYMBOL_GPL(toi_extent_state_save);
@@ -297,7 +384,8 @@ EXPORT_SYMBOL_GPL(toi_extent_state_save);
 void toi_extent_state_restore(struct toi_extent_iterate_state *state,
 		struct hibernate_extent_iterate_saved_state *saved_state)
 {
-	int posn = saved_state->extent_num;
+	int i;
+	struct hibernate_extent_chain *cur_chain;
 
 	if (saved_state->chain_num == -1) {
 		toi_extent_state_goto_start(state);
@@ -305,10 +393,16 @@ void toi_extent_state_restore(struct toi_extent_iterate_state *state,
 	}
 
 	state->current_chain = saved_state->chain_num;
-	state->current_extent = (state->chains + state->current_chain)->first;
-	state->current_offset = saved_state->offset;
 
-	while (posn--)
-		state->current_extent = state->current_extent->next;
+	for (i = 0; i < state->num_chains; i++) {
+		int posn = saved_state->extent_num[i];
+		cur_chain = state->chains + i;
+
+		cur_chain->current_extent = cur_chain->first;
+		cur_chain->current_offset = saved_state->offset[i];
+
+		while (posn--)
+			cur_chain->current_extent = cur_chain->current_extent->next;
+	}
 }
 EXPORT_SYMBOL_GPL(toi_extent_state_restore);

@@ -614,6 +614,7 @@ static int toi_file_write_header_cleanup(void)
 	struct toi_file_header *header;
 	int result, result2;
 	unsigned long sig_page = toi_get_zeroed_page(38, TOI_ATOMIC_GFP);
+	struct hibernate_extent_chain * cur_chain;
 
 	/* Write any unsaved data */
 	result = toi_bio_ops.write_header_chunk_finish();
@@ -633,9 +634,10 @@ static int toi_file_write_header_cleanup(void)
 
 	header = (struct toi_file_header *) sig_page;
 
+	cur_chain = toi_writer_posn.chains + toi_writer_posn.current_chain;
+
 	prepare_signature(header,
-			toi_writer_posn.current_offset <<
-			devinfo.bmap_shift);
+			cur_chain->current_offset << devinfo.bmap_shift);
 
 	result = toi_bio_ops.bdev_page_io(WRITE, toi_file_target_bdev,
 			target_firstblock,

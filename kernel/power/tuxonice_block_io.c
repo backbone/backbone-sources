@@ -48,7 +48,7 @@ unsigned long mutex_times[2][2][NR_CPUS];
 } while (0)
 #endif
 
-static int target_outstanding_io = 1024;
+static int target_outstanding_io = 1024, stripe_data;
 static int max_outstanding_writes, max_outstanding_reads;
 
 static struct page *bio_queue_head, *bio_queue_tail;
@@ -499,9 +499,9 @@ static void dump_block_chains(void)
 
 	for (i = 0; i < 4; i++)
 		printk(KERN_DEBUG "Posn %d: Chain %d, extent %d, offset %lu.\n",
-				i, toi_writer_posn_save[i].chain_num,
-				toi_writer_posn_save[i].extent_num,
-				toi_writer_posn_save[i].offset);
+			i, toi_writer_posn_save[i].chain_num,
+			toi_writer_posn_save[i].extent_num[toi_writer_posn_save[i].chain_num],
+			toi_writer_posn_save[i].offset[toi_writer_posn_save[i].chain_num]);
 }
 
 static int total_header_bytes;
@@ -533,9 +533,11 @@ static int debug_broken_header(void)
  **/
 static int go_next_page(int writing, int section_barrier)
 {
-	int i, chain_num = toi_writer_posn.current_chain,
+	int chain_num = toi_writer_posn.current_chain,
 	  max = (chain_num == -1) ? 1 : toi_devinfo[chain_num].blocks_per_page,
 	  compare_to = 0, compare_chain, compare_offset;
+	struct hibernate_extent_chain *cur_chain =
+		toi_writer_posn.chains + chain_num;
 
 	/* Have we already used the last page of the stream? */
 	switch (current_stream) {
@@ -551,10 +553,10 @@ static int go_next_page(int writing, int section_barrier)
 	}
 
 	compare_chain = toi_writer_posn_save[compare_to].chain_num;
-	compare_offset = toi_writer_posn_save[compare_to].offset;
+	compare_offset = toi_writer_posn_save[compare_to].offset[compare_chain];
 
 	if (section_barrier && chain_num == compare_chain &&
-	    toi_writer_posn.current_offset == compare_offset) {
+	    cur_chain->current_offset == compare_offset) {
 		if (writing) {
 			if (!current_stream)
 				return debug_broken_header();
@@ -564,9 +566,12 @@ static int go_next_page(int writing, int section_barrier)
 		}
 	}
 
-	/* Nope. Go foward a page - or maybe two */
-	for (i = 0; i < max; i++)
-		toi_extent_state_next(&toi_writer_posn);
+	/* Nope. Go foward a page - or maybe two. Don't stripe the header,
+	 * so that bad fragmentation doesn't put the extent data containing
+	 * the location of the second page out of the first header page.
+	 */
+	toi_extent_state_next(&toi_writer_posn, max,
+			current_stream ? stripe_data : 0);
 
 	if (toi_extent_state_eof(&toi_writer_posn)) {
 		/* Don't complain if readahead falls off the end */
@@ -613,6 +618,8 @@ static int toi_bio_rw_page(int writing, struct page *page,
 {
 	struct toi_bdev_info *dev_info;
 	int result = go_next_page(writing, 1);
+	struct hibernate_extent_chain *this =
+		toi_writer_posn.chains + toi_writer_posn.current_chain;
 
 	if (result)
 		return result;
@@ -620,8 +627,7 @@ static int toi_bio_rw_page(int writing, struct page *page,
 	dev_info = &toi_devinfo[toi_writer_posn.current_chain];
 
 	return toi_do_io(writing, dev_info->bdev,
-		toi_writer_posn.current_offset <<
-			dev_info->bmap_shift,
+		this->current_offset << dev_info->bmap_shift,
 		page, is_readahead, 0, free_group);
 }
 
@@ -1148,10 +1154,11 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 	if (owner) {
 		owner->header_used += buffer_size;
 		toi_message(TOI_HEADER, TOI_LOW, 1,
-			"Header: %s : %d bytes (%d/%d).\n",
+			"Header: %s : %d bytes (%d/%d) from offset %d.\n",
 			owner->name,
 			buffer_size, owner->header_used,
-			owner->header_requested);
+			owner->header_requested,
+			toi_writer_buffer_posn);
 		if (owner->header_used > owner->header_requested) {
 			printk(KERN_EMERG "TuxOnIce module %s is using more "
 				"header space (%u) than it requested (%u).\n",
@@ -1163,8 +1170,8 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 	} else {
 		unowned += buffer_size;
 		toi_message(TOI_HEADER, TOI_LOW, 1,
-			"Header: (No owner): %d bytes (%d total so far)\n",
-			buffer_size, unowned);
+			"Header: (No owner): %d bytes (%d total so far) from offset %d.\n",
+			buffer_size, unowned, toi_writer_buffer_posn);
 	}
 
 	if (!writing && !no_readahead && more_readahead)
@@ -1212,7 +1219,7 @@ static int write_header_chunk_finish(void)
  **/
 static int toi_bio_storage_needed(void)
 {
-	return sizeof(int);
+	return 2 * sizeof(int);
 }
 
 /**
@@ -1223,7 +1230,8 @@ static int toi_bio_save_config_info(char *buf)
 {
 	int *ints = (int *) buf;
 	ints[0] = target_outstanding_io;
-	return sizeof(int);
+	ints[1] = stripe_data;
+	return 2 * sizeof(int);
 }
 
 /**
@@ -1235,6 +1243,7 @@ static void toi_bio_load_config_info(char *buf, int size)
 {
 	int *ints = (int *) buf;
 	target_outstanding_io  = ints[0];
+	stripe_data = ints[1];
 }
 
 /**
@@ -1247,6 +1256,7 @@ static int toi_bio_initialise(int starting_cycle)
 	if (starting_cycle) {
 		max_outstanding_writes = 0;
 		max_outstanding_reads = 0;
+		current_stream = 0;
 		toi_queue_flusher = current;
 #ifdef MEASURE_MUTEX_CONTENTION
 		{
@@ -1297,6 +1307,8 @@ EXPORT_SYMBOL_GPL(toi_bio_ops);
 static struct toi_sysfs_data sysfs_params[] = {
 	SYSFS_INT("target_outstanding_io", SYSFS_RW, &target_outstanding_io,
 			0, 16384, 0, NULL),
+	SYSFS_INT("stripe_data", SYSFS_RW, &stripe_data,
+			0, 1, 0, NULL),
 };
 
 static struct toi_module_ops toi_blockwriter_ops = {

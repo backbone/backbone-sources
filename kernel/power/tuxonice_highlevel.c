@@ -805,19 +805,18 @@ static int do_prepare_image(void)
  **/
 int do_check_can_resume(void)
 {
-	char *buf = (char *) toi_get_zeroed_page(21, TOI_ATOMIC_GFP);
-	int result = 0;
+	int result = -1;
 
-	if (!buf)
-		return 0;
+	if (toi_activate_storage(0))
+		return -1;
 
-	/* Only interested in first byte, so throw away return code. */
-	image_exists_read(buf, PAGE_SIZE);
+	if (!test_toi_state(TOI_RESUME_DEVICE_OK))
+		toi_attempt_to_parse_resume_device(0);
 
-	if (buf[0] == '1')
-		result = 1;
+	if (toiActiveAllocator)
+		result = toiActiveAllocator->image_exists(1);
 
-	toi_free_page(21, (unsigned long) buf);
+	toi_deactivate_storage(0);
 	return result;
 }
 EXPORT_SYMBOL_GPL(do_check_can_resume);
