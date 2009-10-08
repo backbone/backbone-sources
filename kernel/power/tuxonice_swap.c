@@ -715,6 +715,8 @@ static int toi_swap_allocate_storage(unsigned long request)
 				swapfilenum++;
 			if (swapfilenum == MAX_SWAPFILES)
 				break;
+			to_add = 0;
+			continue;
 		}
 
 		new_value = entry.val;
