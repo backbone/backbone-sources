@@ -152,7 +152,7 @@ void toi_finish_anything(int hibernate_or_resume)
 	toi_put_modules();
 	if (hibernate_or_resume) {
 		block_dump = block_dump_save;
-		set_cpus_allowed(current, CPU_MASK_ALL);
+		set_cpus_allowed_ptr(current, cpu_all_mask);
 		toi_alloc_print_debug_stats();
 		atomic_inc(&snapshot_device_available);
 		mutex_unlock(&pm_mutex);
@@ -195,8 +195,8 @@ int toi_start_anything(int hibernate_or_resume)
 	if (hibernate_or_resume) {
 		block_dump_save = block_dump;
 		block_dump = 0;
-		set_cpus_allowed(current,
-				cpumask_of_cpu(first_cpu(cpu_online_map)));
+		set_cpus_allowed_ptr(current,
+				&cpumask_of_cpu(first_cpu(cpu_online_map)));
 	}
 
 	if (toi_initialise_modules_early(hibernate_or_resume))
@@ -212,7 +212,7 @@ int toi_start_anything(int hibernate_or_resume)
 early_init_err:
 	if (hibernate_or_resume) {
 		block_dump_save = block_dump;
-		set_cpus_allowed(current, CPU_MASK_ALL);
+		set_cpus_allowed_ptr(current, cpu_all_mask);
 	}
 prehibernate_err:
 	if (hibernate_or_resume)
