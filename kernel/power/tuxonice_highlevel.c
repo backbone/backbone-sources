@@ -98,7 +98,7 @@ static DEFINE_MUTEX(tuxonice_in_use);
 static int block_dump_save;
 
 /* Binary signature if an image is present */
-char *tuxonice_signature = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
+char tuxonice_signature[9] = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
 EXPORT_SYMBOL_GPL(tuxonice_signature);
 
 unsigned long boot_kernel_data_buffer;
@@ -1225,6 +1225,8 @@ static struct toi_sysfs_data sysfs_params[] = {
 			TOI_NO_PS2_IF_UNNEEDED, 0),
 	SYSFS_BIT("late_cpu_hotplug", SYSFS_RW, &toi_bkd.toi_action,
 			TOI_LATE_CPU_HOTPLUG, 0),
+	SYSFS_STRING("binary_signature", SYSFS_READONLY,
+			tuxonice_signature, 9, 0, NULL),
 #ifdef CONFIG_TOI_KEEP_IMAGE
 	SYSFS_BIT("keep_image", SYSFS_RW , &toi_bkd.toi_action, TOI_KEEP_IMAGE,
 			0),
