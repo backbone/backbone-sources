@@ -276,6 +276,9 @@ int tuxonice_calc_checksum(struct page *page, char *checksum_locn)
 	kunmap(page);
 	result = crypto_hash_digest(&ctx->desc, ctx->sg, PAGE_SIZE,
 						checksum_locn);
+	if (result)
+		printk("TuxOnIce checksumming: crypto_hash_digest "
+				"returned %d.\n", result);
 	return result;
 }
 /*
