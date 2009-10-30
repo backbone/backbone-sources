@@ -383,7 +383,8 @@ static void userui_abort_hibernate(int result_code, const char *fmt, ...)
  */
 static void request_abort_hibernate(void)
 {
-	if (test_result_state(TOI_ABORT_REQUESTED))
+	if (test_result_state(TOI_ABORT_REQUESTED) ||
+	   !test_action_state(TOI_CAN_CANCEL))
 		return;
 
 	if (test_toi_state(TOI_NOW_RESUMING)) {
