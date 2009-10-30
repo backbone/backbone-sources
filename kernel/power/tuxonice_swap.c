@@ -687,6 +687,7 @@ static int toi_swap_allocate_storage(unsigned long request)
 		devinfo[i].dev_t = si->bdev->bd_dev;
 		devinfo[i].bmap_shift = 3;
 		devinfo[i].blocks_per_page = 1;
+		block_chain[i].prio = si->prio;
 		if (swapfilenum == MAX_SWAPFILES)
 			swapfilenum = i;
 	}
@@ -939,8 +940,11 @@ static int toi_swap_read_header_init(void)
 	toi_extent_state_goto_start(&toi_writer_posn);
 	toi_bio_ops.set_extra_page_forward();
 
-	for (i = 0; i < MAX_SWAPFILES && !result; i++)
-		result = toi_load_extent_chain(&block_chain[i]);
+	for (i = 0; i < MAX_SWAPFILES && !result; i++) {
+		result = toi_load_extent_chain(&toi_writer_posn, i);
+		if (result)
+			break;
+	}
 
 	return result;
 }
@@ -1014,8 +1018,8 @@ static int toi_swap_storage_needed(void)
 		sizeof(devinfo);
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
-		result += sizeof(block_chain[i].size) +
-			  sizeof(block_chain[i].num_extents);
+		result += sizeof(unsigned long) +
+			  2 * sizeof(int);
 		result += (2 * sizeof(unsigned long) *
 			block_chain[i].num_extents);
 	}

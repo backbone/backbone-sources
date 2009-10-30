@@ -15,6 +15,16 @@
 #include "tuxonice_ui.h"
 #include "tuxonice.h"
 
+static int prio_chain_head = -1;
+
+/* Pointer to current entry being loaded/saved. */
+struct toi_extent_iterate_state toi_writer_posn;
+EXPORT_SYMBOL_GPL(toi_writer_posn);
+
+/* 0 = Header, 1 = Pageset1, 2 = Pageset2, 3 = End of PS1 */
+struct hibernate_extent_iterate_saved_state toi_writer_posn_save[4];
+EXPORT_SYMBOL_GPL(toi_writer_posn_save);
+
 /**
  * toi_get_extent - return a free extent
  *
@@ -131,7 +141,7 @@ int toi_serialise_extent_chain(struct toi_module_ops *owner,
 	int ret, i = 0;
 
 	ret = toiActiveAllocator->rw_header_chunk(WRITE, owner, (char *) chain,
-			sizeof(chain->size) + sizeof(chain->num_extents));
+			sizeof(unsigned long) + 2 * sizeof(int));
 	if (ret)
 		return ret;
 
@@ -162,15 +172,16 @@ EXPORT_SYMBOL_GPL(toi_serialise_extent_chain);
  * The linked list of extents is reconstructed from the disk. chain will point
  * to the first entry.
  **/
-int toi_load_extent_chain(struct hibernate_extent_chain *chain)
+int toi_load_extent_chain(struct toi_extent_iterate_state *state, int index)
 {
+	struct hibernate_extent_chain *chain = &state->chains[index];
 	struct hibernate_extent *this, *last = NULL;
 	int i, ret;
 
 	/* Get the next page */
 	ret = toiActiveAllocator->rw_header_chunk_noreadahead(READ, NULL,
-			(char *) chain, sizeof(chain->size) +
-			sizeof(chain->num_extents));
+			(char *) chain, sizeof(unsigned long) +
+			2 * sizeof(int));
 	if (ret) {
 		printk(KERN_ERR "Failed to read the size of extent chain.\n");
 		return 1;
@@ -204,8 +215,23 @@ int toi_load_extent_chain(struct hibernate_extent_chain *chain)
 			 */
 			chain->current_extent = this;
 			chain->current_offset = this->start;
+
+			/*
+			 * Can't wait until we've read the whole chain
+			 * before we insert it in the list. We might need
+			 * this chain to read the next page in the header
+			 */
+			toi_insert_chain_in_prio_list(&toi_writer_posn, index);
+			if (!index)
+				toi_writer_posn.current_chain = prio_chain_head;
 		}
 		last = this;
+	}
+
+	if (!chain->current_extent) {
+		chain->current_extent = chain->first;
+		if (chain->current_extent)
+			chain->current_offset = chain->current_extent->start;
 	}
 	return 0;
 }
@@ -238,52 +264,47 @@ void toi_extent_chain_next(struct toi_extent_iterate_state *state)
  *
  */
 
-static void find_next_chain_unstripped(struct toi_extent_iterate_state *state)
-{
-	struct hibernate_extent_chain *this = state->chains +
-		state->current_chain;
-
-	while (!this->current_extent) {
-		int chain_num = ++(state->current_chain);
-
-		if (chain_num == state->num_chains)
-			return;
-
-		this = state->chains + state->current_chain;
-
-		if (this->first) {
-			this->current_extent = this->first;
-			this->current_offset = this->current_extent->start;
-		}
-	}
-}
-
-static void find_next_chain_stripped(struct toi_extent_iterate_state *state)
+static int __find_next_chain_same_prio(struct toi_extent_iterate_state *state)
 {
 	int start_chain = state->current_chain;
-	struct hibernate_extent_chain *this;
+	int cur_chain = start_chain;
+	struct hibernate_extent_chain *this = state->chains + start_chain;
+	int orig_prio = this->prio;
 
 	do {
-		int chain_num = ++(state->current_chain);
+		cur_chain = this->next;
 
-		if (chain_num == state->num_chains)
-			state->current_chain = 0;
+		if (cur_chain == -1)
+			cur_chain = prio_chain_head;
 
 		/* Back on original chain? Use it again. */
-		if (start_chain == state->current_chain)
-			return;
+		if (cur_chain == start_chain)
+			return start_chain;
 
-		this = state->chains + state->current_chain;
-	} while (!this->current_extent);
+		this = state->chains + cur_chain;
+	} while (!this->current_extent || this->prio != orig_prio);
+
+	return cur_chain;
 }
 
-static void find_next_chain(struct toi_extent_iterate_state *state,
-		int stripped)
+static void find_next_chain(struct toi_extent_iterate_state *state)
 {
-	if (stripped)
-		find_next_chain_stripped(state);
-	else
-		find_next_chain_unstripped(state);
+	struct hibernate_extent_chain *this;
+
+	state->current_chain = __find_next_chain_same_prio(state);
+	this = state->chains + state->current_chain;
+
+	/*
+	 * If we didn't get another chain of the same priority that we
+	 * can use, look for the next priority.
+	 */
+	while (state->current_chain != -1 && !this->current_extent) {
+		state->current_chain = this->next;
+
+		this = (state->current_chain > -1) ?
+			state->chains + state->current_chain :
+			NULL;
+	}
 }
 
 /**
@@ -298,27 +319,55 @@ static void find_next_chain(struct toi_extent_iterate_state *state,
  * be larger than storage, so we can validly run out of data to return.
  **/
 unsigned long toi_extent_state_next(struct toi_extent_iterate_state *state,
-		int blocks, int stripe_mode)
+		int blocks, int current_stream)
 {
 	int i;
 
-	if (state->current_chain == state->num_chains)
+	if (state->current_chain == -1)
 		return 0;
 
 	/* Assume chains always have lengths that are multiples of @blocks */
 	for (i = 0; i < blocks; i++)
 		toi_extent_chain_next(state);
 
-	if (stripe_mode ||
-	    !((state->chains + state->current_chain)->current_extent))
-		find_next_chain(state, stripe_mode);
+	if (current_stream ||
+	    !(state->chains + state->current_chain)->current_extent)
+		find_next_chain(state);
 
-	if (state->current_chain == state->num_chains)
+	if (state->current_chain == -1)
 		return 0;
 	else
 		return (state->chains + state->current_chain)->current_offset;
 }
 EXPORT_SYMBOL_GPL(toi_extent_state_next);
+
+void toi_insert_chain_in_prio_list(struct toi_extent_iterate_state *state, int i)
+{
+	int *prev_idx;
+
+	/* Empty chains are irrelevant */
+	if (!state->chains[i].first)
+		return;
+
+	state->chains[i].next = -1;
+
+	/* First entry? Put in the head */
+	if (prio_chain_head == -1) {
+		prio_chain_head = i;
+		return;
+	}
+
+	/* Loop through the existing chain, finding where to insert it */
+	prev_idx = &prio_chain_head;
+
+	while (*prev_idx > -1 &&
+	       state->chains[*prev_idx].prio < state->chains[i].prio)
+		prev_idx = &state->chains[*prev_idx].next;
+
+	state->chains[i].next = *prev_idx;
+	*prev_idx = i;
+}
+EXPORT_SYMBOL_GPL(toi_insert_chain_in_prio_list);
 
 /**
  * toi_extent_state_goto_start - reinitialize an extent chain iterator
@@ -328,14 +377,18 @@ void toi_extent_state_goto_start(struct toi_extent_iterate_state *state)
 {
 	int i;
 
+	/* Reset */
+	prio_chain_head = -1;
+
 	for (i = 0; i < state->num_chains; i++) {
 		struct hibernate_extent_chain *this = state->chains + i;
+		toi_insert_chain_in_prio_list(state, i);
 		this->current_extent = this->first;
 		if (this->current_extent)
 			this->current_offset = this->current_extent->start;
 	}
 
-	state->current_chain = 0;
+	state->current_chain = prio_chain_head;
 }
 EXPORT_SYMBOL_GPL(toi_extent_state_goto_start);
 

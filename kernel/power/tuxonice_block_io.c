@@ -48,7 +48,7 @@ unsigned long mutex_times[2][2][NR_CPUS];
 } while (0)
 #endif
 
-static int target_outstanding_io = 1024, stripe_data;
+static int target_outstanding_io = 1024;
 static int max_outstanding_writes, max_outstanding_reads;
 
 static struct page *bio_queue_head, *bio_queue_tail;
@@ -67,14 +67,6 @@ static DECLARE_WAIT_QUEUE_HEAD(num_in_progress_wait);
 static int extra_page_forward;
 
 static int current_stream;
-/* 0 = Header, 1 = Pageset1, 2 = Pageset2, 3 = End of PS1 */
-struct hibernate_extent_iterate_saved_state toi_writer_posn_save[4];
-EXPORT_SYMBOL_GPL(toi_writer_posn_save);
-
-/* Pointer to current entry being loaded/saved. */
-struct toi_extent_iterate_state toi_writer_posn;
-EXPORT_SYMBOL_GPL(toi_writer_posn);
-
 /* Not static, so that the allocators can setup and complete
  * writing the header */
 char *toi_writer_buffer;
@@ -570,8 +562,10 @@ static int go_next_page(int writing, int section_barrier)
 	 * so that bad fragmentation doesn't put the extent data containing
 	 * the location of the second page out of the first header page.
 	 */
-	toi_extent_state_next(&toi_writer_posn, max,
-			current_stream ? stripe_data : 0);
+	toi_extent_state_next(&toi_writer_posn, max, current_stream);
+
+	chain_num = toi_writer_posn.current_chain;
+	cur_chain = toi_writer_posn.chains + chain_num;
 
 	if (toi_extent_state_eof(&toi_writer_posn)) {
 		/* Don't complain if readahead falls off the end */
@@ -1219,7 +1213,7 @@ static int write_header_chunk_finish(void)
  **/
 static int toi_bio_storage_needed(void)
 {
-	return 2 * sizeof(int);
+	return sizeof(int);
 }
 
 /**
@@ -1230,8 +1224,7 @@ static int toi_bio_save_config_info(char *buf)
 {
 	int *ints = (int *) buf;
 	ints[0] = target_outstanding_io;
-	ints[1] = stripe_data;
-	return 2 * sizeof(int);
+	return sizeof(int);
 }
 
 /**
@@ -1243,7 +1236,6 @@ static void toi_bio_load_config_info(char *buf, int size)
 {
 	int *ints = (int *) buf;
 	target_outstanding_io  = ints[0];
-	stripe_data = ints[1];
 }
 
 /**
@@ -1307,8 +1299,6 @@ EXPORT_SYMBOL_GPL(toi_bio_ops);
 static struct toi_sysfs_data sysfs_params[] = {
 	SYSFS_INT("target_outstanding_io", SYSFS_RW, &target_outstanding_io,
 			0, 16384, 0, NULL),
-	SYSFS_INT("stripe_data", SYSFS_RW, &stripe_data,
-			0, 1, 0, NULL),
 };
 
 static struct toi_module_ops toi_blockwriter_ops = {

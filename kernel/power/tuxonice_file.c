@@ -715,10 +715,11 @@ static int toi_file_read_header_init(void)
 	/* Jump to the next page */
 	toi_bio_ops.set_extra_page_forward();
 
-	/* Bring back the chain from disk: this will read
+	/* 
+	 * Bring back the chain from disk: this will read
 	 * all extents.
 	 */
-	return toi_load_extent_chain(&block_chain);
+	return toi_load_extent_chain(&toi_writer_posn, 0);
 }
 
 static int toi_file_read_header_cleanup(void)
@@ -841,7 +842,7 @@ static int toi_file_storage_needed(void)
 	return strlen(toi_file_target) + 1 +
 		sizeof(toi_writer_posn_save) +
 		sizeof(devinfo) +
-		sizeof(block_chain.size) + sizeof(block_chain.num_extents) +
+		sizeof(unsigned long) + 2 * sizeof(int) +
 		(2 * sizeof(unsigned long) * block_chain.num_extents);
 }
 
