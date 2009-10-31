@@ -55,3 +55,15 @@ extern struct toi_bio_ops toi_bio_ops;
 
 extern char *toi_writer_buffer;
 extern int toi_writer_buffer_posn;
+
+void toi_extent_state_save(struct toi_extent_iterate_state *state,
+		struct hibernate_extent_iterate_saved_state *saved_state);
+void toi_extent_state_restore(struct toi_extent_iterate_state *state,
+		struct hibernate_extent_iterate_saved_state *saved_state);
+void toi_extent_state_goto_start(struct toi_extent_iterate_state *state);
+int toi_serialise_extent_chain(struct toi_module_ops *owner,
+		struct hibernate_extent_chain *chain);
+int toi_load_extent_chain(struct toi_extent_iterate_state *state, int index);
+
+extern struct hibernate_extent_iterate_saved_state toi_writer_posn_save[4];
+extern struct toi_extent_iterate_state toi_writer_posn;
