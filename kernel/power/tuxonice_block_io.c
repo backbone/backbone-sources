@@ -924,7 +924,7 @@ static int go_next_page(int writing, int section_barrier)
 	 */
 	toi_extent_state_next(&toi_writer_posn, max, current_stream);
 
-	if (toi_extent_state_eof(&toi_writer_posn)) {
+	if (toi_writer_posn.current_chain == -1) {
 		/* Don't complain if readahead falls off the end */
 		if (writing && section_barrier) {
 			printk(KERN_DEBUG "Extent state eof. "

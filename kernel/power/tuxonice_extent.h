@@ -45,9 +45,6 @@ struct hibernate_extent_iterate_saved_state {
 	unsigned long offset[MAX_SWAPFILES];
 };
 
-#define toi_extent_state_eof(state) \
-	((state)->num_chains == (state)->current_chain)
-
 /* Simplify iterating through all the values in an extent chain */
 #define toi_extent_for_each(extent_chain, extentpointer, value) \
 if ((extent_chain)->first) \
