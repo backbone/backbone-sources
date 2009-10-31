@@ -234,23 +234,6 @@ static int __populate_block_list(int min, int max)
 	return toi_add_to_extent_chain(&block_chain, min, max);
 }
 
-static int apply_header_reservation(void)
-{
-	int i;
-
-	/* Apply header space reservation */
-	toi_extent_state_goto_start(&toi_writer_posn);
-
-	for (i = 0; i < header_pages_reserved; i++)
-		if (toi_bio_ops.forward_one_page(1, 0))
-			return -ENOSPC;
-
-	/* The end of header pages will be the start of pageset 2 */
-	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
-
-	return 0;
-}
-
 static int populate_block_list(void)
 {
 	int i, extent_min = -1, extent_max = -1, got_header = 0, result = 0;
@@ -313,7 +296,7 @@ static int populate_block_list(void)
 	}
 
 out:
-	return apply_header_reservation();
+	return toi_bio_ops.reserve_header(header_pages_reserved);
 }
 
 static void toi_file_cleanup(int finishing_cycle)
@@ -545,7 +528,7 @@ static int toi_file_allocate_storage(unsigned long main_space_requested)
 
 	/* Only release_storage reduces the size */
 	if (!blocks_to_get)
-		return apply_header_reservation();
+		return toi_bio_ops.reserve_header(header_pages_reserved);
 
 	result = populate_block_list();
 

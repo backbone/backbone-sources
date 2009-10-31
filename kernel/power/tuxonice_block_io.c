@@ -453,6 +453,26 @@ int toi_load_extent_chain(struct toi_extent_iterate_state *state, int index)
 }
 EXPORT_SYMBOL_GPL(toi_load_extent_chain);
 
+static int reserve_header(int num_pages)
+{
+	int i;
+
+	if (!num_pages)
+		return 0;
+
+	/* Apply header space reservation */
+	toi_extent_state_goto_start(&toi_writer_posn);
+
+	for (i = 0; i < num_pages; i++)
+		if (toi_bio_ops.forward_one_page(1, 0))
+			return -ENOSPC;
+
+	/* The end of header pages will be the start of pageset 2 */
+	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
+
+	return 0;
+}
+
 /**
  * do_bio_wait - wait for some TuxOnIce I/O to complete
  * @reason: The array index of the reason we're waiting.
@@ -1630,6 +1650,7 @@ struct toi_bio_ops toi_bio_ops = {
 	.rw_header_chunk_noreadahead = toi_rw_header_chunk_noreadahead,
 	.write_header_chunk_finish = write_header_chunk_finish,
 	.io_flusher = bio_io_flusher,
+	.reserve_header = reserve_header,
 };
 EXPORT_SYMBOL_GPL(toi_bio_ops);
 

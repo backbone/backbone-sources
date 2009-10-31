@@ -444,28 +444,6 @@ static int write_modified_signature(int modification)
 	return result;
 }
 
-/*
- * apply_header_reservation
- */
-static int apply_header_reservation(void)
-{
-	unsigned long i;
-
-	toi_extent_state_goto_start(&toi_writer_posn);
-
-	if (!header_pages_reserved)
-		return 0;
-
-	for (i = 0; i < header_pages_reserved; i++)
-		if (toi_bio_ops.forward_one_page(1, 0))
-			return -ENOSPC;
-
-	/* The end of header pages will be the start of pageset 2;
-	 * we are now sitting on the first pageset2 page. */
-	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
-	return 0;
-}
-
 static void toi_swap_reserve_header_space(unsigned long request)
 {
 	header_pages_reserved = request;
@@ -539,7 +517,7 @@ static int get_main_pool_phys_params(void)
 		return -ENOMEM;
 	}
 
-	return apply_header_reservation();
+	return toi_bio_ops.reserve_header(header_pages_reserved);
 }
 
 static unsigned long raw_to_real(unsigned long raw)
@@ -670,7 +648,7 @@ static int toi_swap_allocate_storage(unsigned long request)
 		needed - swapextents.size : 0;
 
 	if (pages_to_get < 1)
-		return apply_header_reservation();
+		return toi_bio_ops.reserve_header(header_pages_reserved);
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si = get_swap_info_struct(i);
@@ -690,7 +668,7 @@ static int toi_swap_allocate_storage(unsigned long request)
 	}
 
 	if (swapfilenum == MAX_SWAPFILES)
-		return apply_header_reservation();
+		return toi_bio_ops.reserve_header(header_pages_reserved);
 
 	while (gotten < pages_to_get) {
 		swp_entry_t entry;

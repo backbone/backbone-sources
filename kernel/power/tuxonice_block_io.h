@@ -49,6 +49,7 @@ struct toi_bio_ops {
 	int (*rw_init) (int rw, int stream_number);
 	int (*rw_cleanup) (int rw);
 	int (*io_flusher) (int rw);
+	int (*reserve_header)(int num_pages);
 };
 
 extern struct toi_bio_ops toi_bio_ops;
