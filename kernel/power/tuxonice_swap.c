@@ -1232,7 +1232,7 @@ static int header_locations_read_sysfs(const char *page, int count)
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si =  get_swap_info_struct(i);
 
-		if ((!si->flags & SWP_USED) || si->swap_map ||
+		if ((!si->flags & SWP_USED) || !si->swap_map ||
 		    !(si->flags & SWP_WRITEOK))
 			continue;
 
