@@ -564,9 +564,6 @@ static int go_next_page(int writing, int section_barrier)
 	 */
 	toi_extent_state_next(&toi_writer_posn, max, current_stream);
 
-	chain_num = toi_writer_posn.current_chain;
-	cur_chain = toi_writer_posn.chains + chain_num;
-
 	if (toi_extent_state_eof(&toi_writer_posn)) {
 		/* Don't complain if readahead falls off the end */
 		if (writing && section_barrier) {
