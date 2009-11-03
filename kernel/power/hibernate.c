@@ -714,21 +714,22 @@ int software_resume(void)
 	/* The snapshot device should not be opened while we're running */
 	if (!atomic_add_unless(&snapshot_device_available, -1, 0)) {
 		error = -EBUSY;
+		swsusp_close(FMODE_READ);
 		goto Unlock;
 	}
 
 	pm_prepare_console();
 	error = pm_notifier_call_chain(PM_RESTORE_PREPARE);
 	if (error)
-		goto Finish;
+		goto close_finish;
 
 	error = usermodehelper_disable();
 	if (error)
-		goto Finish;
+		goto close_finish;
 
 	error = create_basic_memory_bitmaps();
 	if (error)
-		goto Finish;
+		goto close_finish;
 
 	pr_debug("PM: Preparing processes for restore.\n");
 	error = prepare_processes();
@@ -740,6 +741,7 @@ int software_resume(void)
 	pr_debug("PM: Reading hibernation image.\n");
 
 	error = swsusp_read(&flags);
+	swsusp_close(FMODE_READ);
 	if (!error)
 		hibernation_restore(flags & SF_PLATFORM_MODE);
 
@@ -758,6 +760,9 @@ int software_resume(void)
 	mutex_unlock(&pm_mutex);
 	pr_debug("PM: Resume from disk failed.\n");
 	return error;
+close_finish:
+	swsusp_close(FMODE_READ);
+	goto Finish;
 }
 
 late_initcall(software_resume);
