@@ -67,6 +67,8 @@ static void __toi_power_down(int method)
 			panic("Attempt to reload pagedir 2 failed. "
 					"Try rebooting.");
 
+		pm_prepare_console();
+
 		error = pm_notifier_call_chain(PM_SUSPEND_PREPARE);
 		if (!error) {
 			error = suspend_devices_and_enter(PM_SUSPEND_MEM);
@@ -74,6 +76,7 @@ static void __toi_power_down(int method)
 				did_suspend_to_both = 1;
 		}
 		pm_notifier_call_chain(PM_POST_SUSPEND);
+		pm_restore_console();
 
 		/* Success - we're now post-resume-from-ram */
 		if (did_suspend_to_both)

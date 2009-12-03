@@ -1,5 +1,5 @@
 /*
- * kernel/power/tuxonice_block_io.c
+ * kernel/power/tuxonice_bio.c
  *
  * Copyright (C) 2004-2008 Nigel Cunningham (nigel at tuxonice net)
  *
@@ -14,15 +14,20 @@
 #include <linux/blkdev.h>
 #include <linux/syscalls.h>
 #include <linux/suspend.h>
+#include <linux/ctype.h>
+#include <linux/uuid.h>
+#include <scsi/scsi_scan.h>
 
 #include "tuxonice.h"
 #include "tuxonice_sysfs.h"
 #include "tuxonice_modules.h"
 #include "tuxonice_prepare_image.h"
-#include "tuxonice_block_io.h"
+#include "tuxonice_bio.h"
 #include "tuxonice_ui.h"
 #include "tuxonice_alloc.h"
 #include "tuxonice_io.h"
+#include "tuxonice_builtin.h"
+#include "tuxonice_bio_internal.h"
 
 #define MEMORY_ONLY 1
 #define THROTTLE_WAIT 2
@@ -48,6 +53,8 @@ unsigned long mutex_times[2][2][NR_CPUS];
 } while (0)
 #endif
 
+static int page_idx, reset_idx;
+
 static int target_outstanding_io = 1024;
 static int max_outstanding_writes, max_outstanding_reads;
 
@@ -56,7 +63,7 @@ static atomic_t toi_bio_queue_size;
 static DEFINE_SPINLOCK(bio_queue_lock);
 
 static int free_mem_throttle, throughput_throttle;
-static int more_readahead = 1;
+int more_readahead = 1;
 static struct page *readahead_list_head, *readahead_list_tail;
 
 static struct page *waiting_on;
@@ -64,18 +71,11 @@ static struct page *waiting_on;
 static atomic_t toi_io_in_progress, toi_io_done;
 static DECLARE_WAIT_QUEUE_HEAD(num_in_progress_wait);
 
-static int extra_page_forward;
-
-static int current_stream;
+int current_stream;
 /* Not static, so that the allocators can setup and complete
  * writing the header */
 char *toi_writer_buffer;
-EXPORT_SYMBOL_GPL(toi_writer_buffer);
-
 int toi_writer_buffer_posn;
-EXPORT_SYMBOL_GPL(toi_writer_buffer_posn);
-
-static struct toi_bdev_info *toi_devinfo;
 
 static DEFINE_MUTEX(toi_bio_mutex);
 static DEFINE_MUTEX(toi_bio_readahead_mutex);
@@ -83,18 +83,12 @@ static DEFINE_MUTEX(toi_bio_readahead_mutex);
 static struct task_struct *toi_queue_flusher;
 static int toi_bio_queue_flush_pages(int dedicated_thread);
 
+struct toi_module_ops toi_blockwriter_ops;
+
 #define TOTAL_OUTSTANDING_IO (atomic_read(&toi_io_in_progress) + \
 	       atomic_read(&toi_bio_queue_size))
 
-static int prio_chain_head = -1;
-
-/* Pointer to current entry being loaded/saved. */
-struct toi_extent_iterate_state toi_writer_posn;
-EXPORT_SYMBOL_GPL(toi_writer_posn);
-
-/* 0 = Header, 1 = Pageset1, 2 = Pageset2, 3 = End of PS1 */
-struct hibernate_extent_iterate_saved_state toi_writer_posn_save[4];
-EXPORT_SYMBOL_GPL(toi_writer_posn_save);
+unsigned long raw_pages_allocd, header_pages_reserved;
 
 /**
  * set_free_mem_throttle - set the point where we pause to avoid oom.
@@ -123,354 +117,86 @@ static char *reason_name[NUM_REASONS] = {
 	"throughput_throttle",
 };
 
-/**
- *
- **/
-static void toi_extent_chain_next(struct toi_extent_iterate_state *state)
-{
-	struct hibernate_extent_chain *this = state->chains +
-		state->current_chain;
+/* User Specified Parameters. */
+unsigned long resume_firstblock;
+dev_t resume_dev_t;
+struct block_device *resume_block_device;
+static atomic_t resume_bdev_open_count;
 
-	if (!this->current_extent)
-		return;
-
-	if (this->current_offset == this->current_extent->end) {
-		if (this->current_extent->next) {
-			this->current_extent = this->current_extent->next;
-			this->current_offset = this->current_extent->start;
-		} else {
-			this->current_extent = NULL;
-			this->current_offset = 0;
-		}
-	} else
-		this->current_offset++;
-}
+struct block_device *header_block_device;
 
 /**
+ * toi_close_bdev: Close a swap bdev.
  *
+ * int: The swap entry number to close.
  */
-
-static int __find_next_chain_same_prio(struct toi_extent_iterate_state *state)
+void toi_close_bdev(struct block_device *bdev)
 {
-	int start_chain = state->current_chain;
-	int cur_chain = start_chain;
-	struct hibernate_extent_chain *this = state->chains + start_chain;
-	int orig_prio = this->prio;
-
-	do {
-		cur_chain = this->next;
-
-		if (cur_chain == -1)
-			cur_chain = prio_chain_head;
-
-		/* Back on original chain? Use it again. */
-		if (cur_chain == start_chain)
-			return start_chain;
-
-		this = state->chains + cur_chain;
-	} while (!this->current_extent || this->prio != orig_prio);
-
-	return cur_chain;
-}
-
-static void find_next_chain(struct toi_extent_iterate_state *state)
-{
-	struct hibernate_extent_chain *this;
-
-	state->current_chain = __find_next_chain_same_prio(state);
-	this = state->chains + state->current_chain;
-
-	/*
-	 * If we didn't get another chain of the same priority that we
-	 * can use, look for the next priority.
-	 */
-	while (state->current_chain != -1 && !this->current_extent) {
-		state->current_chain = this->next;
-
-		this = (state->current_chain > -1) ?
-			state->chains + state->current_chain :
-			NULL;
-	}
+	toi_message(TOI_IO, TOI_VERBOSE, 0, ">>> TuxOnIce closing bdev %p.",
+			bdev);
+	blkdev_put(bdev, FMODE_READ | FMODE_NDELAY);
 }
 
 /**
- * toi_extent_state_next - go to the next extent
- * @blocks: The number of values to progress.
- * @stripe_mode: Whether to spread usage across all chains.
+ * toi_open_bdev: Open a bdev at resume time.
  *
- * Given a state, progress to the next valid entry. We may begin in an
- * invalid state, as we do when invoked after extent_state_goto_start below.
+ * index: The swap index. May be MAX_SWAPFILES for the resume_dev_t
+ * (the user can have resume= pointing at a swap partition/file that isn't
+ * swapon'd when they hibernate. MAX_SWAPFILES+1 for the first page of the
+ * header. It will be from a swap partition that was enabled when we hibernated,
+ * but we don't know it's real index until we read that first page.
+ * dev_t: The device major/minor.
+ * display_errs: Whether to try to do this quietly.
  *
- * When using compression and expected_compression > 0, we let the image size
- * be larger than storage, so we can validly run out of data to return.
- **/
-static unsigned long toi_extent_state_next(struct toi_extent_iterate_state *state,
-		int blocks, int current_stream)
+ * We stored a dev_t in the image header. Open the matching device without
+ * requiring /dev/<whatever> in most cases and record the details needed
+ * to close it later and avoid duplicating work.
+ */
+struct block_device *toi_open_bdev(char *uuid, dev_t default_device,
+		int display_errs)
 {
-	int i;
+	struct block_device *bdev;
+	dev_t device = default_device;
+	char buf[32];
 
-	if (state->current_chain == -1)
-		return 0;
+	if (uuid) {
+		device = blk_lookup_uuid(uuid);
+		if (!device) {
+			device = default_device;
+			printk(KERN_DEBUG "Unable to resolve uuid. Falling back"
+					" to dev_t.\n");
+		} else
+			printk(KERN_DEBUG "Resolved uuid to device %s.\n",
+					format_dev_t(buf, device));
+	}
 
-	/* Assume chains always have lengths that are multiples of @blocks */
-	for (i = 0; i < blocks; i++)
-		toi_extent_chain_next(state);
+	if (!device) {
+		printk(KERN_ERR "TuxOnIce attempting to open a "
+				"blank dev_t!\n");
+		dump_stack();
+		return NULL;
+	}
+	bdev = toi_open_by_devnum(device, FMODE_READ | FMODE_NDELAY);
 
-	if (current_stream ||
-	    !(state->chains + state->current_chain)->current_extent)
-		find_next_chain(state);
+	if (IS_ERR(bdev) || !bdev) {
+		if (display_errs)
+			toi_early_boot_message(1, TOI_CONTINUE_REQ,
+				"Failed to get access to block device "
+				"\"%x\" (error %d).\n Maybe you need "
+				"to run mknod and/or lvmsetup in an "
+				"initrd/ramfs?", device, bdev);
+		return ERR_PTR(-EINVAL);
+	}
+	toi_message(TOI_IO, TOI_VERBOSE, 0,
+			"TuxOnIce got bdev %p for dev_t %x.",
+			bdev, device);
 
-	if (state->current_chain == -1)
-		return 0;
-	else
-		return (state->chains + state->current_chain)->current_offset;
+	return bdev;
 }
 
-static void toi_insert_chain_in_prio_list(
-		struct toi_extent_iterate_state *state, int i)
+static void toi_bio_reserve_header_space(unsigned long request)
 {
-	int *prev_idx;
-
-	/* Empty chains are irrelevant */
-	if (!state->chains[i].first)
-		return;
-
-	state->chains[i].next = -1;
-
-	/* First entry? Put in the head */
-	if (prio_chain_head == -1) {
-		prio_chain_head = i;
-		return;
-	}
-
-	/* Loop through the existing chain, finding where to insert it */
-	prev_idx = &prio_chain_head;
-
-	while (*prev_idx > -1 &&
-	       state->chains[*prev_idx].prio < state->chains[i].prio)
-		prev_idx = &state->chains[*prev_idx].next;
-
-	state->chains[i].next = *prev_idx;
-	*prev_idx = i;
-}
-
-/**
- * toi_extent_state_goto_start - reinitialize an extent chain iterator
- * @state:	Iterator to reinitialize
- **/
-void toi_extent_state_goto_start(struct toi_extent_iterate_state *state)
-{
-	int i;
-
-	/* Reset */
-	prio_chain_head = -1;
-
-	for (i = 0; i < state->num_chains; i++) {
-		struct hibernate_extent_chain *this = state->chains + i;
-		toi_insert_chain_in_prio_list(state, i);
-		this->current_extent = this->first;
-		if (this->current_extent)
-			this->current_offset = this->current_extent->start;
-	}
-
-	state->current_chain = prio_chain_head;
-}
-EXPORT_SYMBOL_GPL(toi_extent_state_goto_start);
-
-/**
- * toi_extent_state_save - save state of the iterator
- * @state:		Current state of the chain
- * @saved_state:	Iterator to populate
- *
- * Given a state and a struct hibernate_extent_state_store, save the current
- * position in a format that can be used with relocated chains (at
- * resume time).
- **/
-void toi_extent_state_save(struct toi_extent_iterate_state *state,
-		struct hibernate_extent_iterate_saved_state *saved_state)
-{
-	struct hibernate_extent *extent;
-	struct hibernate_extent_chain *cur_chain;
-	int i;
-
-	saved_state->chain_num = state->current_chain;
-
-	if (saved_state->chain_num == -1)
-		return;
-
-	for (i = 0; i < state->num_chains; i++) {
-		cur_chain = state->chains + i;
-
-		saved_state->extent_num[i] = 0;
-		saved_state->offset[i] = cur_chain->current_offset;
-
-		extent = cur_chain->first;
-
-		while (extent != cur_chain->current_extent) {
-			saved_state->extent_num[i]++;
-			extent = extent->next;
-		}
-	}
-}
-EXPORT_SYMBOL_GPL(toi_extent_state_save);
-
-/**
- * toi_extent_state_restore - restore the position saved by extent_state_save
- * @state:		State to populate
- * @saved_state:	Iterator saved to restore
- **/
-void toi_extent_state_restore(struct toi_extent_iterate_state *state,
-		struct hibernate_extent_iterate_saved_state *saved_state)
-{
-	int i;
-	struct hibernate_extent_chain *cur_chain;
-
-	if (saved_state->chain_num == -1) {
-		toi_extent_state_goto_start(state);
-		return;
-	}
-
-	state->current_chain = saved_state->chain_num;
-
-	for (i = 0; i < state->num_chains; i++) {
-		int posn = saved_state->extent_num[i];
-		cur_chain = state->chains + i;
-
-		cur_chain->current_extent = cur_chain->first;
-		cur_chain->current_offset = saved_state->offset[i];
-
-		while (posn--)
-			cur_chain->current_extent = cur_chain->current_extent->next;
-	}
-}
-EXPORT_SYMBOL_GPL(toi_extent_state_restore);
-
-/**
- * toi_serialise_extent_chain - write a chain in the image
- * @owner:	Module writing the chain.
- * @chain:	Chain to write.
- **/
-int toi_serialise_extent_chain(struct toi_module_ops *owner,
-		struct hibernate_extent_chain *chain)
-{
-	struct hibernate_extent *this;
-	int ret, i = 0;
-
-	ret = toiActiveAllocator->rw_header_chunk(WRITE, owner, (char *) chain,
-			sizeof(unsigned long) + 2 * sizeof(int));
-	if (ret)
-		return ret;
-
-	this = chain->first;
-	while (this) {
-		ret = toiActiveAllocator->rw_header_chunk(WRITE, owner,
-				(char *) this, 2 * sizeof(this->start));
-		if (ret)
-			return ret;
-		this = this->next;
-		i++;
-	}
-
-	if (i != chain->num_extents) {
-		printk(KERN_EMERG "Saved %d extents but chain metadata says "
-			"there should be %d.\n", i, chain->num_extents);
-		return 1;
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(toi_serialise_extent_chain);
-
-/**
- * toi_load_extent_chain - read back a chain saved in the image
- * @chain:	Chain to load
- *
- * The linked list of extents is reconstructed from the disk. chain will point
- * to the first entry.
- **/
-int toi_load_extent_chain(struct toi_extent_iterate_state *state, int index)
-{
-	struct hibernate_extent_chain *chain = &state->chains[index];
-	struct hibernate_extent *this, *last = NULL;
-	int i, ret;
-
-	/* Get the next page */
-	ret = toiActiveAllocator->rw_header_chunk_noreadahead(READ, NULL,
-			(char *) chain, sizeof(unsigned long) +
-			2 * sizeof(int));
-	if (ret) {
-		printk(KERN_ERR "Failed to read the size of extent chain.\n");
-		return 1;
-	}
-
-	for (i = 0; i < chain->num_extents; i++) {
-		this = toi_kzalloc(3, sizeof(struct hibernate_extent),
-				TOI_ATOMIC_GFP);
-		if (!this) {
-			printk(KERN_INFO "Failed to allocate a new extent.\n");
-			return -ENOMEM;
-		}
-		this->next = NULL;
-		/* Get the next page */
-		ret = toiActiveAllocator->rw_header_chunk_noreadahead(READ,
-				NULL, (char *) this, 2 * sizeof(this->start));
-		if (ret) {
-			printk(KERN_INFO "Failed to read an extent.\n");
-			return 1;
-		}
-
-		if (last)
-			last->next = this;
-		else {
-			chain->first = this;
-
-			/* 
-			 * Couldn't do this earlier, but can't do
-			 * goto_start now - we may have already used blocks
-			 * in the first chain.
-			 */
-			chain->current_extent = this;
-			chain->current_offset = this->start;
-
-			/*
-			 * Can't wait until we've read the whole chain
-			 * before we insert it in the list. We might need
-			 * this chain to read the next page in the header
-			 */
-			toi_insert_chain_in_prio_list(&toi_writer_posn, index);
-			if (!index)
-				toi_writer_posn.current_chain = prio_chain_head;
-		}
-		last = this;
-	}
-
-	if (!chain->current_extent) {
-		chain->current_extent = chain->first;
-		if (chain->current_extent)
-			chain->current_offset = chain->current_extent->start;
-	}
-	return 0;
-}
-EXPORT_SYMBOL_GPL(toi_load_extent_chain);
-
-static int reserve_header(int num_pages)
-{
-	int i;
-
-	if (!num_pages)
-		return 0;
-
-	/* Apply header space reservation */
-	toi_extent_state_goto_start(&toi_writer_posn);
-
-	for (i = 0; i < num_pages; i++)
-		if (toi_bio_ops.forward_one_page(1, 0))
-			return -ENOSPC;
-
-	/* The end of header pages will be the start of pageset 2 */
-	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
-
-	return 0;
+	header_pages_reserved = request;
 }
 
 /**
@@ -673,12 +399,13 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 	}
 
 
-	if (unlikely(test_action_state(TOI_TEST_FILTER_SPEED))) {
+	if (unlikely(test_action_state(TOI_TEST_BIO))) {
 		/* Fake having done the hard work */
 		set_bit(BIO_UPTODATE, &bio->bi_flags);
 		toi_end_bio(bio, 0);
 	} else
 		submit_bio(writing | (1 << BIO_RW_SYNCIO) |
+				(1 << BIO_RW_TUXONICE) |
 				(1 << BIO_RW_UNPLUG), bio);
 
 	return 0;
@@ -701,7 +428,7 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
  * next page. For reading, we do readahead and therefore don't know the final
  * address where the data needs to go.
  **/
-static int toi_do_io(int writing, struct block_device *bdev, long block0,
+int toi_do_io(int writing, struct block_device *bdev, long block0,
 	struct page *page, int is_readahead, int syncio, int free_group)
 {
 	page->private = 0;
@@ -772,9 +499,19 @@ static int toi_bio_memory_needed(void)
  **/
 static int toi_bio_print_debug_stats(char *buffer, int size)
 {
-	int len = scnprintf(buffer, size, "- Max outstanding reads %d. Max "
-			"writes %d.\n", max_outstanding_reads,
-			max_outstanding_writes);
+	int len = 0;
+
+	if (toiActiveAllocator != &toi_blockwriter_ops) {
+		len = scnprintf(buffer, size,
+				"- Block I/O inactive.\n");
+		return len;
+	}
+
+	len = scnprintf(buffer, size, "- Block I/O active.\n");
+
+	len += scnprintf(buffer + len, size - len,
+			"- Max outstanding reads %d. Max writes %d.\n",
+			max_outstanding_reads, max_outstanding_writes);
 
 	len += scnprintf(buffer + len, size - len,
 		"  Memory_needed: %d x (%lu + %u + %u) = %d bytes.\n",
@@ -809,57 +546,10 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 		"  Free mem throttle point reached %d.\n", free_mem_throttle);
 }
 
-/**
- * toi_set_devinfo - set the bdev info used for i/o
- * @info: Pointer to an array of struct toi_bdev_info - the list of
- * bdevs and blocks on them in which the image is stored.
- *
- * Set the list of bdevs and blocks in which the image will be stored.
- * Think of them (all together) as one long tape on which the data will be
- * stored.
- **/
-static void toi_set_devinfo(struct toi_bdev_info *info)
-{
-	toi_devinfo = info;
-}
-
-/**
- * dump_block_chains - print the contents of the bdev info array.
- **/
-static void dump_block_chains(void)
-{
-	int i;
-
-	for (i = 0; i < toi_writer_posn.num_chains; i++) {
-		struct hibernate_extent *this;
-
-		this = (toi_writer_posn.chains + i)->first;
-
-		if (!this)
-			continue;
-
-		printk(KERN_DEBUG "Chain %d:", i);
-
-		while (this) {
-			printk(" [%lu-%lu]%s", this->start,
-					this->end, this->next ? "," : "");
-			this = this->next;
-		}
-
-		printk("\n");
-	}
-
-	for (i = 0; i < 4; i++)
-		printk(KERN_DEBUG "Posn %d: Chain %d, extent %d, offset %lu.\n",
-			i, toi_writer_posn_save[i].chain_num,
-			toi_writer_posn_save[i].extent_num[toi_writer_posn_save[i].chain_num],
-			toi_writer_posn_save[i].offset[toi_writer_posn_save[i].chain_num]);
-}
-
 static int total_header_bytes;
 static int unowned;
 
-static int debug_broken_header(void)
+void debug_broken_header(void)
 {
 	printk(KERN_DEBUG "Image header too big for size allocated!\n");
 	print_toi_header_storage_for_modules();
@@ -872,114 +562,6 @@ static int debug_broken_header(void)
 			get_header_storage_needed());
 	dump_block_chains();
 	abort_hibernate(TOI_HEADER_TOO_BIG, "Header reservation too small.");
-	return -EIO;
-}
-
-/**
- * go_next_page - skip blocks to the start of the next page
- * @writing: Whether we're reading or writing the image.
- *
- * Go forward one page, or two if extra_page_forward is set. It only gets
- * set at the start of reading the image header, to skip the first page
- * of the header, which is read without using the extent chains.
- **/
-static int go_next_page(int writing, int section_barrier)
-{
-	int chain_num = toi_writer_posn.current_chain,
-	  max = (chain_num == -1) ? 1 : toi_devinfo[chain_num].blocks_per_page,
-	  compare_to = 0, compare_chain, compare_offset;
-	struct hibernate_extent_chain *cur_chain =
-		toi_writer_posn.chains + chain_num;
-
-	/* Have we already used the last page of the stream? */
-	switch (current_stream) {
-	case 0:
-		compare_to = 2;
-		break;
-	case 1:
-		compare_to = 3;
-		break;
-	case 2:
-		compare_to = 1;
-		break;
-	}
-
-	compare_chain = toi_writer_posn_save[compare_to].chain_num;
-	compare_offset = toi_writer_posn_save[compare_to].offset[compare_chain];
-
-	if (section_barrier && chain_num == compare_chain &&
-	    cur_chain->current_offset == compare_offset) {
-		if (writing) {
-			if (!current_stream)
-				return debug_broken_header();
-		} else {
-			more_readahead = 0;
-			return -ENODATA;
-		}
-	}
-
-	/* Nope. Go foward a page - or maybe two. Don't stripe the header,
-	 * so that bad fragmentation doesn't put the extent data containing
-	 * the location of the second page out of the first header page.
-	 */
-	toi_extent_state_next(&toi_writer_posn, max, current_stream);
-
-	if (toi_writer_posn.current_chain == -1) {
-		/* Don't complain if readahead falls off the end */
-		if (writing && section_barrier) {
-			printk(KERN_DEBUG "Extent state eof. "
-				"Expected compression ratio too optimistic?\n");
-			dump_block_chains();
-		}
-		return -ENODATA;
-	}
-
-	if (extra_page_forward) {
-		extra_page_forward = 0;
-		return go_next_page(writing, section_barrier);
-	}
-
-	return 0;
-}
-
-/**
- * set_extra_page_forward - make us skip an extra page on next go_next_page
- *
- * Used in reading header, to jump to 2nd page after getting 1st page
- * direct from image header.
- **/
-static void set_extra_page_forward(void)
-{
-	extra_page_forward = 1;
-}
-
-/**
- * toi_bio_rw_page - do i/o on the next disk page in the image
- * @writing: Whether reading or writing.
- * @page: Page to do i/o on.
- * @is_readahead: Whether we're doing readahead
- * @free_group: The group used in allocating the page
- *
- * Submit a page for reading or writing, possibly readahead.
- * Pass the group used in allocating the page as well, as it should
- * be freed on completion of the bio if we're writing the page.
- **/
-static int toi_bio_rw_page(int writing, struct page *page,
-		int is_readahead, int free_group)
-{
-	struct toi_bdev_info *dev_info;
-	int result = go_next_page(writing, 1);
-	struct hibernate_extent_chain *this =
-		toi_writer_posn.chains + toi_writer_posn.current_chain;
-
-	if (result)
-		return result;
-
-	dev_info = &toi_devinfo[toi_writer_posn.current_chain];
-
-	return toi_do_io(writing, dev_info->bdev,
-		this->current_offset << dev_info->bmap_shift,
-		page, is_readahead, 0, free_group);
 }
 
 /**
@@ -992,13 +574,22 @@ static int toi_bio_rw_page(int writing, struct page *page,
 static int toi_rw_init(int writing, int stream_number)
 {
 	if (stream_number)
-		toi_extent_state_restore(&toi_writer_posn,
-				&toi_writer_posn_save[stream_number]);
+		toi_extent_state_restore(stream_number);
 	else
-		toi_extent_state_goto_start(&toi_writer_posn);
+		toi_extent_state_goto_start();
+
+	if (writing) {
+		reset_idx = 0;
+		if (!current_stream)
+			page_idx = 0;
+	} else {
+		reset_idx = 1;
+	}
 
 	atomic_set(&toi_io_done, 0);
-	toi_writer_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
+	if (!toi_writer_buffer)
+		toi_writer_buffer = (char *) toi_get_zeroed_page(11,
+				TOI_ATOMIC_GFP);
 	toi_writer_buffer_posn = writing ? 0 : PAGE_SIZE;
 
 	current_stream = stream_number;
@@ -1006,17 +597,6 @@ static int toi_rw_init(int writing, int stream_number)
 	more_readahead = 1;
 
 	return toi_writer_buffer ? 0 : -ENOMEM;
-}
-
-/**
- * toi_read_header_init - prepare to read the image header
- *
- * Reset readahead indices prior to starting to read a section of the image.
- **/
-static void toi_read_header_init(void)
-{
-	toi_writer_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
-	more_readahead = 1;
 }
 
 /**
@@ -1033,6 +613,7 @@ static void toi_bio_queue_write(char **full_buffer)
 	struct page *page = virt_to_page(*full_buffer);
 	unsigned long flags;
 
+	*full_buffer = NULL;
 	page->private = 0;
 
 	spin_lock_irqsave(&bio_queue_lock, flags);
@@ -1046,8 +627,6 @@ static void toi_bio_queue_write(char **full_buffer)
 
 	spin_unlock_irqrestore(&bio_queue_lock, flags);
 	wake_up(&toi_io_queue_flusher);
-
-	*full_buffer = NULL;
 }
 
 /**
@@ -1061,6 +640,7 @@ static int toi_rw_cleanup(int writing)
 {
 	int i, result;
 
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "toi_rw_cleanup.");
 	if (writing) {
 		int result;
 
@@ -1073,11 +653,9 @@ static int toi_rw_cleanup(int writing)
 			return result;
 
 		if (current_stream == 2)
-			toi_extent_state_save(&toi_writer_posn,
-					&toi_writer_posn_save[1]);
+			toi_extent_state_save(1);
 		else if (current_stream == 1)
-			toi_extent_state_save(&toi_writer_posn,
-					&toi_writer_posn_save[3]);
+			toi_extent_state_save(3);
 	}
 
 	result = toi_finish_all_io();
@@ -1119,8 +697,10 @@ static int toi_start_one_readahead(int dedicated_thread)
 	int oom = 0, result;
 
 	result = throttle_if_needed(dedicated_thread ? THROTTLE_WAIT : 0);
-	if (result)
+	if (result) {
+		printk(KERN_ERR "throttle_if_needed returned %d.\n", result);
 		return result;
+	}
 
 	mutex_lock(&toi_bio_readahead_mutex);
 
@@ -1130,6 +710,8 @@ static int toi_start_one_readahead(int dedicated_thread)
 		if (!buffer) {
 			if (oom && !dedicated_thread) {
 				mutex_unlock(&toi_bio_readahead_mutex);
+				printk(KERN_ERR
+					"oom and not dedicated thread.\n");
 				return -ENOMEM;
 			}
 
@@ -1140,7 +722,11 @@ static int toi_start_one_readahead(int dedicated_thread)
 	}
 
 	result = toi_bio_rw_page(READ, virt_to_page(buffer), 1, 0);
+	if (result == -ENODATA)
+		toi__free_page(12, virt_to_page(buffer));
 	mutex_unlock(&toi_bio_readahead_mutex);
+	if (result)
+		printk(KERN_DEBUG "toi_bio_rw_page returned %d.\n", result);
 	return result;
 }
 
@@ -1221,22 +807,24 @@ static int toi_bio_get_next_page_read(int no_readahead)
 	 * extents out of the first page.
 	 */
 	if (unlikely(no_readahead && toi_start_one_readahead(0))) {
-		printk(KERN_DEBUG "No readahead and toi_start_one_readahead "
+		printk(KERN_EMERG "No readahead and toi_start_one_readahead "
 				"returned non-zero.\n");
 		return -EIO;
 	}
 
 	if (unlikely(!readahead_list_head)) {
-		/* 
+		/*
 		 * If the last page finishes exactly on the page
 		 * boundary, we will be called one extra time and
 		 * have no data to return. In this case, we should
 		 * not BUG(), like we used to!
 		 */
-		if (!more_readahead)
+		if (!more_readahead) {
+			printk(KERN_EMERG "No more readahead.\n");
 			return -ENODATA;
+		}
 		if (unlikely(toi_start_one_readahead(0))) {
-			printk(KERN_DEBUG "No readahead and "
+			printk(KERN_EMERG "No readahead and "
 			 "toi_start_one_readahead returned non-zero.\n");
 			return -EIO;
 		}
@@ -1279,12 +867,10 @@ int toi_bio_queue_flush_pages(int dedicated_thread)
 {
 	unsigned long flags;
 	int result = 0;
-	static int busy;
+	static DEFINE_MUTEX(busy);
 
-	if (busy)
+	if (!mutex_trylock(&busy))
 		return 0;
-
-	busy = 1;
 
 top:
 	spin_lock_irqsave(&bio_queue_lock, flags);
@@ -1295,8 +881,11 @@ top:
 			bio_queue_tail = NULL;
 		atomic_dec(&toi_bio_queue_size);
 		spin_unlock_irqrestore(&bio_queue_lock, flags);
-		if (!result)
-			result = toi_bio_rw_page(WRITE, page, 0, 11);
+		result = toi_bio_rw_page(WRITE, page, 0, 11);
+		/*
+		 * If writing the page failed, don't drop out.
+		 * Flush the rest of the queue too.
+		 */
 		if (result)
 			toi__free_page(11 , page);
 		spin_lock_irqsave(&bio_queue_lock, flags);
@@ -1311,7 +900,7 @@ top:
 		toi_bio_queue_flusher_should_finish = 0;
 	}
 
-	busy = 0;
+	mutex_unlock(&busy);
 	return result;
 }
 
@@ -1371,13 +960,19 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
 			 * read readahead_list_head into toi_writer_buffer
 			 */
 			int result = toi_bio_get_next_page_read(no_readahead);
-			if (result)
+			if (result) {
+				printk("toi_bio_get_next_page_read "
+						"returned %d.\n", result);
 				return result;
+			}
 		} else {
 			toi_bio_queue_write(&toi_writer_buffer);
 			result = toi_bio_get_new_page(&toi_writer_buffer);
-			if (result)
+			if (result) {
+				printk(KERN_ERR "toi_bio_get_new_page returned "
+						"%d.\n", result);
 				return result;
+			}
 		}
 
 		toi_writer_buffer_posn = 0;
@@ -1400,6 +995,7 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 		unsigned int *buf_size)
 {
 	int result = 0;
+	int this_idx;
 	char *buffer_virt = kmap(buffer_page);
 
 	/*
@@ -1423,11 +1019,22 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	 *	[destination pfn|page size|page data]
 	 * buf_size is PAGE_SIZE
 	 */
-	if (toi_rw_buffer(READ, (char *) pfn, sizeof(unsigned long), 0) ||
+	if (toi_rw_buffer(READ, (char *) &this_idx, sizeof(int), 0) ||
+	    toi_rw_buffer(READ, (char *) pfn, sizeof(unsigned long), 0) ||
 	    toi_rw_buffer(READ, (char *) buf_size, sizeof(int), 0) ||
 	    toi_rw_buffer(READ, buffer_virt, *buf_size, 0)) {
 		abort_hibernate(TOI_FAILED_IO, "Read of data failed.");
 		result = 1;
+	}
+
+	if (reset_idx) {
+		page_idx = this_idx;
+		reset_idx = 0;
+	} else {
+		page_idx++;
+		if (page_idx != this_idx)
+			printk(KERN_ERR "Got page index %d, expected %d.\n",
+					this_idx, page_idx);
 	}
 
 	my_mutex_unlock(0, &toi_bio_mutex);
@@ -1462,13 +1069,15 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 	}
 
 	buffer_virt = kmap(buffer_page);
+	page_idx++;
 
 	/*
 	 * Structure in the image:
 	 *	[destination pfn|page size|page data]
 	 * buf_size is PAGE_SIZE
 	 */
-	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long), 0) ||
+	if (toi_rw_buffer(WRITE, (char *) &page_idx, sizeof(int), 0) ||
+	    toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long), 0) ||
 	    toi_rw_buffer(WRITE, (char *) &buf_size, sizeof(int), 0) ||
 	    toi_rw_buffer(WRITE, buffer_virt, buf_size, 0)) {
 		printk(KERN_DEBUG "toi_rw_buffer returned non-zero to "
@@ -1505,12 +1114,12 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 	if (owner) {
 		owner->header_used += buffer_size;
 		toi_message(TOI_HEADER, TOI_LOW, 1,
-			"Header: %s : %d bytes (%d/%d) from offset %d.\n",
+			"Header: %s : %d bytes (%d/%d) from offset %d.",
 			owner->name,
 			buffer_size, owner->header_used,
 			owner->header_requested,
 			toi_writer_buffer_posn);
-		if (owner->header_used > owner->header_requested) {
+		if (owner->header_used > owner->header_requested && writing) {
 			printk(KERN_EMERG "TuxOnIce module %s is using more "
 				"header space (%u) than it requested (%u).\n",
 				owner->name,
@@ -1521,25 +1130,34 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 	} else {
 		unowned += buffer_size;
 		toi_message(TOI_HEADER, TOI_LOW, 1,
-			"Header: (No owner): %d bytes (%d total so far) from offset %d.\n",
-			buffer_size, unowned, toi_writer_buffer_posn);
+			"Header: (No owner): %d bytes (%d total so far) from "
+			"offset %d.", buffer_size, unowned,
+			toi_writer_buffer_posn);
 	}
 
-	if (!writing && !no_readahead && more_readahead)
+	if (!writing && !no_readahead && more_readahead) {
 		result = toi_start_new_readahead(0);
+		toi_message(TOI_IO, TOI_VERBOSE, 0, "Start new readahead "
+				"returned %d.", result);
+	}
 
-	if (!result)
+	if (!result) {
 		result = toi_rw_buffer(writing, buffer, buffer_size,
 				no_readahead);
+		toi_message(TOI_IO, TOI_VERBOSE, 0, "rw_buffer returned "
+				"%d.", result);
+	}
 
 	total_header_bytes += buffer_size;
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "_toi_rw_header_chunk returning "
+			"%d.", result);
 	return result;
 }
 
 static int toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 		char *buffer, int size)
 {
-	return _toi_rw_header_chunk(writing, owner, buffer, size, 0);
+	return _toi_rw_header_chunk(writing, owner, buffer, size, 1);
 }
 
 static int toi_rw_header_chunk_noreadahead(int writing,
@@ -1549,28 +1167,11 @@ static int toi_rw_header_chunk_noreadahead(int writing,
 }
 
 /**
- * write_header_chunk_finish - flush any buffered header data
- **/
-static int write_header_chunk_finish(void)
-{
-	int result = 0;
-
-	if (toi_writer_buffer_posn)
-		toi_bio_queue_write(&toi_writer_buffer);
-
-	result = toi_finish_all_io();
-
-	unowned = 0;
-	total_header_bytes = 0;
-	return result;
-}
-
-/**
  * toi_bio_storage_needed - get the amount of storage needed for my fns
  **/
 static int toi_bio_storage_needed(void)
 {
-	return sizeof(int);
+	return sizeof(int) + PAGE_SIZE + toi_bio_devinfo_storage_needed();
 }
 
 /**
@@ -1595,6 +1196,38 @@ static void toi_bio_load_config_info(char *buf, int size)
 	target_outstanding_io  = ints[0];
 }
 
+static void close_resume_dev_t(int force)
+{
+	if ((force || atomic_dec_and_test(&resume_bdev_open_count)) &&
+			resume_block_device) {
+		toi_close_bdev(resume_block_device);
+		resume_block_device = NULL;
+	}
+}
+
+static int open_resume_dev_t(int force, int quiet)
+{
+	if (force)
+		close_resume_dev_t(1);
+	else
+		atomic_inc(&resume_bdev_open_count);
+
+	if (resume_block_device)
+		return 0;
+
+	resume_block_device = toi_open_bdev(NULL, resume_dev_t, 0);
+	if (IS_ERR(resume_block_device)) {
+		if (!quiet)
+			toi_early_boot_message(1, TOI_CONTINUE_REQ,
+				"Failed to open device %x, where"
+				" the header should be found.",
+				resume_dev_t);
+		return 1;
+	}
+
+	return 0;
+}
+
 /**
  * toi_bio_initialise - initialise bio code at start of some action
  * @starting_cycle:	Whether starting a hibernation cycle, or just reading or
@@ -1602,24 +1235,79 @@ static void toi_bio_load_config_info(char *buf, int size)
  **/
 static int toi_bio_initialise(int starting_cycle)
 {
-	if (starting_cycle) {
-		max_outstanding_writes = 0;
-		max_outstanding_reads = 0;
-		current_stream = 0;
-		toi_queue_flusher = current;
+	int result;
+
+	if (!starting_cycle || !resume_dev_t)
+		return 0;
+
+	max_outstanding_writes = 0;
+	max_outstanding_reads = 0;
+	current_stream = 0;
+	toi_queue_flusher = current;
 #ifdef MEASURE_MUTEX_CONTENTION
-		{
+	{
 		int i, j, k;
 
 		for (i = 0; i < 2; i++)
 			for (j = 0; j < 2; j++)
 				for_each_online_cpu(k)
 					mutex_times[i][j][k] = 0;
-		}
+	}
 #endif
+	result = open_resume_dev_t(0, 1);
+
+	if (result)
+		return result;
+
+	return get_signature_page();
+}
+
+static unsigned long raw_to_real(unsigned long raw)
+{
+	unsigned long result;
+
+	result = raw - (raw * (sizeof(unsigned long) + sizeof(int)) +
+		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int) + 1)) /
+		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int));
+
+	return result < 0 ? 0 : result;
+}
+
+static unsigned long toi_bio_storage_available(void)
+{
+	unsigned long sum = 0;
+	struct toi_module_ops *this_module;
+
+	list_for_each_entry(this_module, &toi_modules, module_list) {
+		if (!this_module->enabled ||
+		    this_module->type != BIO_ALLOCATOR_MODULE)
+			continue;
+		toi_message(TOI_IO, TOI_VERBOSE, 0, "Seeking storage "
+				"available from %s.", this_module->name);
+		sum += this_module->bio_allocator_ops->storage_available();
 	}
 
-	return 0;
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "Total storage available is %lu "
+			"pages.", sum);
+	return raw_to_real(sum - header_pages_reserved);
+
+}
+
+static unsigned long toi_bio_storage_allocated(void)
+{
+	return raw_pages_allocd > header_pages_reserved ?
+		raw_to_real(raw_pages_allocd - header_pages_reserved) : 0;
+}
+
+/*
+ * If we have read part of the image, we might have filled  memory with
+ * data that should be zeroed out.
+ */
+static void toi_bio_noresume_reset(void)
+{
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "toi_bio_noresume_reset.");
+	toi_rw_cleanup(READ);
+	free_all_bdev_info();
 }
 
 /**
@@ -1628,29 +1316,405 @@ static int toi_bio_initialise(int starting_cycle)
  **/
 static void toi_bio_cleanup(int finishing_cycle)
 {
+	if (!finishing_cycle)
+		return;
+
 	if (toi_writer_buffer) {
 		toi_free_page(11, (unsigned long) toi_writer_buffer);
 		toi_writer_buffer = NULL;
 	}
+
+	forget_signature_page();
+
+	if (header_block_device && toi_sig_data &&
+			toi_sig_data->header_dev_t != resume_dev_t)
+		toi_close_bdev(header_block_device);
+
+	header_block_device = NULL;
+}
+
+static int toi_bio_write_header_init(void)
+{
+	int result;
+
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "toi_bio_write_header_init");
+	toi_rw_init(WRITE, 0);
+	toi_writer_buffer_posn = 0;
+
+	/* Info needed to bootstrap goes at the start of the header.
+	 * First we save the positions and devinfo, including the number
+	 * of header pages. Then we save the structs containing data needed
+	 * for reading the header pages back.
+	 * Note that even if header pages take more than one page, when we
+	 * read back the info, we will have restored the location of the
+	 * next header page by the time we go to use it.
+	 */
+
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "serialise extent chains.");
+	result = toi_serialise_extent_chains();
+
+	if (result)
+		return result;
+
+	/*
+	 * Signature page hasn't been modified at this point. Write it in
+	 * the header so we can restore it later.
+	 */
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "serialise signature page.");
+	return toi_rw_header_chunk_noreadahead(WRITE, &toi_blockwriter_ops,
+			(char *) toi_cur_sig_page,
+			PAGE_SIZE);
+}
+
+static int toi_bio_write_header_cleanup(void)
+{
+	int result = 0;
+
+	if (toi_writer_buffer_posn)
+		toi_bio_queue_write(&toi_writer_buffer);
+
+	result = toi_finish_all_io();
+
+	unowned = 0;
+	total_header_bytes = 0;
+
+	/* Set signature to save we have an image */
+	if (!result)
+		result = toi_bio_mark_have_image();
+
+	return result;
+}
+
+/*
+ * toi_bio_read_header_init()
+ *
+ * Description:
+ * 1. Attempt to read the device specified with resume=.
+ * 2. Check the contents of the swap header for our signature.
+ * 3. Warn, ignore, reset and/or continue as appropriate.
+ * 4. If continuing, read the toi_swap configuration section
+ *    of the header and set up block device info so we can read
+ *    the rest of the header & image.
+ *
+ * Returns:
+ * May not return if user choose to reboot at a warning.
+ * -EINVAL if cannot resume at this time. Booting should continue
+ * normally.
+ */
+
+static int toi_bio_read_header_init(void)
+{
+	int result = 0;
+	char buf[32];
+
+	toi_writer_buffer_posn = 0;
+
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "toi_bio_read_header_init");
+
+	if (!toi_sig_data) {
+		printk(KERN_INFO "toi_bio_read_header_init called when we "
+				"haven't verified there is an image!\n");
+		return -EINVAL;
+	}
+
+	/*
+	 * If the header is not on the resume_swap_dev_t, get the resume device
+	 * first.
+	 */
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "Header dev_t is %lx.",
+			toi_sig_data->header_dev_t);
+	if (toi_sig_data->have_uuid) {
+		dev_t device;
+		device = blk_lookup_uuid(toi_sig_data->header_uuid);
+		if (device) {
+			printk("Using dev_t %s, returned by blk_lookup_uuid.\n",
+					format_dev_t(buf, device));
+			toi_sig_data->header_dev_t = device;
+		}
+	}
+	if (toi_sig_data->header_dev_t != resume_dev_t) {
+		header_block_device = toi_open_bdev(NULL,
+				toi_sig_data->header_dev_t, 1);
+
+		if (IS_ERR(header_block_device))
+			return PTR_ERR(header_block_device);
+	} else
+		header_block_device = resume_block_device;
+
+	if (!toi_writer_buffer)
+		toi_writer_buffer = (char *) toi_get_zeroed_page(11,
+				TOI_ATOMIC_GFP);
+	more_readahead = 1;
+
+	/*
+	 * Read toi_swap configuration.
+	 * Headerblock size taken into account already.
+	 */
+	result = toi_bio_ops.bdev_page_io(READ, header_block_device,
+			toi_sig_data->first_header_block,
+			virt_to_page((unsigned long) toi_writer_buffer));
+	if (result)
+		return result;
+
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "load extent chains.");
+	result = toi_load_extent_chains();
+
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "load original signature page.");
+	toi_orig_sig_page = (char *) toi_get_zeroed_page(38, TOI_ATOMIC_GFP);
+	if (!toi_orig_sig_page) {
+		printk(KERN_ERR "Failed to allocate memory for the current"
+			" image signature.\n");
+		return -ENOMEM;
+	}
+
+	return toi_rw_header_chunk_noreadahead(READ, &toi_blockwriter_ops,
+			(char *) toi_orig_sig_page,
+			PAGE_SIZE);
+}
+
+static int toi_bio_read_header_cleanup(void)
+{
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "toi_bio_read_header_cleanup.");
+	return toi_rw_cleanup(READ);
+}
+
+/* Works only for digits and letters, but small and fast */
+#define TOLOWER(x) ((x) | 0x20)
+
+/*
+ * UUID must be 32 chars long. It may have dashes, but nothing
+ * else.
+ */
+char *uuid_from_commandline(char *commandline)
+{
+	int low = 0;
+	char *result = NULL, *output, *ptr;
+
+	if (strncmp(commandline, "UUID=", 5))
+		return NULL;
+
+	result = kzalloc(17, GFP_KERNEL);
+	if (!result) {
+		printk("Failed to kzalloc UUID text memory.\n");
+		return NULL;
+	}
+
+	ptr = commandline + 5;
+	output = result;
+
+	while (*ptr && (output - result) < 16) {
+		if (isxdigit(*ptr)) {
+			int value = isdigit(*ptr) ? *ptr - '0' :
+				TOLOWER(*ptr) - 'a' + 10;
+			if (low) {
+				*output += value;
+				output++;
+			} else {
+				*output = value << 4;
+			}
+			low = !low;
+		} else if (*ptr != '-')
+			break;
+		ptr++;
+	}
+
+	if ((output - result) < 16 || *ptr) {
+		printk(KERN_DEBUG "Found resume=UUID=, but the value looks "
+				"invalid.\n");
+		kfree(result);
+		result = NULL;
+	}
+
+	return result;
+}
+
+/**
+ * try_to_open_resume_device: Try to parse and open resume=
+ *
+ * Any "swap:" has been stripped away and we just have the path to deal with.
+ * We attempt to do name_to_dev_t, open and stat the file. Having opened the
+ * file, get the struct block_device * to match.
+ */
+static int try_to_open_resume_device(char *commandline, int quiet)
+{
+	struct kstat stat;
+	int error = 0;
+	char *uuid = uuid_from_commandline(commandline);
+
+	resume_dev_t = MKDEV(0, 0);
+
+	if (uuid) {
+		resume_dev_t = blk_lookup_uuid(uuid);
+		kfree(uuid);
+	}
+
+	if (!resume_dev_t)
+		resume_dev_t = name_to_dev_t(commandline);
+
+	if (!resume_dev_t) {
+		wait_for_device_probe();
+		scsi_complete_async_scans();
+		resume_dev_t = name_to_dev_t(commandline);
+	}
+
+	if (!resume_dev_t) {
+		struct file *file = filp_open(commandline,
+				O_RDONLY|O_LARGEFILE, 0);
+
+		if (!IS_ERR(file) && file) {
+			vfs_getattr(file->f_vfsmnt, file->f_dentry, &stat);
+			filp_close(file, NULL);
+		} else
+			error = vfs_stat(commandline, &stat);
+		if (!error)
+			resume_dev_t = stat.rdev;
+	}
+
+	if (!resume_dev_t) {
+		if (quiet)
+			return 1;
+
+		if (test_toi_state(TOI_TRYING_TO_RESUME))
+			toi_early_boot_message(1, toi_translate_err_default,
+			  "Failed to translate \"%s\" into a device id.\n",
+			  commandline);
+		else
+			printk("TuxOnIce: Can't translate \"%s\" into a device "
+					"id yet.\n", commandline);
+		return 1;
+	}
+
+	return open_resume_dev_t(1, quiet);
+}
+
+/*
+ * Parse Image Location
+ *
+ * Attempt to parse a resume= parameter.
+ * Swap Writer accepts:
+ * resume=[swap:|file:]DEVNAME[:FIRSTBLOCK][@BLOCKSIZE]
+ *
+ * Where:
+ * DEVNAME is convertable to a dev_t by name_to_dev_t
+ * FIRSTBLOCK is the location of the first block in the swap file
+ * (specifying for a swap partition is nonsensical but not prohibited).
+ * Data is validated by attempting to read a swap header from the
+ * location given. Failure will result in toi_swap refusing to
+ * save an image, and a reboot with correct parameters will be
+ * necessary.
+ */
+static int toi_bio_parse_sig_location(char *commandline,
+		int only_allocator, int quiet)
+{
+	char *thischar, *devstart, *colon = NULL;
+	int signature_found, result = -EINVAL, temp_result = 0;
+
+	if (strncmp(commandline, "swap:", 5) &&
+	    strncmp(commandline, "file:", 5)) {
+		/*
+		 * Failing swap:, we'll take a simple
+		 * resume=/dev/hda2, but fall through to
+		 * other allocators if /dev/ or UUID= isn't matched.
+		 */
+		if (strncmp(commandline, "/dev/", 5) &&
+		    strncmp(commandline, "UUID=", 5))
+			return 1;
+	} else
+		commandline += 5;
+
+	devstart = commandline;
+	thischar = commandline;
+	while ((*thischar != ':') && (*thischar != '@') &&
+		((thischar - commandline) < 250) && (*thischar))
+		thischar++;
+
+	if (*thischar == ':') {
+		colon = thischar;
+		*colon = 0;
+		thischar++;
+	}
+
+	while ((thischar - commandline) < 250 && *thischar)
+		thischar++;
+
+	if (colon) {
+		unsigned long block;
+		temp_result = strict_strtoul(colon + 1, 0, &block);
+		if (!temp_result)
+			resume_firstblock = (int) block;
+	} else
+		resume_firstblock = 0;
+
+	clear_toi_state(TOI_CAN_HIBERNATE);
+	clear_toi_state(TOI_CAN_RESUME);
+
+	if (!temp_result)
+		temp_result = try_to_open_resume_device(devstart, quiet);
+
+	if (colon)
+		*colon = ':';
+
+	if (temp_result)
+		return -EINVAL;
+
+	signature_found = toi_bio_image_exists(quiet);
+
+	if (signature_found != -1) {
+		result = 0;
+		/*
+		 * TODO: If only file storage, CAN_HIBERNATE should only be
+		 * set if file allocator's target is valid.
+		 */
+		set_toi_state(TOI_CAN_HIBERNATE);
+		set_toi_state(TOI_CAN_RESUME);
+	} else
+		if (!quiet)
+			printk(KERN_ERR "TuxOnIce: Block I/O: No "
+				"signature found at %s.\n", devstart);
+
+	close_resume_dev_t(0);
+	return result;
+}
+
+static void toi_bio_release_storage(void)
+{
+	header_pages_reserved = 0;
+	raw_pages_allocd = 0;
+
+	free_all_bdev_info();
+}
+
+/* toi_swap_remove_image
+ *
+ */
+static int toi_bio_remove_image(void)
+{
+	int result;
+
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "toi_bio_remove_image.");
+
+	result = toi_bio_restore_original_signature();
+
+	/*
+	 * We don't do a sanity check here: we want to restore the swap
+	 * whatever version of kernel made the hibernate image.
+	 *
+	 * We need to write swap, but swap may not be enabled so
+	 * we write the device directly
+	 *
+	 * If we don't have an current_signature_page, we didn't
+	 * read an image header, so don't change anything.
+	 */
+
+	toi_bio_release_storage();
+
+	return result;
 }
 
 struct toi_bio_ops toi_bio_ops = {
 	.bdev_page_io = toi_bdev_page_io,
-	.finish_all_io = toi_finish_all_io,
-	.update_throughput_throttle = update_throughput_throttle,
-	.forward_one_page = go_next_page,
-	.set_extra_page_forward = set_extra_page_forward,
-	.set_devinfo = toi_set_devinfo,
-	.read_page = toi_bio_read_page,
-	.write_page = toi_bio_write_page,
-	.rw_init = toi_rw_init,
-	.rw_cleanup = toi_rw_cleanup,
-	.read_header_init = toi_read_header_init,
-	.rw_header_chunk = toi_rw_header_chunk,
-	.rw_header_chunk_noreadahead = toi_rw_header_chunk_noreadahead,
-	.write_header_chunk_finish = write_header_chunk_finish,
-	.io_flusher = bio_io_flusher,
-	.reserve_header = reserve_header,
+	.register_storage = toi_register_storage_chain,
+	.free_storage = toi_bio_release_storage,
 };
 EXPORT_SYMBOL_GPL(toi_bio_ops);
 
@@ -1659,21 +1723,45 @@ static struct toi_sysfs_data sysfs_params[] = {
 			0, 16384, 0, NULL),
 };
 
-static struct toi_module_ops toi_blockwriter_ops = {
-	.name					= "lowlevel i/o",
-	.type					= MISC_HIDDEN_MODULE,
-	.directory				= "block_io",
-	.module					= THIS_MODULE,
-	.print_debug_info			= toi_bio_print_debug_stats,
-	.memory_needed				= toi_bio_memory_needed,
-	.storage_needed				= toi_bio_storage_needed,
-	.save_config_info			= toi_bio_save_config_info,
-	.load_config_info			= toi_bio_load_config_info,
-	.initialise				= toi_bio_initialise,
-	.cleanup				= toi_bio_cleanup,
+struct toi_module_ops toi_blockwriter_ops = {
+	.type				= WRITER_MODULE,
+	.name				= "block i/o",
+	.directory			= "block_io",
+	.module				= THIS_MODULE,
+	.memory_needed			= toi_bio_memory_needed,
+	.print_debug_info		= toi_bio_print_debug_stats,
+	.storage_needed			= toi_bio_storage_needed,
+	.save_config_info		= toi_bio_save_config_info,
+	.load_config_info		= toi_bio_load_config_info,
+	.initialise			= toi_bio_initialise,
+	.cleanup			= toi_bio_cleanup,
 
-	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) /
+	.rw_init			= toi_rw_init,
+	.rw_cleanup			= toi_rw_cleanup,
+	.read_page			= toi_bio_read_page,
+	.write_page			= toi_bio_write_page,
+	.rw_header_chunk		= toi_rw_header_chunk,
+	.rw_header_chunk_noreadahead	= toi_rw_header_chunk_noreadahead,
+	.io_flusher			= bio_io_flusher,
+	.update_throughput_throttle	= update_throughput_throttle,
+	.finish_all_io			= toi_finish_all_io,
+
+	.noresume_reset			= toi_bio_noresume_reset,
+	.storage_available 		= toi_bio_storage_available,
+	.storage_allocated		= toi_bio_storage_allocated,
+	.reserve_header_space		= toi_bio_reserve_header_space,
+	.allocate_storage		= toi_bio_allocate_storage,
+	.image_exists			= toi_bio_image_exists,
+	.mark_resume_attempted		= toi_bio_mark_resume_attempted,
+	.write_header_init		= toi_bio_write_header_init,
+	.write_header_cleanup		= toi_bio_write_header_cleanup,
+	.read_header_init		= toi_bio_read_header_init,
+	.read_header_cleanup		= toi_bio_read_header_cleanup,
+	.remove_image			= toi_bio_remove_image,
+	.parse_sig_location		= toi_bio_parse_sig_location,
+
+	.sysfs_data			= sysfs_params,
+	.num_sysfs_entries		= sizeof(sysfs_params) /
 		sizeof(struct toi_sysfs_data),
 };
 

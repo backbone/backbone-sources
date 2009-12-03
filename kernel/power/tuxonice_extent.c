@@ -63,6 +63,9 @@ int toi_add_to_extent_chain(struct hibernate_extent_chain *chain,
 {
 	struct hibernate_extent *new_ext = NULL, *cur_ext = NULL;
 
+	toi_message(TOI_IO, TOI_VERBOSE, 0,
+		"Adding extent %lu-%lu to chain %p.\n", start, end, chain);
+
 	/* Find the right place in the chain */
 	if (chain->last_touched && chain->last_touched->start < start)
 		cur_ext = chain->last_touched;

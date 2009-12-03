@@ -21,7 +21,7 @@
 #include "tuxonice_pageflags.h"
 #include "power.h"
 
-#define TOI_CORE_VERSION "3.0.1"
+#define TOI_CORE_VERSION "3.0.99.31"
 
 #define MY_BOOT_KERNEL_DATA_VERSION 1
 
@@ -210,4 +210,5 @@ extern int toi_launch_userspace_program(char *command, int channel_no,
 		enum umh_wait wait, int debug);
 
 extern char tuxonice_signature[9];
+extern int freezer_sync;
 #endif

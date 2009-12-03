@@ -12,7 +12,7 @@
 extern int toi_prepare_image(void);
 extern void toi_recalculate_image_contents(int storage_available);
 extern unsigned long real_nr_free_pages(unsigned long zone_idx_mask);
-extern int image_size_limit;
+extern long image_size_limit;
 extern void toi_free_extra_pagedir_memory(void);
 extern unsigned long extra_pd1_pages_allowance;
 extern void free_attention_list(void);

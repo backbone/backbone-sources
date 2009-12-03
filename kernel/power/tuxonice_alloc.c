@@ -15,13 +15,14 @@
 #include "tuxonice_sysfs.h"
 #include "tuxonice.h"
 
-#define TOI_ALLOC_PATHS 39
+#define TOI_ALLOC_PATHS 40
 
 static DEFINE_MUTEX(toi_alloc_mutex);
 
 static struct toi_module_ops toi_alloc_ops;
 
 static int toi_fail_num;
+static int trace_allocs;
 static atomic_t toi_alloc_count[TOI_ALLOC_PATHS],
 		toi_free_count[TOI_ALLOC_PATHS],
 		toi_test_count[TOI_ALLOC_PATHS],
@@ -68,7 +69,8 @@ static char *toi_alloc_desc[TOI_ALLOC_PATHS] = {
 	"swap mark resume attempted buffer", /* 35 */
 	"cluster member",
 	"boot kernel data buffer",
-	"setting swap signature"
+	"setting swap signature",
+	"block i/o bdev struct"
 };
 
 #define MIGHT_FAIL(FAIL_NUM, FAIL_VAL) \
@@ -93,7 +95,7 @@ static void alloc_update_stats(int fail_num, void *result, int size)
 	if (unlikely(test_action_state(TOI_GET_MAX_MEM_ALLOCD))) {
 		mutex_lock(&toi_alloc_mutex);
 		toi_cur_allocd[fail_num]++;
-		cur_allocd+= size;
+		cur_allocd += size;
 		if (unlikely(cur_allocd > max_allocd)) {
 			int i;
 
@@ -109,9 +111,12 @@ static void free_update_stats(int fail_num, int size)
 {
 	BUG_ON(fail_num >= TOI_ALLOC_PATHS);
 	atomic_inc(&toi_free_count[fail_num]);
+	if (unlikely(atomic_read(&toi_free_count[fail_num]) >
+				atomic_read(&toi_alloc_count[fail_num])))
+		dump_stack();
 	if (unlikely(test_action_state(TOI_GET_MAX_MEM_ALLOCD))) {
 		mutex_lock(&toi_alloc_mutex);
-		cur_allocd-= size;
+		cur_allocd -= size;
 		toi_cur_allocd[fail_num]--;
 		mutex_unlock(&toi_alloc_mutex);
 	}
@@ -126,6 +131,8 @@ void *toi_kzalloc(int fail_num, size_t size, gfp_t flags)
 	result = kzalloc(size, flags);
 	if (toi_alloc_ops.enabled)
 		alloc_update_stats(fail_num, result, size);
+	if (fail_num == trace_allocs)
+		dump_stack();
 	return result;
 }
 EXPORT_SYMBOL_GPL(toi_kzalloc);
@@ -141,6 +148,8 @@ unsigned long toi_get_free_pages(int fail_num, gfp_t mask,
 	if (toi_alloc_ops.enabled)
 		alloc_update_stats(fail_num, (void *) result,
 				PAGE_SIZE << order);
+	if (fail_num == trace_allocs)
+		dump_stack();
 	return result;
 }
 EXPORT_SYMBOL_GPL(toi_get_free_pages);
@@ -154,6 +163,8 @@ struct page *toi_alloc_page(int fail_num, gfp_t mask)
 	result = alloc_page(mask);
 	if (toi_alloc_ops.enabled)
 		alloc_update_stats(fail_num, (void *) result, PAGE_SIZE);
+	if (fail_num == trace_allocs)
+		dump_stack();
 	return result;
 }
 EXPORT_SYMBOL_GPL(toi_alloc_page);
@@ -162,11 +173,15 @@ unsigned long toi_get_zeroed_page(int fail_num, gfp_t mask)
 {
 	unsigned long result;
 
+	if (fail_num == trace_allocs)
+		dump_stack();
 	if (toi_alloc_ops.enabled)
 		MIGHT_FAIL(fail_num, 0);
 	result = get_zeroed_page(mask);
 	if (toi_alloc_ops.enabled)
 		alloc_update_stats(fail_num, (void *) result, PAGE_SIZE);
+	if (fail_num == trace_allocs)
+		dump_stack();
 	return result;
 }
 EXPORT_SYMBOL_GPL(toi_get_zeroed_page);
@@ -176,6 +191,8 @@ void toi_kfree(int fail_num, const void *arg, int size)
 	if (arg && toi_alloc_ops.enabled)
 		free_update_stats(fail_num, size);
 
+	if (fail_num == trace_allocs)
+		dump_stack();
 	kfree(arg);
 }
 EXPORT_SYMBOL_GPL(toi_kfree);
@@ -185,6 +202,8 @@ void toi_free_page(int fail_num, unsigned long virt)
 	if (virt && toi_alloc_ops.enabled)
 		free_update_stats(fail_num, PAGE_SIZE);
 
+	if (fail_num == trace_allocs)
+		dump_stack();
 	free_page(virt);
 }
 EXPORT_SYMBOL_GPL(toi_free_page);
@@ -194,6 +213,8 @@ void toi__free_page(int fail_num, struct page *page)
 	if (page && toi_alloc_ops.enabled)
 		free_update_stats(fail_num, PAGE_SIZE);
 
+	if (fail_num == trace_allocs)
+		dump_stack();
 	__free_page(page);
 }
 EXPORT_SYMBOL_GPL(toi__free_page);
@@ -203,6 +224,8 @@ void toi_free_pages(int fail_num, struct page *page, int order)
 	if (page && toi_alloc_ops.enabled)
 		free_update_stats(fail_num, PAGE_SIZE << order);
 
+	if (fail_num == trace_allocs)
+		dump_stack();
 	__free_pages(page, order);
 }
 
@@ -218,7 +241,7 @@ void toi_alloc_print_debug_stats(void)
 		    atomic_read(&toi_free_count[i])) {
 			if (!header_done) {
 				printk(KERN_INFO "Idx  Allocs   Frees   Tests "
-					"  Fails Max     Description\n");
+					"  Fails     Max Description\n");
 				header_done = 1;
 			}
 
@@ -237,24 +260,27 @@ static int toi_alloc_initialise(int starting_cycle)
 {
 	int i;
 
-	if (starting_cycle && toi_alloc_ops.enabled) {
-		for (i = 0; i < TOI_ALLOC_PATHS; i++) {
-			atomic_set(&toi_alloc_count[i], 0);
-			atomic_set(&toi_free_count[i], 0);
-			atomic_set(&toi_test_count[i], 0);
-			atomic_set(&toi_fail_count[i], 0);
-			toi_cur_allocd[i] = 0;
-			toi_max_allocd[i] = 0;
-		};
-		max_allocd = 0;
-		cur_allocd = 0;
-	}
+	if (!starting_cycle)
+		return 0;
 
+	for (i = 0; i < TOI_ALLOC_PATHS; i++) {
+		atomic_set(&toi_alloc_count[i], 0);
+		atomic_set(&toi_free_count[i], 0);
+		atomic_set(&toi_test_count[i], 0);
+		atomic_set(&toi_fail_count[i], 0);
+		toi_cur_allocd[i] = 0;
+		toi_max_allocd[i] = 0;
+	};
+
+	max_allocd = 0;
+	cur_allocd = 0;
 	return 0;
 }
 
 static struct toi_sysfs_data sysfs_params[] = {
 	SYSFS_INT("failure_test", SYSFS_RW, &toi_fail_num, 0, 99, 0, NULL),
+	SYSFS_INT("trace", SYSFS_RW, &trace_allocs, 0, TOI_ALLOC_PATHS, 0,
+			NULL),
 	SYSFS_BIT("find_max_mem_allocated", SYSFS_RW, &toi_bkd.toi_action,
 			TOI_GET_MAX_MEM_ALLOCD, 0),
 	SYSFS_INT("enabled", SYSFS_RW, &toi_alloc_ops.enabled, 0, 1, 0,
@@ -277,7 +303,6 @@ static struct toi_module_ops toi_alloc_ops = {
 int toi_alloc_init(void)
 {
 	int result = toi_register_module(&toi_alloc_ops);
-	toi_alloc_ops.enabled = 0;
 	return result;
 }
 

@@ -13,7 +13,9 @@
 
 LIST_HEAD(toi_filters);
 LIST_HEAD(toiAllocators);
+
 LIST_HEAD(toi_modules);
+EXPORT_SYMBOL_GPL(toi_modules);
 
 struct toi_module_ops *toiActiveAllocator;
 EXPORT_SYMBOL_GPL(toiActiveAllocator);
@@ -235,6 +237,7 @@ int toi_register_module(struct toi_module_ops *module)
 		break;
 	case MISC_MODULE:
 	case MISC_HIDDEN_MODULE:
+	case BIO_ALLOCATOR_MODULE:
 		break;
 	default:
 		printk(KERN_ERR "Hmmm. Module '%s' has an invalid type."
@@ -316,6 +319,7 @@ void toi_unregister_module(struct toi_module_ops *module)
 		break;
 	case MISC_MODULE:
 	case MISC_HIDDEN_MODULE:
+	case BIO_ALLOCATOR_MODULE:
 		break;
 	default:
 		printk(KERN_ERR "Module '%s' has an invalid type."
@@ -345,6 +349,7 @@ void toi_move_module_tail(struct toi_module_ops *module)
 		break;
 	case MISC_MODULE:
 	case MISC_HIDDEN_MODULE:
+	case BIO_ALLOCATOR_MODULE:
 		break;
 	default:
 		printk(KERN_ERR "Module '%s' has an invalid type."
@@ -373,9 +378,6 @@ int toi_initialise_modules(int starting_cycle, int early)
 		if (this_module->early != early)
 			continue;
 		if (this_module->initialise) {
-			toi_message(TOI_MEMORY, TOI_MEDIUM, 1,
-				"Initialising module %s.\n",
-				this_module->name);
 			result = this_module->initialise(starting_cycle);
 			if (result) {
 				toi_cleanup_modules(starting_cycle);
@@ -400,12 +402,8 @@ void toi_cleanup_modules(int finishing_cycle)
 	list_for_each_entry(this_module, &toi_modules, module_list) {
 		if (!this_module->enabled || !this_module->initialised)
 			continue;
-		if (this_module->cleanup) {
-			toi_message(TOI_MEMORY, TOI_MEDIUM, 1,
-				"Cleaning up module %s.\n",
-				this_module->name);
+		if (this_module->cleanup)
 			this_module->cleanup(finishing_cycle);
-		}
 		this_module->initialised = 0;
 	}
 }

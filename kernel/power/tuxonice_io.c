@@ -20,6 +20,7 @@
 #include <linux/kthread.h>
 #include <linux/cpu.h>
 #include <linux/fs_struct.h>
+#include <linux/bio.h>
 #include <asm/tlbflush.h>
 
 #include "tuxonice.h"
@@ -466,15 +467,12 @@ static int read_next_page(int *my_io_index, unsigned long *write_pfn,
 	}
 
 	/*
-	 * See toi_bio_read_page in tuxonice_block_io.c:
+	 * See toi_bio_read_page in tuxonice_bio.c:
 	 * read the next page in the image.
 	 */
 	return first_filter->read_page(write_pfn, buffer, &buf_size);
 }
 
-/**
- * 
- **/
 static void use_read_page(unsigned long write_pfn, struct page *buffer)
 {
 	struct page *final_page = pfn_to_page(write_pfn),
@@ -699,7 +697,8 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	clear_toi_state(TOI_IO_STOPPED);
 	memory_bm_position_reset(io_map);
 
-	if (!test_action_state(TOI_NO_MULTITHREADED_IO))
+	if (!test_action_state(TOI_NO_MULTITHREADED_IO) &&
+		(write || !toi_force_no_multithreaded))
 		num_other_threads = start_other_threads();
 
 	if (!num_other_threads || !toiActiveAllocator->io_flusher ||
@@ -734,7 +733,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 					"%ld.\n", next);
 			do {
 				cpu_relax();
-			} while(0);
+			} while (0);
 		}
 	}
 
@@ -1171,6 +1170,7 @@ static void do_freeze(struct work_struct *dummy)
 {
 	freeze_result = freeze_processes();
 	wake_up(&freeze_wait);
+	trap_non_toi_io = 1;
 }
 
 static DECLARE_WORK(freeze_work, do_freeze);
@@ -1197,7 +1197,7 @@ static int __read_pageset1(void)
 
 	/* Check for an image */
 	result = toiActiveAllocator->image_exists(1);
-	if (!result) {
+	if (result != 1) {
 		result = -ENODATA;
 		noresume_reset_modules();
 		printk(KERN_INFO "TuxOnIce: No image found.\n");
@@ -1276,9 +1276,11 @@ static int __read_pageset1(void)
 	memcpy((char *) &pagedir1,
 		(char *) &toi_header->pagedir, sizeof(pagedir1));
 	toi_result = toi_header->param0;
-	toi_bkd.toi_action = toi_header->param1;
-	toi_bkd.toi_debug_state = toi_header->param2;
-	toi_bkd.toi_default_console_level = toi_header->param3;
+	if (!toi_bkd.toi_debug_state) {
+		toi_bkd.toi_action = toi_header->param1;
+		toi_bkd.toi_debug_state = toi_header->param2;
+		toi_bkd.toi_default_console_level = toi_header->param3;
+	}
 	clear_toi_state(TOI_IGNORE_LOGLEVEL);
 	pagedir2.size = toi_header->pageset_2_size;
 	for (i = 0; i < 4; i++)
@@ -1322,14 +1324,14 @@ static int __read_pageset1(void)
 	toi_cond_pause(1, "About to read original pageset1 locations.");
 
 	/*
-	 * See _toi_rw_header_chunk in tuxonice_block_io.c:
+	 * See _toi_rw_header_chunk in tuxonice_bio.c:
 	 * Initialize pageset1_map by reading the map from the image.
 	 */
 	if (memory_bm_read(pageset1_map, toiActiveAllocator->rw_header_chunk))
 		goto out_thaw;
 
 	/*
-	 * See toi_rw_cleanup in tuxonice_block_io.c:
+	 * See toi_rw_cleanup in tuxonice_bio.c:
 	 * Clean up after reading the header.
 	 */
 	result = toiActiveAllocator->read_header_cleanup();
@@ -1376,6 +1378,7 @@ out:
 
 out_thaw:
 	wait_event(freeze_wait, freeze_result != FREEZE_IN_PROGRESS);
+	trap_non_toi_io = 0;
 	thaw_processes();
 	usermodehelper_enable();
 out_enable_nonboot_cpus:

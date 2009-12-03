@@ -74,6 +74,7 @@
 #include <linux/console.h>
 #include <linux/writeback.h>
 #include <linux/uaccess.h> /* for get/set_fs & KERNEL_DS on i386 */
+#include <linux/bio.h>
 
 #include "tuxonice.h"
 #include "tuxonice_modules.h"
@@ -352,7 +353,7 @@ static int get_toi_debug_info(const char *buffer, int count)
 	SNPRINTF("- Kernel Version : " UTS_RELEASE "\n");
 	SNPRINTF("- Compiler vers. : %d.%d\n", __GNUC__, __GNUC_MINOR__);
 	SNPRINTF("- Attempt number : %d\n", nr_hibernates);
-	SNPRINTF("- Parameters     : %ld %ld %ld %d %d %ld\n",
+	SNPRINTF("- Parameters     : %ld %ld %ld %d %ld %ld\n",
 			toi_result,
 			toi_bkd.toi_action,
 			toi_bkd.toi_debug_state,
@@ -416,6 +417,8 @@ static void do_cleanup(int get_debug_info, int restarting)
 	int i = 0;
 	char *buffer = NULL;
 
+	trap_non_toi_io = 0;
+
 	if (get_debug_info)
 		toi_prepare_status(DONT_CLEAR_BAR, "Cleaning up...");
 
@@ -447,7 +450,7 @@ static void do_cleanup(int get_debug_info, int restarting)
 	    !test_result_state(TOI_ABORTED)) {
 		toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
 			"TuxOnIce: Not invalidating the image due "
-			"to Keep Image being enabled.\n");
+			"to Keep Image being enabled.");
 		set_result_state(TOI_KEPT_IMAGE);
 	} else
 		if (toiActiveAllocator)
@@ -645,7 +648,7 @@ static int __save_image(void)
 	toi_prepare_status(DONT_CLEAR_BAR, "Starting to save the image..");
 
 	toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
-		" - Final values: %d and %d.\n",
+		" - Final values: %d and %d.",
 		pagedir1.size, pagedir2.size);
 
 	toi_cond_pause(1, "About to write pagedir2.");
@@ -703,7 +706,7 @@ Failed:
 
 	toi_cond_pause(1, "About to write pageset1.");
 
-	toi_message(TOI_ANY_SECTION, TOI_LOW, 1, "-- Writing pageset1\n");
+	toi_message(TOI_ANY_SECTION, TOI_LOW, 1, "-- Writing pageset1");
 
 	temp_result = write_pageset(&pagedir1);
 
@@ -794,6 +797,8 @@ static int do_prepare_image(void)
 			!test_result_state(TOI_ABORTED))
 		return 0;
 
+	trap_non_toi_io = 1;
+
 	return 1;
 }
 
@@ -812,7 +817,7 @@ int do_check_can_resume(void)
 		return -1;
 
 	if (!test_toi_state(TOI_RESUME_DEVICE_OK))
-		toi_attempt_to_parse_resume_device(0);
+		toi_attempt_to_parse_resume_device(1);
 
 	if (toiActiveAllocator)
 		result = toiActiveAllocator->image_exists(1);
@@ -1166,15 +1171,13 @@ int toi_launch_userspace_program(char *command, int channel_no,
 		int i;
 		for (i = 0; i < arg; i++)
 			if (argv[i] && argv[i] != channel)
-				toi_kfree(5, argv[i], sizeof (*argv[i]));
+				toi_kfree(5, argv[i], sizeof(*argv[i]));
 	}
 
 	toi_kfree(4, channel, sizeof(*channel));
 
 	return retval;
 }
-
-extern int freezer_sync;
 
 /*
  * This array contains entries that are automatically registered at
@@ -1196,8 +1199,8 @@ static struct toi_sysfs_data sysfs_params[] = {
 			NULL),
 	SYSFS_BIT("ignore_rootfs", SYSFS_RW, &toi_bkd.toi_action,
 			TOI_IGNORE_ROOTFS, 0),
-	SYSFS_INT("image_size_limit", SYSFS_RW, &image_size_limit, -2,
-			INT_MAX, 0, NULL),
+	SYSFS_LONG("image_size_limit", SYSFS_RW, &image_size_limit, -2,
+			INT_MAX, 0),
 	SYSFS_UL("last_result", SYSFS_RW, &toi_result, 0, 0, 0),
 	SYSFS_BIT("no_multithreaded_io", SYSFS_RW, &toi_bkd.toi_action,
 			TOI_NO_MULTITHREADED_IO, 0),

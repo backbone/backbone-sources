@@ -69,9 +69,14 @@ static void ui_nl_set_state(int n)
 		(1 << TOI_LOGALL) |
 		(1 << TOI_SINGLESTEP) |
 		(1 << TOI_PAUSE_NEAR_PAGESET_END);
+	static unsigned long new_action;
 
-	toi_bkd.toi_action = (toi_bkd.toi_action & (~toi_action_mask)) |
+	new_action = (toi_bkd.toi_action & (~toi_action_mask)) |
 		(n & toi_action_mask);
+
+	printk(KERN_DEBUG "n is %x. Action flags being changed from %lx "
+			"to %lx.", n, toi_bkd.toi_action, new_action);
+	toi_bkd.toi_action = new_action;
 
 	if (!test_action_state(TOI_PAUSE) &&
 			!test_action_state(TOI_SINGLESTEP))

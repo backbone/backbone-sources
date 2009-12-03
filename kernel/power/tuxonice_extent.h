@@ -16,10 +16,6 @@
 #ifndef EXTENT_H
 #define EXTENT_H
 
-#ifndef MAX_SWAPFILES
-#define MAX_SWAPFILES 32
-#endif
-
 struct hibernate_extent {
 	unsigned long start, end;
 	struct hibernate_extent *next;
@@ -27,22 +23,10 @@ struct hibernate_extent {
 
 struct hibernate_extent_chain {
 	unsigned long size; /* size of the chain ie sum (max-min+1) */
-	int num_extents, prio, next;
+	int num_extents;
 	struct hibernate_extent *first, *last_touched;
 	struct hibernate_extent *current_extent;
 	unsigned long current_offset;
-};
-
-struct toi_extent_iterate_state {
-	struct hibernate_extent_chain *chains;
-	int num_chains;
-	int current_chain;
-};
-
-struct hibernate_extent_iterate_saved_state {
-	int chain_num;
-	int extent_num[MAX_SWAPFILES];
-	unsigned long offset[MAX_SWAPFILES];
 };
 
 /* Simplify iterating through all the values in an extent chain */
@@ -57,7 +41,4 @@ if ((extent_chain)->first) \
 		 ((extentpointer) ? (extentpointer)->start : 0)) : \
 			(value)++))
 
-void toi_put_extent_chain(struct hibernate_extent_chain *chain);
-int toi_add_to_extent_chain(struct hibernate_extent_chain *chain,
-		unsigned long start, unsigned long end);
 #endif

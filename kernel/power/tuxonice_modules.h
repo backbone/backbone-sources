@@ -30,7 +30,8 @@ struct toi_module_header {
 enum {
 	FILTER_MODULE,
 	WRITER_MODULE,
-	MISC_MODULE, /* Block writer, eg. */
+	BIO_ALLOCATOR_MODULE,
+	MISC_MODULE,
 	MISC_HIDDEN_MODULE,
 };
 
@@ -90,6 +91,7 @@ struct toi_module_ops {
 
 	unsigned long (*storage_available) (void);
 	void (*reserve_header_space) (unsigned long space_requested);
+	int (*register_storage) (void);
 	int (*allocate_storage) (unsigned long space_requested);
 	unsigned long (*storage_allocated) (void);
 
@@ -142,6 +144,9 @@ struct toi_module_ops {
 	/* Sysfs Data */
 	struct toi_sysfs_data *sysfs_data;
 	int num_sysfs_entries;
+
+	/* Block I/O allocator */
+	struct toi_bio_allocator_ops *bio_allocator_ops;
 };
 
 extern int toi_num_modules, toiNumAllocators;

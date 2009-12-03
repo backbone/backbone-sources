@@ -40,8 +40,9 @@
 
 static unsigned long num_nosave, main_storage_allocated, storage_limit,
 	    header_storage_needed;
-unsigned long extra_pd1_pages_allowance = CONFIG_TOI_DEFAULT_EXTRA_PAGES_ALLOWANCE;
-int image_size_limit;
+unsigned long extra_pd1_pages_allowance =
+	CONFIG_TOI_DEFAULT_EXTRA_PAGES_ALLOWANCE;
+long image_size_limit;
 static int no_ps2_needed;
 
 struct attention_list {
@@ -607,7 +608,7 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 	snprintf(buffer, 254,
 		"Free:%lu(%lu). Sets:%lu(%lu),%lu(%lu). "
 		"Nosave:%lu-%lu=%lu. Storage:%lu/%lu(%lu=>%lu). "
-		"Needed:%lu,%lu,%lu(%u,%lu,%lu,%lu) (PS2:%s)\n",
+		"Needed:%lu,%lu,%lu(%u,%lu,%lu,%ld) (PS2:%s)\n",
 
 		/* Free */
 		real_nr_free_pages(all_zones_mask),
@@ -632,7 +633,7 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 		any_to_free(1),
 		MIN_FREE_RAM, toi_memory_for_modules(0),
 		extra_pd1_pages_allowance,
-		((unsigned long) image_size_limit) << 8,
+		image_size_limit,
 
 		need_pageset2() ? "yes" : "no");
 
@@ -867,8 +868,7 @@ static void update_image(int ps2_recalc)
 		storage_limit = toiActiveAllocator->storage_available();
 		seek = min(storage_limit, main_storage_needed(0, 0));
 
-		//toiActiveAllocator->allocate_storage(seek);
-		result = toiActiveAllocator->allocate_storage(storage_limit);
+		result = toiActiveAllocator->allocate_storage(seek);
 		if (result)
 			printk("Failed to allocate storage (%d).\n", result);
 
@@ -977,8 +977,9 @@ static void eat_memory(void)
 
 		amount_wanted = amount_needed(1);
 
-		printk("Asked shrink_all_memory for %ld pages, got %ld.\n",
-				request, request - amount_wanted);
+		printk(KERN_DEBUG "Asked shrink_all_memory for %ld pages,"
+				"got %ld.\n", request,
+				request - amount_wanted);
 
 		toi_cond_pause(0, NULL);
 
