@@ -208,8 +208,7 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 	PRINTK("blkdev_get %p.\n", part);
 
 	if (blkdev_get(bdev, FMODE_READ)) {
-		bdevname(bdev, buf);
-		PRINTK("blkdev_get for %s failed.\n", buf);
+		PRINTK("blkdev_get failed.\n");
 		return 0;
 	}
 
