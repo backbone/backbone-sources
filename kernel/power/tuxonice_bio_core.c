@@ -697,10 +697,8 @@ static int toi_start_one_readahead(int dedicated_thread)
 	int oom = 0, result;
 
 	result = throttle_if_needed(dedicated_thread ? THROTTLE_WAIT : 0);
-	if (result) {
-		printk(KERN_ERR "throttle_if_needed returned %d.\n", result);
+	if (result)
 		return result;
-	}
 
 	mutex_lock(&toi_bio_readahead_mutex);
 
@@ -710,8 +708,6 @@ static int toi_start_one_readahead(int dedicated_thread)
 		if (!buffer) {
 			if (oom && !dedicated_thread) {
 				mutex_unlock(&toi_bio_readahead_mutex);
-				printk(KERN_ERR
-					"oom and not dedicated thread.\n");
 				return -ENOMEM;
 			}
 
