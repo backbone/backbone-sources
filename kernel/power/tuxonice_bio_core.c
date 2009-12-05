@@ -725,8 +725,12 @@ static int toi_start_one_readahead(int dedicated_thread)
 	if (result == -ENODATA)
 		toi__free_page(12, virt_to_page(buffer));
 	mutex_unlock(&toi_bio_readahead_mutex);
-	if (result)
-		printk(KERN_DEBUG "toi_bio_rw_page returned %d.\n", result);
+	if (result) {
+		if (result == -ENODATA)
+			toi_message(TOI_IO, TOI_VERBOSE, 0, "Last readahead page submitted.");
+		else
+			printk(KERN_DEBUG "toi_bio_rw_page returned %d.\n", result);
+	}
 	return result;
 }
 
