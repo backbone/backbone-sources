@@ -209,8 +209,9 @@ menuconfig TOI_CORE
 		default y
 		---help---
 		  This option enables support for storing an image in a
-		  simple file. This should be possible, but we're still
-		  testing it.
+		  simple file. You might want this if your swap is
+		  sometimes full enough that you don't have enough spare
+		  space to store an image.
 
 	config TOI_SWAP
 		tristate "Swap Allocator"
