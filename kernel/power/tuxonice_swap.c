@@ -291,6 +291,9 @@ static int toi_swap_register_storage(void)
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si = get_swap_info_struct(i);
 		struct toi_bdev_info *devinfo;
+		unsigned char *p;
+		unsigned char buf[256];
+
 		if (!(si->flags & SWP_WRITEOK) ||
 		    !strncmp(si->bdev->bd_disk->disk_name, "ram", 3))
 			continue;
@@ -314,6 +317,9 @@ static int toi_swap_register_storage(void)
 		devinfo->prio = si->prio;
 		devinfo->bmap_shift = 3;
 		devinfo->blocks_per_page = 1;
+
+		p = d_path(&si->swap_file->f_path, buf, sizeof(buf));
+		sprintf(devinfo->name, "swap on %s", p);
 
 		toi_message(TOI_IO, TOI_VERBOSE, 0, "Registering swap storage:"
 				" Device %d (%lx), prio %d.", i,

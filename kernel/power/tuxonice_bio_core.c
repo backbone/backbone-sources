@@ -509,6 +509,8 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 
 	len = scnprintf(buffer, size, "- Block I/O active.\n");
 
+	len += toi_bio_chains_debug_info(buffer + len, size - len);
+
 	len += scnprintf(buffer + len, size - len,
 			"- Max outstanding reads %d. Max writes %d.\n",
 			max_outstanding_reads, max_outstanding_writes);
@@ -1735,6 +1737,7 @@ struct toi_module_ops toi_blockwriter_ops = {
 	.load_config_info		= toi_bio_load_config_info,
 	.initialise			= toi_bio_initialise,
 	.cleanup			= toi_bio_cleanup,
+	.post_atomic_restore		= toi_bio_chains_post_atomic,
 
 	.rw_init			= toi_rw_init,
 	.rw_cleanup			= toi_rw_cleanup,

@@ -30,6 +30,7 @@ struct toi_bdev_info {
 	struct toi_module_ops *allocator;
 	int allocator_index;
 	struct hibernate_extent_chain allocations;
+	char name[266]; /* "swap on " or "file " + up to 256 chars */
 
 	/* Saved in header */
 	char uuid[17];
@@ -37,6 +38,7 @@ struct toi_bdev_info {
 	int prio;
 	int bmap_shift;
 	int blocks_per_page;
+	unsigned long pages_used;
 	struct hibernate_extent_saved_state saved_state[4];
 };
 

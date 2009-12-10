@@ -198,6 +198,7 @@ static int toi_file_register_storage(void)
 	devinfo->bmap_shift = target_inode->i_blkbits - 9;
 	devinfo->blocks_per_page =
 		(1 << (PAGE_SHIFT - target_inode->i_blkbits));
+	sprintf(devinfo->name, "file %s", toi_file_target);
 	file_chain = devinfo;
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "Dev_t is %lx. Prio is %d. Bmap "
 			"shift is %d. Blocks per page %d.",

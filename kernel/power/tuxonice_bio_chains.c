@@ -376,6 +376,30 @@ int toi_bio_devinfo_storage_needed(void)
 	return result;
 }
 
+static unsigned long chain_pages_used(struct toi_bdev_info *chain)
+{
+	struct hibernate_extent *this = chain->blocks.first;
+	struct hibernate_extent_saved_state *state = &chain->saved_state[3];
+	unsigned long size = 0;
+	int extent_idx = 1;
+
+	if (!state->extent_num) {
+		if (!this)
+			return 0;
+		else
+			return chain->blocks.size;
+	}
+
+	while (extent_idx < state->extent_num) {
+		size += (this->end - this->start + 1);
+		this = this->next;
+		extent_idx++;
+	}
+
+	/* We didn't use the one we're sitting on, so don't count it */
+	return size + state->offset - this->start;
+}
+
 /**
  * toi_serialise_extent_chain - write a chain in the image
  * @chain:	Chain to write.
@@ -385,6 +409,8 @@ static int toi_serialise_extent_chain(struct toi_bdev_info *chain)
 	struct hibernate_extent *this;
 	int ret;
 	int i = 1;
+
+	chain->pages_used = chain_pages_used(chain);
 
 	if (test_action_state(TOI_LOGALL))
 		dump_block_chains();
@@ -536,6 +562,8 @@ int toi_load_extent_chain(int index)
 		toi_kfree(39, chain, sizeof(*chain));
 		return 1;
 	}
+
+	toi_bkd.pages_used[index] = chain->pages_used;
 
 	ret = toiActiveAllocator->rw_header_chunk_noreadahead(READ, NULL,
 			(char *) &chain->blocks.num_extents, sizeof(int));
@@ -958,4 +986,32 @@ int toi_bio_allocate_storage(unsigned long request)
 
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "Done. Reserving header.");
 	return apply_header_reservation();
+}
+
+void toi_bio_chains_post_atomic(struct toi_boot_kernel_data *bkd)
+{
+	int i = 0;
+	struct toi_bdev_info *cur_chain = prio_chain_head;
+
+	while (cur_chain) {
+		cur_chain->pages_used = bkd->pages_used[i];
+		cur_chain = cur_chain->next;
+		i++;
+	}
+}
+
+int toi_bio_chains_debug_info(char *buffer, int size)
+{
+	/* Show what we actually used */
+	struct toi_bdev_info *cur_chain = prio_chain_head;
+	int len = 0;
+
+	while (cur_chain) {
+		len += scnprintf(buffer + len, size - len, "  Used %lu pages "
+				"from %s.\n", cur_chain->pages_used,
+				cur_chain->name);
+		cur_chain = cur_chain->next;
+	}
+
+	return len;
 }

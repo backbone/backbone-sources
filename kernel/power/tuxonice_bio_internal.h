@@ -62,3 +62,5 @@ extern struct toi_module_ops toi_blockwriter_ops;
 void dump_block_chains(void);
 void debug_broken_header(void);
 extern unsigned long raw_pages_allocd, header_pages_reserved;
+int toi_bio_chains_debug_info(char *buffer, int size);
+void toi_bio_chains_post_atomic(struct toi_boot_kernel_data *bkd);
