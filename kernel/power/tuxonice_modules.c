@@ -409,6 +409,21 @@ void toi_cleanup_modules(int finishing_cycle)
 }
 
 /*
+ * toi_post_atomic_restore_modules
+ *
+ * Get ready to do some work!
+ */
+void toi_post_atomic_restore_modules(struct toi_boot_kernel_data *bkd)
+{
+	struct toi_module_ops *this_module;
+
+	list_for_each_entry(this_module, &toi_modules, module_list) {
+		if (this_module->enabled && this_module->post_atomic_restore)
+			this_module->post_atomic_restore(bkd);
+	}
+}
+
+/*
  * toi_get_next_filter
  *
  * Get the next filter in the pipeline.

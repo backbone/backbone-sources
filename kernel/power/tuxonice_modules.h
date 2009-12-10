@@ -17,6 +17,8 @@
 /* This is the maximum size we store in the image header for a module name */
 #define TOI_MAX_MODULE_NAME_LENGTH 30
 
+struct toi_boot_kernel_data;
+
 /* Per-module metadata */
 struct toi_module_header {
 	char name[TOI_MAX_MODULE_NAME_LENGTH];
@@ -78,6 +80,8 @@ struct toi_module_ops {
 	 */
 	int (*initialise) (int starting_cycle);
 	void (*cleanup) (int finishing_cycle);
+
+	void (*post_atomic_restore) (struct toi_boot_kernel_data *bkd);
 
 	/*
 	 * Calls for allocating storage (allocators only).
@@ -178,6 +182,8 @@ extern int toi_initialise_modules(int starting_cycle, int early);
 #define toi_initialise_modules_late(starting) \
 	toi_initialise_modules(starting, 0)
 extern void toi_cleanup_modules(int finishing_cycle);
+
+extern void toi_post_atomic_restore_modules(struct toi_boot_kernel_data *bkd);
 
 extern void toi_print_modules(void);
 

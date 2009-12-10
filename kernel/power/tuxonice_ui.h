@@ -44,7 +44,6 @@ struct ui_ops {
 	void (*abort)(int result_code, const char *fmt, ...);
 	void (*prepare)(void);
 	void (*cleanup)(void);
-	void (*post_atomic_restore)(void);
 	void (*message)(u32 section, u32 level, u32 normally_logged,
 			const char *fmt, ...);
 };
@@ -54,11 +53,6 @@ extern struct ui_ops *toi_current_ui;
 #define toi_update_status(val, max, fmt, args...) \
  (toi_current_ui ? (toi_current_ui->update_status) (val, max, fmt, ##args) : \
 	max)
-
-#define toi_ui_post_atomic_restore(void) \
-	do { if (toi_current_ui) \
-		(toi_current_ui->post_atomic_restore)(); \
-	} while (0)
 
 #define toi_prepare_console(void) \
 	do { if (toi_current_ui) \

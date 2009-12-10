@@ -26,6 +26,7 @@
 #include "tuxonice_builtin.h"
 #include "tuxonice_atomic_copy.h"
 #include "tuxonice_alloc.h"
+#include "tuxonice_modules.h"
 
 unsigned long extra_pd1_pages_used;
 
@@ -107,7 +108,7 @@ void copyback_post(void)
 	if (toi_activate_storage(1))
 		panic("Failed to reactivate our storage.");
 
-	toi_ui_post_atomic_restore();
+	toi_post_atomic_restore_modules(bkd);
 
 	toi_cond_pause(1, "About to reload secondary pagedir.");
 

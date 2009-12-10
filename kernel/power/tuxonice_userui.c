@@ -89,7 +89,7 @@ static void ui_nl_set_state(int n)
  * Tell userui that atomic restore just occured, so that it can do things like
  * redrawing the screen, re-getting settings and so on.
  */
-static void userui_post_atomic_restore(void)
+static void userui_post_atomic_restore(struct toi_boot_kernel_data *bkd)
 {
 	toi_send_netlink_message(&ui_helper_data,
 			USERUI_MSG_POST_ATOMIC_RESTORE, NULL, 0);
@@ -600,13 +600,13 @@ static struct toi_module_ops userui_ops = {
 	.save_config_info		= userui_save_config_info,
 	.load_config_info		= userui_load_config_info,
 	.memory_needed			= userui_memory_needed,
+	.post_atomic_restore		= userui_post_atomic_restore,
 	.sysfs_data			= sysfs_params,
 	.num_sysfs_entries		= sizeof(sysfs_params) /
 		sizeof(struct toi_sysfs_data),
 };
 
 static struct ui_ops my_ui_ops = {
-	.post_atomic_restore		= userui_post_atomic_restore,
 	.update_status			= userui_update_status,
 	.message			= userui_message,
 	.prepare_status			= userui_prepare_status,
