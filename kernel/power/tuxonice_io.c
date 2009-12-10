@@ -460,8 +460,14 @@ static int read_next_page(int *my_io_index, unsigned long *write_pfn,
 	 */
 	if (unlikely(test_toi_state(TOI_STOP_RESUME))) {
 		atomic_dec(&toi_io_workers);
-		if (!atomic_read(&toi_io_workers))
+		if (!atomic_read(&toi_io_workers)) {
+			/* 
+			 * So we can be sure we'll have memory for
+			 * marking that we haven't resumed.
+			 */
+			rw_cleanup_modules(READ);
 			set_toi_state(TOI_IO_STOPPED);
+		}
 		while (1)
 			schedule();
 	}
@@ -712,6 +718,10 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 
 	set_toi_state(TOI_IO_STOPPED);
 	if (unlikely(test_toi_state(TOI_STOP_RESUME))) {
+		if (!atomic_read(&toi_io_workers)) {
+			rw_cleanup_modules(READ);
+			set_toi_state(TOI_IO_STOPPED);
+		}
 		while (1)
 			schedule();
 	}

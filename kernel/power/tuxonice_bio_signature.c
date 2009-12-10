@@ -81,10 +81,21 @@ void forget_signature_page(void)
 	}
 }
 
+/* 
+ * We need to ensure we use the signature page that's currently on disk,
+ * so as to not remove the image header. Post-atomic-restore, the orig sig
+ * page will be empty, so we can use that as our method of knowing that we
+ * need to load the on-disk signature and not use the non-image sig in
+ * memory. (We're going to powerdown after writing the change, so it's safe.
+ */
 int toi_bio_mark_resume_attempted(int flag)
 {
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "Make resume attempted = %d.",
 			flag);
+	if (!toi_orig_sig_page) {
+		forget_signature_page();
+		get_signature_page();
+	}
 	toi_sig_data->resumed_before = flag;
 	return toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
 		resume_firstblock, virt_to_page(toi_cur_sig_page));
