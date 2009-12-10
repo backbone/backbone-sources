@@ -28,7 +28,7 @@ struct uuid_info {
  * have uuid offsets for all of these yet - mssing ones are 0x0.
  * Further information welcome.
  *
- * Rearranged by sector of fs signature for optimisation.
+ * Rearranged by page of fs signature for optimisation.
  */
 static struct uuid_info uuid_list[] = {
   { "oracleasm", 0,	32,  8, "ORCLDISK",		0x0 },
@@ -139,23 +139,14 @@ static void uuid_end_bio(struct bio *bio, int err)
 
 /**
  * submit - submit BIO request
- * @writing: READ or WRITE.
  * @dev: The block device we're using.
- * @first_block: The first sector we're using.
- * @page: The page being used for I/O.
- * @free_group: If writing, the group that was used in allocating the page
- * 	and which will be used in freeing the page from the completion
- * 	routine.
+ * @page_num: The page we're reading.
  *
  * Based on Patrick Mochell's pmdisk code from long ago: "Straight from the
  * textbook - allocate and initialize the bio. If we're writing, make sure
  * the page is marked as dirty. Then submit it and carry on."
- *
- * If we're just testing the speed of our own code, we fake having done all
- * the hard work and all toi_end_bio immediately.
  **/
-static struct page *read_bdev_sector(struct block_device *dev,
-		sector_t first_block)
+static struct page *read_bdev_page(struct block_device *dev, int page_num)
 {
 	struct bio *bio = NULL;
 	struct page *page = alloc_page(GFP_KERNEL);
@@ -167,15 +158,18 @@ static struct page *read_bdev_sector(struct block_device *dev,
 
 	bio = bio_alloc(GFP_KERNEL, 1);
 	bio->bi_bdev = dev;
-	bio->bi_sector = first_block;
+	bio->bi_sector = page_num << 3;
 	bio->bi_end_io = uuid_end_bio;
 
+	PRINTK("Submitting bio on page %lx, page %d.\n",
+			(unsigned long) dev->bd_dev, page_num);
+
 	if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
-		printk(KERN_DEBUG "ERROR: adding page to bio at %lld\n",
-				(unsigned long long) first_block);
+		printk(KERN_DEBUG "ERROR: adding page to bio at %d\n",
+				page_num);
 		bio_put(bio);
 		__free_page(page);
-		printk(KERN_DEBUG "read_bdev_sector freed page %p (in error "
+		printk(KERN_DEBUG "read_bdev_page freed page %p (in error "
 				"path).\n", page);
 		return ERR_PTR(-EFAULT);
 	}
@@ -241,7 +235,7 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 		if (!i || pg_num != last_pg_num) {
 			if (data_page)
 				__free_page(data_page);
-			data_page = read_bdev_sector(bdev, pg_num);
+			data_page = read_bdev_page(bdev, pg_num);
 			data = page_address(data_page);
 		}
 
@@ -257,7 +251,7 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 		if (!uuid_data || uuid_pg_num != last_uuid_pg_num) {
 			if (uuid_data_page)
 				__free_page(uuid_data_page);
-			uuid_data_page = read_bdev_sector(bdev, uuid_pg_num);
+			uuid_data_page = read_bdev_page(bdev, uuid_pg_num);
 			uuid_data = page_address(uuid_data_page);
 		}
 
@@ -318,7 +312,7 @@ int uuid_from_block_dev(struct block_device *bdev, char *uuid)
 		if (!i || pg_num != last_pg_num) {
 			if (data_page)
 				__free_page(data_page);
-			data_page = read_bdev_sector(bdev, pg_num);
+			data_page = read_bdev_page(bdev, pg_num);
 			data = page_address(data_page);
 		}
 
@@ -336,7 +330,7 @@ int uuid_from_block_dev(struct block_device *bdev, char *uuid)
 		if (!uuid_data || uuid_pg_num != last_uuid_pg_num) {
 			if (uuid_data_page)
 				__free_page(uuid_data_page);
-			uuid_data_page = read_bdev_sector(bdev, uuid_pg_num);
+			uuid_data_page = read_bdev_page(bdev, uuid_pg_num);
 			uuid_data = page_address(uuid_data_page);
 		}
 
