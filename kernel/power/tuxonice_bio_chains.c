@@ -51,6 +51,7 @@ void dump_block_chains(void)
 
 		printk("\n");
 		cur_chain = cur_chain->next;
+		i++;
 	}
 
 	printk(KERN_DEBUG "Saved states:\n");
@@ -539,6 +540,12 @@ void free_all_bdev_info(void)
 	prio_chain_head = NULL;
 }
 
+static void set_up_start_position(void)
+{
+	toi_writer_posn.current_chain = prio_chain_head;
+	go_next_page(0, 0);
+}
+
 /**
  * toi_load_extent_chain - read back a chain saved in the image
  * @chain:	Chain to load
@@ -546,7 +553,7 @@ void free_all_bdev_info(void)
  * The linked list of extents is reconstructed from the disk. chain will point
  * to the first entry.
  **/
-int toi_load_extent_chain(int index)
+int toi_load_extent_chain(int index, int *num_loaded)
 {
 	struct toi_bdev_info *chain = toi_kzalloc(39,
 			sizeof(struct toi_bdev_info), GFP_ATOMIC);
@@ -646,11 +653,16 @@ int toi_load_extent_chain(int index)
 			 * this chain to read the next page in the header
 			 */
 			toi_insert_chain_in_prio_list(chain);
-			if (!index) {
-				toi_writer_posn.current_chain = prio_chain_head;
-				go_next_page(0, 0);
-			}
 		}
+
+		/*
+		 * We have to wait until 2 extents are loaded before setting up properly
+		 * because if the first extent has only one page, we will need to put the
+		 * position on the second extent. Sounds obvious, but it wasn't!
+		 */
+		(*num_loaded)++;
+		if ((*num_loaded) == 2)
+			set_up_start_position();
 		last = this;
 	}
 
@@ -675,6 +687,7 @@ int toi_load_extent_chains(void)
 	int result;
 	int to_load;
 	int i;
+	int extents_loaded = 0;
 
 	result = toiActiveAllocator->rw_header_chunk_noreadahead(READ, NULL,
 			(char *) &to_load,
@@ -686,10 +699,14 @@ int toi_load_extent_chains(void)
 	for (i = 0; i < to_load; i++) {
 		toi_message(TOI_IO, TOI_VERBOSE, 0, " >> Loading chain %d/%d.",
 				i, to_load);
-		result = toi_load_extent_chain(i);
+		result = toi_load_extent_chain(i, &extents_loaded);
 		if (result)
 			return result;
 	}
+
+	/* If we never got to a second extent, we still need to do this. */
+	if (extents_loaded == 1)
+		set_up_start_position();
 
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "Save chain numbers.");
 	result = toiActiveAllocator->rw_header_chunk_noreadahead(READ,
