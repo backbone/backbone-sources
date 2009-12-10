@@ -498,10 +498,11 @@ static void free_bdev_info(struct toi_bdev_info *chain)
 
 	/*
 	 * The allocator may need to do more than just free the chains
-	 * (swap_free, for example).
+	 * (swap_free, for example). Don't call from boot kernel.
 	 */
 	toi_message(TOI_IO, TOI_VERBOSE, 0, " - Allocator extents.");
-	chain->allocator->bio_allocator_ops->free_storage(chain);
+	if (chain->allocator)
+		chain->allocator->bio_allocator_ops->free_storage(chain);
 
 	/*
 	 * Dropping out of reading atomic copy? Need to undo
