@@ -556,7 +556,7 @@ void debug_broken_header(void)
 	printk(KERN_DEBUG "Image header too big for size allocated!\n");
 	print_toi_header_storage_for_modules();
 	printk(KERN_DEBUG "Page flags : %d.\n", toi_pageflags_space_needed());
-	printk(KERN_DEBUG "toi_header : %ld.\n", sizeof(struct toi_header));
+	printk(KERN_DEBUG "toi_header : %zu.\n", sizeof(struct toi_header));
 	printk(KERN_DEBUG "Total unowned : %d.\n", unowned);
 	printk(KERN_DEBUG "Total used : %d (%ld pages).\n", total_header_bytes,
 			DIV_ROUND_UP(total_header_bytes, PAGE_SIZE));

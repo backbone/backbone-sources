@@ -77,10 +77,10 @@ void print_toi_header_storage_for_modules(void)
 		}
 	}
 
-	printk(KERN_DEBUG "+ empty terminator : %ld.\n",
+	printk(KERN_DEBUG "+ empty terminator : %zu.\n",
 			sizeof(struct toi_module_header));
 	printk(KERN_DEBUG "                     ====\n");
-	printk(KERN_DEBUG "                     %ld\n",
+	printk(KERN_DEBUG "                     %zu\n",
 			bytes + sizeof(struct toi_module_header));
 }
 EXPORT_SYMBOL_GPL(print_toi_header_storage_for_modules);
