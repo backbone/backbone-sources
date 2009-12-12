@@ -652,17 +652,30 @@ static void display_stats(int always, int sub_extra_pd1_allow)
  */
 static void generate_free_page_map(void)
 {
-	int order, pfn, cpu, t;
+	int order, cpu, t;
 	unsigned long flags, i;
 	struct zone *zone;
 	struct list_head *curr;
+	unsigned long pfn;
+	struct page *page;
 
 	for_each_populated_zone(zone) {
+
+		if (!zone->spanned_pages)
+			continue;
+
 		spin_lock_irqsave(&zone->lock, flags);
 
-		for (i = 0; i < zone->spanned_pages; i++)
-			ClearPageNosaveFree(pfn_to_page(
-						ZONE_START(zone) + i));
+		for (i = 0; i < zone->spanned_pages; i++) {
+			pfn = ZONE_START(zone) + i;
+
+			if (!pfn_valid(pfn))
+				continue;
+
+			page = pfn_to_page(pfn);
+
+			ClearPageNosaveFree(page);
+		}
 
 		for_each_migratetype_order(order, t) {
 			list_for_each(curr,
