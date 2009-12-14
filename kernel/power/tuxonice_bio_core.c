@@ -1619,7 +1619,7 @@ static int toi_bio_parse_sig_location(char *commandline,
 		/*
 		 * Failing swap:, we'll take a simple resume=/dev/hda2, or a
 		 * blank value (scan) but fall through to other allocators
-		 & if /dev/ or UUID= isn't matched.
+		 * if /dev/ or UUID= isn't matched.
 		 */
 		if (strncmp(commandline, "/dev/", 5) &&
 		    strncmp(commandline, "UUID=", 5) &&
