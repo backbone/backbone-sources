@@ -64,3 +64,4 @@ void debug_broken_header(void);
 extern unsigned long raw_pages_allocd, header_pages_reserved;
 int toi_bio_chains_debug_info(char *buffer, int size);
 void toi_bio_chains_post_atomic(struct toi_boot_kernel_data *bkd);
+int toi_bio_scan_for_image(int quiet);

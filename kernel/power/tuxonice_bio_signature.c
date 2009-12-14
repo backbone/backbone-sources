@@ -290,3 +290,46 @@ out:
 
 	return result;
 }
+
+int toi_bio_scan_for_image(int quiet)
+{
+	struct block_device *bdev;
+	char default_name[255] = "/dev/";
+
+	if (!quiet)
+		printk("Scanning swap devices for TuxOnIce signature...\n");
+	for (bdev = next_bdev_of_type(NULL, "swap"); bdev;
+				bdev = next_bdev_of_type(bdev, "swap")) {
+		int result;
+		char name[255] = "/dev/";
+		bdevname(bdev, name + 5);
+		if (!quiet)
+			printk("- Trying %s.\n", name);
+		resume_block_device = bdev;
+		resume_dev_t = bdev->bd_dev;
+
+		result = toi_check_for_signature();
+
+		resume_block_device = NULL;
+		resume_dev_t = MKDEV(0,0);
+
+		if (!default_name[6])
+			strcpy(default_name, name);
+
+		if (result == 1) {
+			/* Got one! */
+			strcpy(resume_file, name);
+			next_bdev_of_type(bdev, NULL);
+			if (!quiet)
+				printk(" ==> Image found on %s.\n",
+						resume_file);
+			return 1;
+		}
+		forget_signature_page();
+	}
+
+	if (!quiet)
+		printk("No image found.\n");
+	strcpy(resume_file, default_name);
+	return 0;
+}

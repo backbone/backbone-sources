@@ -1545,6 +1545,9 @@ static int try_to_open_resume_device(char *commandline, int quiet)
 
 	resume_dev_t = MKDEV(0, 0);
 
+	if (!strlen(commandline))
+		toi_bio_scan_for_image(quiet);
+
 	if (uuid) {
 		resume_dev_t = blk_lookup_uuid(uuid);
 		kfree(uuid);
@@ -1614,12 +1617,13 @@ static int toi_bio_parse_sig_location(char *commandline,
 	if (strncmp(commandline, "swap:", 5) &&
 	    strncmp(commandline, "file:", 5)) {
 		/*
-		 * Failing swap:, we'll take a simple
-		 * resume=/dev/hda2, but fall through to
-		 * other allocators if /dev/ or UUID= isn't matched.
+		 * Failing swap:, we'll take a simple resume=/dev/hda2, or a
+		 * blank value (scan) but fall through to other allocators
+		 & if /dev/ or UUID= isn't matched.
 		 */
 		if (strncmp(commandline, "/dev/", 5) &&
-		    strncmp(commandline, "UUID=", 5))
+		    strncmp(commandline, "UUID=", 5) &&
+		    strlen(commandline))
 			return 1;
 	} else
 		commandline += 5;
@@ -1656,8 +1660,9 @@ static int toi_bio_parse_sig_location(char *commandline,
 	if (colon)
 		*colon = ':';
 
+	/* No error if we only scanned */
 	if (temp_result)
-		return -EINVAL;
+		return strlen(commandline) ? -EINVAL: 1;
 
 	signature_found = toi_bio_image_exists(quiet);
 

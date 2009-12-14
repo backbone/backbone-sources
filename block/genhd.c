@@ -1315,3 +1315,55 @@ dev_t blk_lookup_uuid(const char *uuid)
 	return devt;
 }
 EXPORT_SYMBOL_GPL(blk_lookup_uuid);
+
+/* Caller uses NULL, key to start. For each match found, we return a bdev on
+ * which we have done blkdev_get, and we do the blkdev_put on block devices
+ * that are passed to us. When no more matches are found, we return NULL.
+ */
+struct block_device *next_bdev_of_type(struct block_device *last,
+	const char *key)
+{
+	dev_t devt = MKDEV(0, 0);
+	struct class_dev_iter iter;
+	struct device *dev;
+	struct block_device *next = NULL, *bdev;
+	int got_last = 0;
+
+	if (!key)
+		goto out;
+
+	class_dev_iter_init(&iter, &block_class, NULL, &disk_type);
+	while (!devt && (dev = class_dev_iter_next(&iter))) {
+		struct gendisk *disk = dev_to_disk(dev);
+		struct disk_part_iter piter;
+		struct hd_struct *part;
+
+		disk_part_iter_init(&piter, disk, DISK_PITER_INCL_PART0);
+
+		while ((part = disk_part_iter_next(&piter))) {
+			bdev = bdget(part_devt(part));
+			if (last && !got_last) {
+				if (last == bdev)
+					got_last = 1;
+				continue;
+			}
+
+			if (blkdev_get(bdev, FMODE_READ))
+				continue;
+
+			if (bdev_matches_key(bdev, key)) {
+				next = bdev;
+				break;
+			}
+
+			blkdev_put(bdev, FMODE_READ);
+		}
+		disk_part_iter_exit(&piter);
+	}
+	class_dev_iter_exit(&iter);
+out:
+	if (last)
+		blkdev_put(last, FMODE_READ);
+	return next;
+}
+EXPORT_SYMBOL_GPL(next_bdev_of_type);

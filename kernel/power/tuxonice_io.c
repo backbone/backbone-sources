@@ -85,13 +85,6 @@ int toi_attempt_to_parse_resume_device(int quiet)
 		goto cleanup;
 	}
 
-	if (!resume_file[0]) {
-		if (!quiet)
-			printk(KERN_INFO "TuxOnIce: Resume= parameter is empty."
-				" Hibernating will be disabled.\n");
-		goto cleanup;
-	}
-
 	list_for_each(Allocator, &toiAllocators) {
 		thisAllocator = list_entry(Allocator, struct toi_module_ops,
 								type_list);

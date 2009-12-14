@@ -15,6 +15,7 @@
  */
 
 struct uuid_info {
+	const char *key;
 	const char *name;
 	long bkoff;
 	unsigned sboff;
@@ -31,99 +32,99 @@ struct uuid_info {
  * Rearranged by page of fs signature for optimisation.
  */
 static struct uuid_info uuid_list[] = {
-  { "oracleasm", 0,	32,  8, "ORCLDISK",		0x0 },
-  { "ntfs",	 0,	 3,  8, "NTFS    ",		0x0 },
-  { "vfat",      0,   0x52,  5, "MSWIN",                0x0 },
-  { "vfat",      0,   0x52,  8, "FAT32   ",             0x0 },
-  { "vfat",      0,   0x36,  5, "MSDOS",                0x0 },
-  { "vfat",      0,   0x36,  8, "FAT16   ",             0x0 },
-  { "vfat",      0,   0x36,  8, "FAT12   ",             0x0 },
-  { "vfat",      0,      0,  1, "\353",                 0x0 },
-  { "vfat",      0,      0,  1, "\351",                 0x0 },
-  { "vfat",      0,  0x1fe,  2, "\125\252",             0x0 },
-  { "xfs",	 0,	 0,  4, "XFSB",			0x14 },
-  { "romfs",	 0,	 0,  8, "-rom1fs-",		0x0 },
-  { "bfs",	 0,	 0,  4, "\316\372\173\033",	0 },
-  { "cramfs",	 0,	 0,  4, "E=\315\050",		0x0 },
-  { "qnx4",	 0,	 4,  6, "QNX4FS",		0 },
-  { "crypt_LUKS", 0,	 0,  6,	"LUKS\xba\xbe",		0x0 },
-  { "squashfs",	 0,	 0,  4,	"sqsh",			0 },
-  { "squashfs",	 0,	 0,  4,	"hsqs",			0 },
-  { "ocfs",	 0,	 8,  9,	"OracleCFS",		0x0 },
-  { "lvm2pv",	 0,  0x018,  8, "LVM2 001",		0x0 },
-  { "sysv",	 0,  0x3f8,  4, "\020~\030\375",	0 },
-  { "jbd",	 1,   0x38,  2, "\123\357",		0x0 },
-  { "ext4dev",	 1,   0x38,  2, "\123\357",		0x468 },
-  { "ext4",	 1,   0x38,  2, "\123\357",		0x468 },
-  { "ext3",	 1,   0x38,  2, "\123\357",		0x468 },
-  { "ext2",	 1,   0x38,  2, "\123\357",		0x468 },
-  { "minix",     1,   0x10,  2, "\177\023",             0 },
-  { "minix",     1,   0x10,  2, "\217\023",             0 },
-  { "minix",	 1,   0x10,  2, "\150\044",		0 },
-  { "minix",	 1,   0x10,  2, "\170\044",		0 },
-  { "lvm2pv",	 1,  0x018,  8, "LVM2 001",		0x0 },
-  { "vxfs",	 1,	 0,  4, "\365\374\001\245",	0 },
-  { "hfsplus",	 1,	 0,  2, "BD",			0x0 },
-  { "hfsplus",	 1,	 0,  2, "H+",			0x0 },
-  { "hfsplus",	 1,	 0,  2, "HX",			0x0 },
-  { "hfs",	 1,	 0,  2, "BD",			0x0 },
-  { "ocfs2",	 1,	 0,  6,	"OCFSV2",		0x0 },
-  { "lvm2pv",	 0,  0x218,  8, "LVM2 001",		0x0 },
-  { "lvm2pv",	 1,  0x218,  8, "LVM2 001",		0x0 },
-  { "ocfs2",	 2,	 0,  6,	"OCFSV2",		0x0 },
-  { "swap",	 0,  0xff6, 10, "SWAP-SPACE",		0x40c },
-  { "swap",	 0,  0xff6, 10, "SWAPSPACE2",		0x40c },
-  { "swsuspend", 0,  0xff6,  9, "S1SUSPEND",		0x40c },
-  { "swsuspend", 0,  0xff6,  9, "S2SUSPEND",		0x40c },
-  { "swsuspend", 0,  0xff6,  9, "ULSUSPEND",		0x40c },
-  { "ocfs2",	 4,	 0,  6,	"OCFSV2",		0x0 },
-  { "ocfs2",	 8,	 0,  6,	"OCFSV2",		0x0 },
-  { "hpfs",	 8,	 0,  4, "I\350\225\371",	0 },
-  { "reiserfs",	 8,   0x34,  8, "ReIsErFs",		0x10054 },
-  { "reiserfs",	 8,	20,  8, "ReIsErFs",		0x10054 },
-  { "zfs",       8,	 0,  8, "\0\0\x02\xf5\xb0\x07\xb1\x0c", 0x0 },
-  { "zfs",       8,	 0,  8, "\x0c\xb1\x07\xb0\xf5\x02\0\0", 0x0 },
-  { "ufs",	 8,  0x55c,  4, "T\031\001\000",	0 },
-  { "swap",	 0, 0x1ff6, 10, "SWAP-SPACE",		0x40c },
-  { "swap",	 0, 0x1ff6, 10, "SWAPSPACE2",		0x40c },
-  { "swsuspend", 0, 0x1ff6,  9, "S1SUSPEND",		0x40c },
-  { "swsuspend", 0, 0x1ff6,  9, "S2SUSPEND",		0x40c },
-  { "swsuspend", 0, 0x1ff6,  9, "ULSUSPEND",		0x40c },
-  { "reiserfs", 64,   0x34,  9, "ReIsEr2Fs",		0x10054 },
-  { "reiserfs", 64,   0x34,  9, "ReIsEr3Fs",		0x10054 },
-  { "reiserfs", 64,   0x34,  8, "ReIsErFs",		0x10054 },
-  { "reiser4",  64,	 0,  7, "ReIsEr4",		0x100544 },
-  { "gfs2",     64,      0,  4, "\x01\x16\x19\x70",     0x0 },
-  { "gfs",      64,      0,  4, "\x01\x16\x19\x70",     0x0 },
-  { "btrfs",	64,   0x40,  8, "_BHRfS_M",		0x0 },
-  { "swap",	 0, 0x3ff6, 10, "SWAP-SPACE",		0x40c },
-  { "swap",	 0, 0x3ff6, 10, "SWAPSPACE2",		0x40c },
-  { "swsuspend", 0, 0x3ff6,  9, "S1SUSPEND",		0x40c },
-  { "swsuspend", 0, 0x3ff6,  9, "S2SUSPEND",		0x40c },
-  { "swsuspend", 0, 0x3ff6,  9, "ULSUSPEND",		0x40c },
-  { "udf",	32,	 1,  5, "BEA01",		0x0 },
-  { "udf",	32,	 1,  5, "BOOT2",		0x0 },
-  { "udf",	32,	 1,  5, "CD001",		0x0 },
-  { "udf",	32,	 1,  5, "CDW02",		0x0 },
-  { "udf",	32,	 1,  5, "NSR02",		0x0 },
-  { "udf",	32,	 1,  5, "NSR03",		0x0 },
-  { "udf",	32,	 1,  5, "TEA01",		0x0 },
-  { "iso9660",	32,	 1,  5, "CD001",		0x0 },
-  { "iso9660",	32,	 9,  5, "CDROM",		0x0 },
-  { "jfs",	32,	 0,  4, "JFS1",			0x88 },
-  { "swap",	 0, 0x7ff6, 10, "SWAP-SPACE",		0x40c },
-  { "swap",	 0, 0x7ff6, 10, "SWAPSPACE2",		0x40c },
-  { "swsuspend", 0, 0x7ff6,  9, "S1SUSPEND",		0x40c },
-  { "swsuspend", 0, 0x7ff6,  9, "S2SUSPEND",		0x40c },
-  { "swsuspend", 0, 0x7ff6,  9, "ULSUSPEND",		0x40c },
-  { "swap",	 0, 0xfff6, 10, "SWAP-SPACE",		0x40c },
-  { "swap",	 0, 0xfff6, 10, "SWAPSPACE2",		0x40c },
-  { "swsuspend", 0, 0xfff6,  9, "S1SUSPEND",		0x40c },
-  { "swsuspend", 0, 0xfff6,  9, "S2SUSPEND",		0x40c },
-  { "swsuspend", 0, 0xfff6,  9, "ULSUSPEND",		0x40c },
-  { "zfs",     264,	 0,  8, "\0\0\x02\xf5\xb0\x07\xb1\x0c", 0x0 },
-  { "zfs",     264,	 0,  8, "\x0c\xb1\x07\xb0\xf5\x02\0\0", 0x0 },
-  { NULL,        0,      0,  0, NULL,			0x0 }
+  { NULL,	"oracleasm",	0,	32,  8, "ORCLDISK",		0x0 },
+  { "ntfs",	"ntfs",		0,	 3,  8, "NTFS    ",		0x0 },
+  { "vfat",	"vfat",		0,   0x52,  5, "MSWIN",                0x0 },
+  { "vfat", 	"vfat",		0,   0x52,  8, "FAT32   ",             0x0 },
+  { "vfat",	"vfat",		0,   0x36,  5, "MSDOS",                0x0 },
+  { "vfat",	"vfat",		0,   0x36,  8, "FAT16   ",             0x0 },
+  { "vfat",	"vfat",		0,   0x36,  8, "FAT12   ",             0x0 },
+  { "vfat",	"vfat",		0,      0,  1, "\353",                 0x0 },
+  { "vfat",	"vfat",		0,      0,  1, "\351",                 0x0 },
+  { "vfat",	"vfat",		0,  0x1fe,  2, "\125\252",             0x0 },
+  { "xfs",	"xfs",		0,	 0,  4, "XFSB",			0x14 },
+  { "romfs",	"romfs",	0,	 0,  8, "-rom1fs-",		0x0 },
+  { "bfs",	"bfs",		0,	 0,  4, "\316\372\173\033",	0 },
+  { "cramfs",	"cramfs",	0,	 0,  4, "E=\315\050",		0x0 },
+  { "qnx4",	"qnx4",		0,	 4,  6, "QNX4FS",		0 },
+  { NULL,	"crypt_LUKS",	0,	 0,  6,	"LUKS\xba\xbe",		0x0 },
+  { "squashfs",	"squashfs",	0,	 0,  4,	"sqsh",			0 },
+  { "squashfs",	"squashfs",	0,	 0,  4,	"hsqs",			0 },
+  { "ocfs",	"ocfs",		0,	 8,  9,	"OracleCFS",		0x0 },
+  { "lvm2pv",	"lvm2pv",	0,  0x018,  8, "LVM2 001",		0x0 },
+  { "sysv",	"sysv",		0,  0x3f8,  4, "\020~\030\375",	0 },
+  { "jbd",	"jbd",		1,   0x38,  2, "\123\357",		0x0 },
+  { "ext",	"ext4dev",	1,   0x38,  2, "\123\357",		0x468 },
+  { "ext",	"ext4",	 	1,   0x38,  2, "\123\357",		0x468 },
+  { "ext",	"ext3",	 	1,   0x38,  2, "\123\357",		0x468 },
+  { "ext",	"ext2",		1,   0x38,  2, "\123\357",		0x468 },
+  { "minix",	"minix",	1,   0x10,  2, "\177\023",             0 },
+  { "minix",	"minix",	1,   0x10,  2, "\217\023",             0 },
+  { "minix",	"minix",	1,   0x10,  2, "\150\044",		0 },
+  { "minix",	"minix",	1,   0x10,  2, "\170\044",		0 },
+  { "lvm2pv",	"lvm2pv",	1,  0x018,  8, "LVM2 001",		0x0 },
+  { "vxfs",	"vxfs",		1,	 0,  4, "\365\374\001\245",	0 },
+  { "hfsplus",	"hfsplus",	1,	 0,  2, "BD",			0x0 },
+  { "hfsplus",	"hfsplus",	1,	 0,  2, "H+",			0x0 },
+  { "hfsplus",	"hfsplus",	1,	 0,  2, "HX",			0x0 },
+  { "hfs",	"hfs",	 	1,	 0,  2, "BD",			0x0 },
+  { "ocfs2",	"ocfs2",	1,	 0,  6,	"OCFSV2",		0x0 },
+  { "lvm2pv",	"lvm2pv",	0,  0x218,  8, "LVM2 001",		0x0 },
+  { "lvm2pv",	"lvm2pv",	1,  0x218,  8, "LVM2 001",		0x0 },
+  { "ocfs2",	"ocfs2",	2,	 0,  6,	"OCFSV2",		0x0 },
+  { "swap",	"swap",		0,  0xff6, 10, "SWAP-SPACE",		0x40c },
+  { "swap",	"swap",		0,  0xff6, 10, "SWAPSPACE2",		0x40c },
+  { "swap",	"swsuspend",	0,  0xff6,  9, "S1SUSPEND",		0x40c },
+  { "swap",	"swsuspend",	0,  0xff6,  9, "S2SUSPEND",		0x40c },
+  { "swap",	"swsuspend",	0,  0xff6,  9, "ULSUSPEND",		0x40c },
+  { "ocfs2",	"ocfs2",	4,	 0,  6,	"OCFSV2",		0x0 },
+  { "ocfs2",	"ocfs2",	8,	 0,  6,	"OCFSV2",		0x0 },
+  { "hpfs",	"hpfs",		8,	0,  4, "I\350\225\371",	0 },
+  { "reiserfs",	"reiserfs",	8,   0x34,  8, "ReIsErFs",		0x10054 },
+  { "reiserfs",	"reiserfs",	8,	20,  8, "ReIsErFs",		0x10054 },
+  { "zfs",	"zfs",		8,	 0,  8, "\0\0\x02\xf5\xb0\x07\xb1\x0c", 0x0 },
+  { "zfs",	"zfs",		8,	 0,  8, "\x0c\xb1\x07\xb0\xf5\x02\0\0", 0x0 },
+  { "ufs",	"ufs",	 	8,  0x55c,  4, "T\031\001\000",	0 },
+  { "swap",	"swap",	 	0, 0x1ff6, 10, "SWAP-SPACE",		0x40c },
+  { "swap",	"swap",	 	0, 0x1ff6, 10, "SWAPSPACE2",		0x40c },
+  { "swap",	"swsuspend",	0, 0x1ff6,  9, "S1SUSPEND",		0x40c },
+  { "swap",	"swsuspend",	0, 0x1ff6,  9, "S2SUSPEND",		0x40c },
+  { "swap",	"swsuspend",	0, 0x1ff6,  9, "ULSUSPEND",		0x40c },
+  { "reiserfs",	"reiserfs",	64,   0x34,  9, "ReIsEr2Fs",		0x10054 },
+  { "reiserfs",	"reiserfs",	64,   0x34,  9, "ReIsEr3Fs",		0x10054 },
+  { "reiserfs",	"reiserfs",	64,   0x34,  8, "ReIsErFs",		0x10054 },
+  { "reiser4",	"reiser4",	64,	 0,  7, "ReIsEr4",		0x100544 },
+  { "gfs2",	"gfs2",		64,      0,  4, "\x01\x16\x19\x70",     0x0 },
+  { "gfs",	"gfs",		64,	0,  4, "\x01\x16\x19\x70",     0x0 },
+  { "btrfs",	"btrfs",	64,   0x40,  8, "_BHRfS_M",		0x0 },
+  { "swap",	"swap",	 	0, 0x3ff6, 10, "SWAP-SPACE",		0x40c },
+  { "swap",	"swap",	 	0, 0x3ff6, 10, "SWAPSPACE2",		0x40c },
+  { "swap",	"swsuspend", 	0, 0x3ff6,  9, "S1SUSPEND",		0x40c },
+  { "swap",	"swsuspend", 	0,	0x3ff6,  9, "S2SUSPEND",		0x40c },
+  { "swap",	"swsuspend", 	0, 0x3ff6,  9, "ULSUSPEND",		0x40c },
+  { "udf",	"udf",		32,	 1,  5, "BEA01",		0x0 },
+  { "udf",	"udf",		32,	 1,  5, "BOOT2",		0x0 },
+  { "udf",	"udf",		32,	 1,  5, "CD001",		0x0 },
+  { "udf",	"udf",		32,	 1,  5, "CDW02",		0x0 },
+  { "udf",	"udf",		32,	 1,  5, "NSR02",		0x0 },
+  { "udf",	"udf",		32,	 1,  5, "NSR03",		0x0 },
+  { "udf",	"udf",		32,	 1,  5, "TEA01",		0x0 },
+  { "iso9660",	"iso9660",	32,	 1,  5, "CD001",		0x0 },
+  { "iso9660",	"iso9660",	32,	 9,  5, "CDROM",		0x0 },
+  { "jfs",	"jfs",		32,	 0,  4, "JFS1",			0x88 },
+  { "swap",	"swap",	 	0, 0x7ff6, 10, "SWAP-SPACE",		0x40c },
+  { "swap",	"swap",	 	0, 0x7ff6, 10, "SWAPSPACE2",		0x40c },
+  { "swap",	"swsuspend", 	0, 0x7ff6,  9, "S1SUSPEND",		0x40c },
+  { "swap",	"swsuspend", 	0, 0x7ff6,  9, "S2SUSPEND",		0x40c },
+  { "swap",	"swsuspend", 	0, 0x7ff6,  9, "ULSUSPEND",		0x40c },
+  { "swap",	"swap",	 	0, 0xfff6, 10, "SWAP-SPACE",		0x40c },
+  { "swap",	"swap",	 	0, 0xfff6, 10, "SWAPSPACE2",		0x40c },
+  { "swap",	"swsuspend", 	0, 0xfff6,  9, "S1SUSPEND",		0x40c },
+  { "swap",	"swsuspend", 	0, 0xfff6,  9, "S2SUSPEND",		0x40c },
+  { "swap",	"swsuspend", 	0, 0xfff6,  9, "ULSUSPEND",		0x40c },
+  { "zfs",	"zfs",		264,	 0,  8, "\0\0\x02\xf5\xb0\x07\xb1\x0c", 0x0 },
+  { "zfs",	"zfs",		264,	 0,  8, "\x0c\xb1\x07\xb0\xf5\x02\0\0", 0x0 },
+  { NULL,	NULL,		0,      0,  0, NULL,			0x0 }
 };
 
 static void uuid_end_bio(struct bio *bio, int err)
@@ -181,6 +182,62 @@ static struct page *read_bdev_page(struct block_device *dev, int page_num)
 	return page;
 }
 
+int bdev_matches_key(struct block_device *bdev, const char *key)
+{
+	unsigned char *data = NULL;
+	struct page *data_page = NULL;
+
+	int dev_offset, pg_num, pg_off, i;
+	int last_pg_num = -1;
+	int result = 0;
+	char buf[50];
+
+	if (!bdev->bd_disk) {
+		bdevname(bdev, buf);
+		PRINTK("bdev %s has no bd_disk.\n", buf);
+		return 0;
+	}
+
+	if (!bdev->bd_disk->queue) {
+		bdevname(bdev, buf);
+		PRINTK("bdev %s has no queue.\n", buf);
+		return 0;
+	}
+
+	for (i = 0; uuid_list[i].name; i++) {
+		struct uuid_info *dat = &uuid_list[i];
+
+		if (!dat->key || strcmp(dat->key, key))
+			continue;
+
+		dev_offset = (dat->bkoff << 10) + dat->sboff;
+		pg_num = dev_offset >> 12;
+		pg_off = dev_offset & 0xfff;
+
+		if ((((pg_num + 1) << 3) - 1) > bdev->bd_part->nr_sects >> 1)
+			continue;
+
+		if (pg_num != last_pg_num) {
+			if (data_page)
+				__free_page(data_page);
+			data_page = read_bdev_page(bdev, pg_num);
+			data = page_address(data_page);
+		}
+
+		last_pg_num = pg_num;
+
+		if (strncmp(&data[pg_off], dat->magic, dat->sig_len))
+			continue;
+
+		result = 1;
+		break;
+	}
+
+	if (data_page)
+		__free_page(data_page);
+
+	return result;
+}
 
 int part_matches_uuid(struct hd_struct *part, const char *uuid)
 {
@@ -193,7 +250,7 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 	unsigned char *uuid_data = NULL;
 	struct page *uuid_data_page = NULL;
 
-	int last_pg_num = 0, last_uuid_pg_num = 0;
+	int last_pg_num = -1, last_uuid_pg_num = 0;
 	int result = 0;
 	char buf[50];
 
@@ -232,7 +289,7 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 		if ((((pg_num + 1) << 3) - 1) > part->nr_sects >> 1)
 			continue;
 
-		if (!i || pg_num != last_pg_num) {
+		if (pg_num != last_pg_num) {
 			if (data_page)
 				__free_page(data_page);
 			data_page = read_bdev_page(bdev, pg_num);
@@ -289,7 +346,7 @@ int uuid_from_block_dev(struct block_device *bdev, char *uuid)
 	unsigned char *uuid_data = NULL;
 	struct page *uuid_data_page = NULL;
 
-	int last_pg_num = 0, last_uuid_pg_num = 0;
+	int last_pg_num = -1, last_uuid_pg_num = 0;
 	int result = 1;
 	char buf[50];
 
@@ -309,7 +366,7 @@ int uuid_from_block_dev(struct block_device *bdev, char *uuid)
 		if ((((pg_num + 1) << 3) - 1) > bdev->bd_part->nr_sects >> 1)
 			continue;
 
-		if (!i || pg_num != last_pg_num) {
+		if (pg_num != last_pg_num) {
 			if (data_page)
 				__free_page(data_page);
 			data_page = read_bdev_page(bdev, pg_num);
