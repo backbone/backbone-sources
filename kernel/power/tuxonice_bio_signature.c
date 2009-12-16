@@ -81,7 +81,7 @@ void forget_signature_page(void)
 	}
 }
 
-/* 
+/*
  * We need to ensure we use the signature page that's currently on disk,
  * so as to not remove the image header. Post-atomic-restore, the orig sig
  * page will be empty, so we can use that as our method of knowing that we
@@ -297,21 +297,23 @@ int toi_bio_scan_for_image(int quiet)
 	char default_name[255] = "";
 
 	if (!quiet)
-		printk("Scanning swap devices for TuxOnIce signature...\n");
+		printk(KERN_DEBUG "Scanning swap devices for TuxOnIce "
+				"signature...\n");
 	for (bdev = next_bdev_of_type(NULL, "swap"); bdev;
 				bdev = next_bdev_of_type(bdev, "swap")) {
 		int result;
 		char name[255] = "";
-		sprintf(name, "%u:%u", MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev));
+		sprintf(name, "%u:%u", MAJOR(bdev->bd_dev),
+				MINOR(bdev->bd_dev));
 		if (!quiet)
-			printk("- Trying %s.\n", name);
+			printk(KERN_DEBUG "- Trying %s.\n", name);
 		resume_block_device = bdev;
 		resume_dev_t = bdev->bd_dev;
 
 		result = toi_check_for_signature();
 
 		resume_block_device = NULL;
-		resume_dev_t = MKDEV(0,0);
+		resume_dev_t = MKDEV(0, 0);
 
 		if (!default_name[0])
 			strcpy(default_name, name);
@@ -321,7 +323,7 @@ int toi_bio_scan_for_image(int quiet)
 			strcpy(resume_file, name);
 			next_bdev_of_type(bdev, NULL);
 			if (!quiet)
-				printk(" ==> Image found on %s.\n",
+				printk(KERN_DEBUG " ==> Image found on %s.\n",
 						resume_file);
 			return 1;
 		}
@@ -329,7 +331,7 @@ int toi_bio_scan_for_image(int quiet)
 	}
 
 	if (!quiet)
-		printk("No image found.\n");
+		printk(KERN_DEBUG "TuxOnIce scan: No image found.\n");
 	strcpy(resume_file, default_name);
 	return 0;
 }

@@ -454,7 +454,7 @@ static int read_next_page(int *my_io_index, unsigned long *write_pfn,
 	if (unlikely(test_toi_state(TOI_STOP_RESUME))) {
 		atomic_dec(&toi_io_workers);
 		if (!atomic_read(&toi_io_workers)) {
-			/* 
+			/*
 			 * So we can be sure we'll have memory for
 			 * marking that we haven't resumed.
 			 */

@@ -656,9 +656,10 @@ int toi_load_extent_chain(int index, int *num_loaded)
 		}
 
 		/*
-		 * We have to wait until 2 extents are loaded before setting up properly
-		 * because if the first extent has only one page, we will need to put the
-		 * position on the second extent. Sounds obvious, but it wasn't!
+		 * We have to wait until 2 extents are loaded before setting up
+		 * properly because if the first extent has only one page, we
+		 * will need to put the position on the second extent. Sounds
+		 * obvious, but it wasn't!
 		 */
 		(*num_loaded)++;
 		if ((*num_loaded) == 2)

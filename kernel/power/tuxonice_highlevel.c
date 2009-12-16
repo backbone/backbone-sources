@@ -1114,8 +1114,8 @@ int toi_launch_userspace_program(char *command, int channel_no,
 			"TERM=linux",
 			"PATH=/sbin:/usr/sbin:/bin:/usr/bin",
 			NULL };
-	static char *argv[] =
-		{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+	static char *argv[] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+		};
 	char *channel = NULL;
 	int arg = 0, size;
 	char test_read[255];
