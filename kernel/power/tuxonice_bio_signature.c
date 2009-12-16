@@ -294,15 +294,15 @@ out:
 int toi_bio_scan_for_image(int quiet)
 {
 	struct block_device *bdev;
-	char default_name[255] = "/dev/";
+	char default_name[255] = "";
 
 	if (!quiet)
 		printk("Scanning swap devices for TuxOnIce signature...\n");
 	for (bdev = next_bdev_of_type(NULL, "swap"); bdev;
 				bdev = next_bdev_of_type(bdev, "swap")) {
 		int result;
-		char name[255] = "/dev/";
-		bdevname(bdev, name + 5);
+		char name[255] = "";
+		sprintf(name, "%u:%u", MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev));
 		if (!quiet)
 			printk("- Trying %s.\n", name);
 		resume_block_device = bdev;
@@ -313,7 +313,7 @@ int toi_bio_scan_for_image(int quiet)
 		resume_block_device = NULL;
 		resume_dev_t = MKDEV(0,0);
 
-		if (!default_name[6])
+		if (!default_name[0])
 			strcpy(default_name, name);
 
 		if (result == 1) {
