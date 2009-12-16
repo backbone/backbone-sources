@@ -32,6 +32,7 @@
 #include <linux/kmod.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
+#include <linux/vt.h>
 
 #include "tuxonice_sysfs.h"
 #include "tuxonice_modules.h"
@@ -542,8 +543,7 @@ static void userui_cond_pause(int pause, char *message)
  */
 static void userui_prepare_console(void)
 {
-	orig_kmsg = kmsg_redirect;
-	kmsg_redirect = fg_console + 1;
+	orig_kmsg = vt_kmsg_redirect(fg_console + 1);
 
 	ui_helper_data.pid = -1;
 
@@ -569,7 +569,7 @@ static void userui_cleanup_console(void)
 	if (ui_helper_data.pid > -1)
 		toi_netlink_close(&ui_helper_data);
 
-	kmsg_redirect = orig_kmsg;
+	vt_kmsg_redirect(orig_kmsg);
 }
 
 /*

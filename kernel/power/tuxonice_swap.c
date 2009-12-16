@@ -105,11 +105,8 @@ static int get_main_pool_phys_params(struct toi_bdev_info *chain)
 
 	toi_extent_for_each(&chain->allocations, extentpointer, address) {
 		swp_entry_t swap_address = (swp_entry_t) { address };
-		pgoff_t offset = swp_offset(swap_address);
-		unsigned swapfilenum = swp_type(swap_address);
-		struct swap_info_struct *sis =
-			get_swap_info_struct(swapfilenum);
-		sector_t new_sector = map_swap_page(sis, offset);
+		struct block_device *bdev;
+		sector_t new_sector = map_swap_entry(swap_address, &bdev);
 
 		if (empty) {
 			empty = 0;

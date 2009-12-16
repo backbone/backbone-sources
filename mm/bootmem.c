@@ -433,8 +433,8 @@ int __init reserve_bootmem(unsigned long addr, unsigned long size,
 	return mark_bootmem(start, end, 1, flags);
 }
 
-static unsigned long align_idx(struct bootmem_data *bdata, unsigned long idx,
-			unsigned long step)
+static unsigned long __init align_idx(struct bootmem_data *bdata,
+				      unsigned long idx, unsigned long step)
 {
 	unsigned long base = bdata->node_min_pfn;
 
@@ -446,8 +446,8 @@ static unsigned long align_idx(struct bootmem_data *bdata, unsigned long idx,
 	return ALIGN(base + idx, step) - base;
 }
 
-static unsigned long align_off(struct bootmem_data *bdata, unsigned long off,
-			unsigned long align)
+static unsigned long __init align_off(struct bootmem_data *bdata,
+				      unsigned long off, unsigned long align)
 {
 	unsigned long base = PFN_PHYS(bdata->node_min_pfn);
 
