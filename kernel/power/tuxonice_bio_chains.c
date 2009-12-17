@@ -964,7 +964,7 @@ int toi_bio_allocate_storage(unsigned long request)
 		 * as possible, but we also want to get all the storage we
 		 * can off this priority.
 		 */
-		for (i = 0; i < divisor; i++) {
+		for (i = 0; i < devices_of_same_priority(chain); i++) {
 			struct toi_bio_allocator_ops *ops =
 				chain->allocator->bio_allocator_ops;
 			toi_message(TOI_IO, TOI_VERBOSE, 0,
