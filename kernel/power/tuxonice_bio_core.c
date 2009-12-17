@@ -216,10 +216,8 @@ static void do_bio_wait(int reason)
 
 	/* On SMP, waiting_on can be reset, so we make a copy */
 	if (was_waiting_on) {
-		if (PageLocked(was_waiting_on)) {
-			wait_on_page_bit(was_waiting_on, PG_locked);
-			atomic_inc(&reasons[reason]);
-		}
+		wait_on_page_locked(was_waiting_on);
+		atomic_inc(&reasons[reason]);
 	} else {
 		atomic_inc(&reasons[reason]);
 

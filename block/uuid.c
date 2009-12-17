@@ -178,7 +178,7 @@ static struct page *read_bdev_page(struct block_device *dev, int page_num)
 	submit_bio(READ | (1 << BIO_RW_SYNCIO) |
 			(1 << BIO_RW_UNPLUG), bio);
 
-	wait_on_page_bit(page, PG_locked);
+	wait_on_page_locked(page);
 	return page;
 }
 
