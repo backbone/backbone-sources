@@ -925,10 +925,17 @@ int toi_bio_allocate_storage(unsigned long request)
 
 	if (!chain) {
 		int result = toi_bio_register_storage();
+		toi_message(TOI_IO, TOI_VERBOSE, 0, "toi_bio_allocate_storage: "
+			"Registering storage.");
 		if (result)
 			return 0;
 		chain = prio_chain_head;
+		if (!chain) {
+			printk("TuxOnIce: No storage was registered.\n");
+			return 0;
+		}
 	}
+
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "toi_bio_allocate_storage: "
 			"Request is %lu pages.", request);
 	extra_pages = DIV_ROUND_UP(request * (sizeof(unsigned long)
@@ -947,7 +954,8 @@ int toi_bio_allocate_storage(unsigned long request)
 		return apply_header_reservation();
 
 	while (to_get && chain) {
-		int divisor = devices_of_same_priority(chain) - no_free;
+		int num_group = devices_of_same_priority(chain);
+		int divisor = num_group - no_free;
 		int i;
 		unsigned long portion = DIV_ROUND_UP(to_get, divisor);
 		unsigned long got = 0;
@@ -964,7 +972,7 @@ int toi_bio_allocate_storage(unsigned long request)
 		 * as possible, but we also want to get all the storage we
 		 * can off this priority.
 		 */
-		for (i = 0; i < devices_of_same_priority(chain); i++) {
+		for (i = 0; i < num_group; i++) {
 			struct toi_bio_allocator_ops *ops =
 				chain->allocator->bio_allocator_ops;
 			toi_message(TOI_IO, TOI_VERBOSE, 0,
