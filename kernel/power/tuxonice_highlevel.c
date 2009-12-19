@@ -69,7 +69,7 @@
 
 #include <linux/suspend.h>
 #include <linux/freezer.h>
-#include <linux/utsrelease.h>
+#include <generated/utsrelease.h>
 #include <linux/cpu.h>
 #include <linux/console.h>
 #include <linux/writeback.h>
