@@ -143,20 +143,20 @@ static int get_main_pool_phys_params(struct toi_bdev_info *chain)
  * and don't need to use the spinlocks (userspace is stopped when this
  * function is called).
  */
-void si_swapinfo_no_compcache(struct sysinfo *val)
+void si_swapinfo_no_compcache(void)
 {
 	unsigned int i;
 
 	si_swapinfo(&swapinfo);
-	val->freeswap = 0;
-	val->totalswap = 0;
+	swapinfo.freeswap = 0;
+	swapinfo.totalswap = 0;
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si = get_swap_info_struct(i);
-		if ((si->flags & SWP_WRITEOK) &&
+		if (si && (si->flags & SWP_WRITEOK) &&
 		    (strncmp(si->bdev->bd_disk->disk_name, "ram", 3))) {
-			val->totalswap += si->inuse_pages;
-			val->freeswap += si->pages - si->inuse_pages;
+			swapinfo.totalswap += si->inuse_pages;
+			swapinfo.freeswap += si->pages - si->inuse_pages;
 		}
 	}
 }
@@ -167,7 +167,7 @@ void si_swapinfo_no_compcache(struct sysinfo *val)
 static unsigned long toi_swap_storage_available(void)
 {
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "In toi_swap_storage_available.");
-	si_swapinfo_no_compcache(&swapinfo);
+	si_swapinfo_no_compcache();
 	return swapinfo.freeswap + swap_allocated;
 }
 
@@ -291,7 +291,7 @@ static int toi_swap_register_storage(void)
 		unsigned char *p;
 		unsigned char buf[256];
 
-		if (!(si->flags & SWP_WRITEOK) ||
+		if (!si || !(si->flags & SWP_WRITEOK) ||
 		    !strncmp(si->bdev->bd_disk->disk_name, "ram", 3))
 			continue;
 
@@ -349,7 +349,6 @@ static int toi_swap_memory_needed(void)
 static int toi_swap_print_debug_stats(char *buffer, int size)
 {
 	int len = 0;
-	struct sysinfo sysinfo;
 
 	len = scnprintf(buffer, size, "- Swap Allocator enabled.\n");
 	if (swapfilename[0])
@@ -357,11 +356,11 @@ static int toi_swap_print_debug_stats(char *buffer, int size)
 			"  Attempting to automatically swapon: %s.\n",
 			swapfilename);
 
-	si_swapinfo_no_compcache(&sysinfo);
+	si_swapinfo_no_compcache();
 
 	len += scnprintf(buffer+len, size-len,
 			"  Swap available for image: %lu pages.\n",
-			sysinfo.freeswap + swap_allocated);
+			swapinfo.freeswap + swap_allocated);
 
 	return len;
 }
@@ -381,7 +380,7 @@ static int header_locations_read_sysfs(const char *page, int count)
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si =  get_swap_info_struct(i);
 
-		if (!(si->flags & SWP_WRITEOK))
+		if (!si || !(si->flags & SWP_WRITEOK))
 			continue;
 
 		if (S_ISBLK(si->swap_file->f_mapping->host->i_mode)) {
