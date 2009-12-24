@@ -279,6 +279,8 @@ int toi_atomic_restore(void)
 	memcpy(&toi_bkd.toi_nosave_commandline, saved_command_line,
 		strlen(saved_command_line));
 
+	toi_pre_atomic_restore_modules(&toi_bkd);
+
 	if (add_boot_kernel_data_pbe())
 		goto Failed;
 

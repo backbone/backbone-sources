@@ -23,7 +23,7 @@
 
 #define TOI_CORE_VERSION "3.0.99.44"
 
-#define MY_BOOT_KERNEL_DATA_VERSION 2
+#define MY_BOOT_KERNEL_DATA_VERSION 3
 
 struct toi_boot_kernel_data {
 	int version;
@@ -34,6 +34,8 @@ struct toi_boot_kernel_data {
 	int toi_io_time[2][2];
 	char toi_nosave_commandline[COMMAND_LINE_SIZE];
 	unsigned long pages_used[33];
+	unsigned long compress_bytes_in;
+	unsigned long compress_bytes_out;
 };
 
 extern struct toi_boot_kernel_data toi_bkd;

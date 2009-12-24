@@ -367,6 +367,18 @@ static void toi_compress_load_config_info(char *buffer, int size)
 	return;
 }
 
+static void toi_compress_pre_atomic_restore(struct toi_boot_kernel_data *bkd)
+{
+	bkd->compress_bytes_in = toi_compress_bytes_in;
+	bkd->compress_bytes_out = toi_compress_bytes_out;
+}
+
+static void toi_compress_post_atomic_restore(struct toi_boot_kernel_data *bkd)
+{
+	toi_compress_bytes_in = bkd->compress_bytes_in;
+	toi_compress_bytes_out = bkd->compress_bytes_out;
+}
+
 /*
  * toi_expected_compression_ratio
  *
@@ -411,6 +423,9 @@ static struct toi_module_ops toi_compression_ops = {
 	.load_config_info	= toi_compress_load_config_info,
 	.storage_needed		= toi_compress_storage_needed,
 	.expected_compression	= toi_compress_expected_ratio,
+
+	.pre_atomic_restore	= toi_compress_pre_atomic_restore,
+	.post_atomic_restore	= toi_compress_post_atomic_restore,
 
 	.rw_init		= toi_compress_rw_init,
 

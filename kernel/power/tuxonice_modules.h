@@ -81,6 +81,7 @@ struct toi_module_ops {
 	int (*initialise) (int starting_cycle);
 	void (*cleanup) (int finishing_cycle);
 
+	void (*pre_atomic_restore) (struct toi_boot_kernel_data *bkd);
 	void (*post_atomic_restore) (struct toi_boot_kernel_data *bkd);
 
 	/*
@@ -184,6 +185,7 @@ extern int toi_initialise_modules(int starting_cycle, int early);
 extern void toi_cleanup_modules(int finishing_cycle);
 
 extern void toi_post_atomic_restore_modules(struct toi_boot_kernel_data *bkd);
+extern void toi_pre_atomic_restore_modules(struct toi_boot_kernel_data *bkd);
 
 extern void toi_print_modules(void);
 
