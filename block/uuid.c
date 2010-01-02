@@ -289,6 +289,10 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 		if ((((pg_num + 1) << 3) - 1) > part->nr_sects >> 1)
 			continue;
 
+		/* Ignore partition types with no UUID offset */
+		if (!dat->uuid_offset)
+			continue;
+
 		if (pg_num != last_pg_num) {
 			if (data_page)
 				__free_page(data_page);
@@ -364,6 +368,10 @@ int uuid_from_block_dev(struct block_device *bdev, char *uuid)
 		uuid_pg_off = dat->uuid_offset & 0xfff;
 
 		if ((((pg_num + 1) << 3) - 1) > bdev->bd_part->nr_sects >> 1)
+			continue;
+
+		/* Ignore partition types with no UUID offset */
+		if (!dat->uuid_offset)
 			continue;
 
 		if (pg_num != last_pg_num) {
