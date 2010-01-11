@@ -174,15 +174,26 @@ struct toi_boot_kernel_data toi_bkd __nosavedata
 };
 EXPORT_SYMBOL_GPL(toi_bkd);
 
-struct block_device *toi_open_by_devnum(dev_t dev, fmode_t mode)
+struct block_device *toi_open_by_devnum(dev_t dev)
 {
 	struct block_device *bdev = bdget(dev);
 	int err = -ENOMEM;
 	if (bdev)
-		err = blkdev_get(bdev, mode);
+		err = blkdev_get(bdev, FMODE_READ | FMODE_NDELAY);
 	return err ? ERR_PTR(err) : bdev;
 }
 EXPORT_SYMBOL_GPL(toi_open_by_devnum);
+
+/**
+ * toi_close_bdev: Close a swap bdev.
+ *
+ * int: The swap entry number to close.
+ */
+void toi_close_bdev(struct block_device *bdev)
+{
+	blkdev_put(bdev, FMODE_READ | FMODE_NDELAY);
+}
+EXPORT_SYMBOL_GPL(toi_close_bdev);
 
 int toi_wait = CONFIG_TOI_DEFAULT_WAIT;
 EXPORT_SYMBOL_GPL(toi_wait);

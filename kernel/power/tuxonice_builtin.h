@@ -23,7 +23,8 @@ extern unsigned long toi_get_nonconflicting_page(void);
 extern int toi_post_context_save(void);
 
 extern char toi_wait_for_keypress_dev_console(int timeout);
-extern struct block_device *toi_open_by_devnum(dev_t dev, fmode_t mode);
+extern struct block_device *toi_open_by_devnum(dev_t dev);
+extern void toi_close_bdev(struct block_device *bdev);
 extern int toi_wait;
 extern int toi_translate_err_default;
 extern int toi_force_no_multithreaded;

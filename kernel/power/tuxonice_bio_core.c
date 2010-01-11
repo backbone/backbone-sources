@@ -126,18 +126,6 @@ static atomic_t resume_bdev_open_count;
 struct block_device *header_block_device;
 
 /**
- * toi_close_bdev: Close a swap bdev.
- *
- * int: The swap entry number to close.
- */
-void toi_close_bdev(struct block_device *bdev)
-{
-	toi_message(TOI_IO, TOI_VERBOSE, 0, ">>> TuxOnIce closing bdev %p.",
-			bdev);
-	blkdev_put(bdev, FMODE_READ | FMODE_NDELAY);
-}
-
-/**
  * toi_open_bdev: Open a bdev at resume time.
  *
  * index: The swap index. May be MAX_SWAPFILES for the resume_dev_t
@@ -176,7 +164,7 @@ struct block_device *toi_open_bdev(char *uuid, dev_t default_device,
 		dump_stack();
 		return NULL;
 	}
-	bdev = toi_open_by_devnum(device, FMODE_READ | FMODE_NDELAY);
+	bdev = toi_open_by_devnum(device);
 
 	if (IS_ERR(bdev) || !bdev) {
 		if (display_errs)

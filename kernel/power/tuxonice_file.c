@@ -147,8 +147,7 @@ static int toi_file_register_storage(void)
 				toi_file_dev_t = stat.rdev;
 		}
 
-		toi_file_target_bdev = toi_open_by_devnum(toi_file_dev_t,
-				FMODE_READ | FMODE_NDELAY);
+		toi_file_target_bdev = toi_open_by_devnum(toi_file_dev_t);
 		if (IS_ERR(toi_file_target_bdev)) {
 			printk(KERN_INFO "Got a dev_num (%lx) but failed to "
 					"open it.\n",
