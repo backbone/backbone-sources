@@ -21,6 +21,7 @@
 #include <linux/cpu.h>
 #include <linux/fs_struct.h>
 #include <linux/bio.h>
+#include <linux/uuid.h>
 #include <asm/tlbflush.h>
 
 #include "tuxonice.h"
@@ -1063,6 +1064,172 @@ static int read_module_configs(void)
 	return 0;
 }
 
+static inline int save_fs_info(struct fs_info *fs, struct block_device *bdev)
+{
+	return (!fs || IS_ERR(fs) || !fs->last_mount_size) ? 0 : 1;
+}
+
+int fs_info_space_needed(void)
+{
+	const struct super_block *sb;
+	int result = sizeof(int);
+
+	list_for_each_entry(sb, &super_blocks, s_list) {
+		struct fs_info *fs;
+
+		if (!sb->s_bdev)
+			continue;
+
+		fs = fs_info_from_block_dev(sb->s_bdev);
+		if (save_fs_info(fs, sb->s_bdev))
+			result += 16 + sizeof(int) + fs->last_mount_size;
+		free_fs_info(fs);
+	}
+	return result;
+}
+
+static int fs_info_num_to_save(void)
+{
+	const struct super_block *sb;
+	int to_save = 0;
+
+	list_for_each_entry(sb, &super_blocks, s_list) {
+		struct fs_info *fs;
+
+		if (!sb->s_bdev)
+			continue;
+
+		fs = fs_info_from_block_dev(sb->s_bdev);
+		if (save_fs_info(fs, sb->s_bdev))
+			to_save++;
+		free_fs_info(fs);
+	}
+
+	return to_save;
+}
+
+static int fs_info_save(void)
+{
+	const struct super_block *sb;
+	int to_save = fs_info_num_to_save();
+
+	if (toiActiveAllocator->rw_header_chunk(WRITE, NULL, (char *) &to_save,
+				sizeof(int))) {
+		abort_hibernate(TOI_FAILED_IO, "Failed to write num fs_info"
+				" to save.");
+		return -EIO;
+	}
+
+	list_for_each_entry(sb, &super_blocks, s_list) {
+		struct fs_info *fs;
+
+		if (!sb->s_bdev)
+			continue;
+
+		fs = fs_info_from_block_dev(sb->s_bdev);
+		if (save_fs_info(fs, sb->s_bdev)) {
+			if (toiActiveAllocator->rw_header_chunk(WRITE, NULL,
+					&fs->uuid[0], 16)) {
+				abort_hibernate(TOI_FAILED_IO, "Failed to "
+						"write uuid.");
+				return -EIO;
+			}
+			if (toiActiveAllocator->rw_header_chunk(WRITE, NULL,
+					(char *) &fs->last_mount_size, sizeof(int))) {
+				abort_hibernate(TOI_FAILED_IO, "Failed to "
+						"write last mount length.");
+				return -EIO;
+			}
+			if (toiActiveAllocator->rw_header_chunk(WRITE, NULL,
+					fs->last_mount, fs->last_mount_size)) {
+				abort_hibernate(TOI_FAILED_IO, "Failed to "
+						"write uuid.");
+				return -EIO;
+			}
+		}
+		free_fs_info(fs);
+	}
+	return 0;
+}
+
+static int fs_info_load_and_check_one(void)
+{
+	char uuid[16], *last_mount;
+	int result = 0, ln;
+	dev_t dev_t;
+	struct block_device *dev;
+	struct fs_info *fs_info;
+
+	if (toiActiveAllocator->rw_header_chunk(READ, NULL, uuid, 16)) {
+		abort_hibernate(TOI_FAILED_IO, "Failed to read uuid.");
+		return -EIO;
+	}
+
+	if (toiActiveAllocator->rw_header_chunk(READ, NULL, (char *) &ln,
+				sizeof(int))) {
+		abort_hibernate(TOI_FAILED_IO,
+				"Failed to read last mount size.");
+		return -EIO;
+	}
+
+	last_mount = kzalloc(ln, GFP_KERNEL);
+
+	if (!last_mount)
+		return -ENOMEM;
+
+	if (toiActiveAllocator->rw_header_chunk(READ, NULL, last_mount,	ln)) {
+		abort_hibernate(TOI_FAILED_IO,
+				"Failed to read last mount timestamp.");
+		result = -EIO;
+		goto out_lmt;
+	}
+
+	dev_t = blk_lookup_uuid(uuid);
+	if (!dev_t)
+		goto out_lmt;
+
+	dev = toi_open_by_devnum(dev_t);
+
+	fs_info = fs_info_from_block_dev(dev);
+	if (fs_info && !IS_ERR(fs_info)) {
+		if (ln != fs_info->last_mount_size) {
+			printk(KERN_EMERG "Found matching uuid but last mount "
+					"time lengths differ?! "
+					"(%d vs %d).\n", ln,
+					fs_info->last_mount_size);
+			result = -EINVAL;
+		} else {
+			char buf[BDEVNAME_SIZE];
+			result = !!memcmp(fs_info->last_mount, last_mount, ln);
+			if (result)
+				printk(KERN_EMERG "Last mount time for %s has "
+					"changed!\n", bdevname(dev, buf));
+		}
+	}
+	toi_close_bdev(dev);
+	free_fs_info(fs_info);
+out_lmt:
+	kfree(last_mount);
+	return result;
+}
+
+static int fs_info_load_and_check(void)
+{
+	int to_do, result;
+
+	if (toiActiveAllocator->rw_header_chunk(READ, NULL, (char *) &to_do,
+				sizeof(int))) {
+		abort_hibernate(TOI_FAILED_IO, "Failed to read num fs_info "
+				"to load.");
+		return -EIO;
+	}
+
+	while(to_do--)
+		result |= fs_info_load_and_check_one();
+
+	return result;
+}
+
 /**
  * write_image_header - write the image header after write the image proper
  *
@@ -1102,6 +1269,10 @@ int write_image_header(void)
 			header_buffer, sizeof(struct toi_header));
 
 	toi_free_page(24, (unsigned long) header_buffer);
+
+	/* Write filesystem info */
+	if (fs_info_save())
+		goto write_image_header_abort;
 
 	/* Write module configurations */
 	ret = write_module_configs();
@@ -1292,6 +1463,13 @@ static int __read_pageset1(void)
 
 	set_toi_state(TOI_BOOT_KERNEL);
 	boot_kernel_data_buffer = toi_header->bkd;
+
+	/* Read filesystem info */
+	if (fs_info_load_and_check()) {
+		printk(KERN_EMERG "TuxOnIce: File system mount time checks "
+			"failed. Refusing to corrupt your filesystems!\n");
+		goto out_remove_image;
+	}
 
 	/* Read module configurations */
 	result = read_module_configs();

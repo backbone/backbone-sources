@@ -414,7 +414,7 @@ static int header_locations_read_sysfs(const char *page, int count)
 					" mkswap on it and try again.\n",
 					path_page);
 			} else {
-				char name_buffer[255];
+				char name_buffer[BDEVNAME_SIZE];
 				len += sprintf(output + len,
 					"For swapfile `%s`,"
 					" use resume=swap:/dev/%s:0x%x.\n",

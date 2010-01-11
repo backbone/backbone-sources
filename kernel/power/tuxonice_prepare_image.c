@@ -417,7 +417,8 @@ unsigned long get_header_storage_needed(void)
 {
 	unsigned long bytes = sizeof(struct toi_header) +
 			toi_header_storage_for_modules() +
-			toi_pageflags_space_needed();
+			toi_pageflags_space_needed() +
+			fs_info_space_needed();
 
 	return DIV_ROUND_UP(bytes, PAGE_SIZE);
 }

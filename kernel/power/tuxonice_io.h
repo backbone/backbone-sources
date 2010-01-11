@@ -68,3 +68,5 @@ extern dev_t name_to_dev_t(char *line);
 
 extern wait_queue_head_t toi_io_queue_flusher;
 extern int toi_bio_queue_flusher_should_finish;
+
+int fs_info_space_needed(void);
