@@ -127,6 +127,16 @@ static struct uuid_info uuid_list[] = {
  { NULL, NULL, 0, 0, 0, NULL, 0x0 }
 };
 
+static int null_uuid(const char *uuid)
+{
+	int i;
+
+	for (i = 0; i < 16 && !uuid[i]; i++);
+
+	return (i == 16);
+}
+
+
 static void uuid_end_bio(struct bio *bio, int err)
 {
 	struct page *page = bio->bi_io_vec[0].bv_page;
@@ -192,6 +202,11 @@ int bdev_matches_key(struct block_device *bdev, const char *key)
 	int result = 0;
 	char buf[50];
 
+	if (null_uuid(key)) {
+		PRINTK("Refusing to find a NULL key.\n");
+		return 0;
+	}
+
 	if (!bdev->bd_disk) {
 		bdevname(bdev, buf);
 		PRINTK("bdev %s has no bd_disk.\n", buf);
@@ -253,6 +268,11 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 	int last_pg_num = -1, last_uuid_pg_num = 0;
 	int result = 0;
 	char buf[50];
+
+	if (null_uuid(uuid)) {
+		PRINTK("Refusing to find a NULL uuid.\n");
+		return 0;
+	}
 
 	bdev = bdget(part_devt(part));
 
@@ -405,6 +425,11 @@ int uuid_from_block_dev(struct block_device *bdev, char *uuid)
 			PRINTK("Don't know uuid offset for %s. Continuing the "
 					"search.\n", dat->name);
 		} else {
+			if (null_uuid(uuid)) {
+				PRINTK("Ignoring a NULL uuid.\n");
+				continue;
+			}
+
 			memcpy(uuid, &uuid_data[uuid_pg_off], 16);
 			PRINT_HEX_DUMP(KERN_EMERG, "uuid_from_block_dev "
 					"returning ", DUMP_PREFIX_NONE, 16, 1,
