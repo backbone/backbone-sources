@@ -1,5 +1,6 @@
 #include <linux/blkdev.h>
 #include <linux/ctype.h>
+#include <linux/uuid.h>
 
 #if 0
 #define PRINTK(fmt, args...) printk(KERN_DEBUG fmt, ## args)
@@ -362,7 +363,19 @@ out:
 	return result;
 }
 
-int uuid_from_block_dev(struct block_device *bdev, char *uuid)
+void free_fs_info(struct fs_info *fs_info)
+{
+	if (!fs_info || IS_ERR(fs_info))
+		return;
+
+	if (fs_info->last_mount)
+		kfree(fs_info->last_mount);
+
+	kfree(fs_info);
+}
+EXPORT_SYMBOL_GPL(free_fs_info);
+
+struct fs_info *fs_info_from_block_dev(struct block_device *bdev)
 {
 	unsigned char *data = NULL;
 	struct page *data_page = NULL;
@@ -373,8 +386,8 @@ int uuid_from_block_dev(struct block_device *bdev, char *uuid)
 	struct page *uuid_data_page = NULL;
 
 	int last_pg_num = -1, last_uuid_pg_num = 0;
-	int result = 1;
 	char buf[50];
+	struct fs_info *fs_info = NULL;
 
 	bdevname(bdev, buf);
 
@@ -408,11 +421,20 @@ int uuid_from_block_dev(struct block_device *bdev, char *uuid)
 		if (strncmp(&data[pg_off], dat->magic, dat->sig_len))
 			continue;
 
-		/* UUID can't be off the end of the disk */
-		if (uuid_pg_num > bdev->bd_part->nr_sects >> 3)
-			continue;
-
 		PRINTK("This partition looks like %s.\n", dat->name);
+
+		fs_info = kzalloc(sizeof(struct fs_info), GFP_KERNEL);
+
+		if (!fs_info) {
+			PRINTK("Failed to allocate fs_info struct.");
+			fs_info = ERR_PTR(-ENOMEM);
+			break;
+		}
+
+		/* UUID can't be off the end of the disk */
+		if ((uuid_pg_num > bdev->bd_part->nr_sects >> 3) ||
+				!dat->uuid_offset)
+			goto no_uuid;
 
 		if (!uuid_data || uuid_pg_num != last_uuid_pg_num) {
 			if (uuid_data_page)
@@ -422,23 +444,36 @@ int uuid_from_block_dev(struct block_device *bdev, char *uuid)
 		}
 
 		last_uuid_pg_num = uuid_pg_num;
+		memcpy(&fs_info->uuid, &uuid_data[uuid_pg_off], 16);
 
-		if (!uuid_pg_off) {
-			PRINTK("Don't know uuid offset for %s. Continuing the "
-					"search.\n", dat->name);
-		} else {
-			if (null_uuid(uuid)) {
-				PRINTK("Ignoring a NULL uuid.\n");
-				continue;
+no_uuid:
+		PRINT_HEX_DUMP(KERN_EMERG, "fs_info_from_block_dev "
+				"returning uuid ", DUMP_PREFIX_NONE, 16, 1,
+				fs_info->uuid, 16, 0);
+
+		if (dat->last_mount_size) {
+			int pg = dat->last_mount_offset >> 12;
+			int off = dat->last_mount_offset & 0xfff;
+			struct page *last_mount = read_bdev_page(bdev, pg);
+			unsigned char *last_mount_data = page_address(last_mount);
+			int sz = dat->last_mount_size;
+			char *ptr = kmalloc(sz, GFP_KERNEL);
+
+			if (!ptr) {
+				printk(KERN_EMERG "fs_info_from_block_dev "
+					"failed to get memory for last mount "
+					"timestamp.");
+				free_fs_info(fs_info);
+				fs_info = ERR_PTR(-ENOMEM);
+			} else {
+				fs_info->last_mount = ptr;
+				fs_info->last_mount_size = sz;
+				memcpy(ptr, &last_mount_data[off], sz);
 			}
 
-			memcpy(uuid, &uuid_data[uuid_pg_off], 16);
-			PRINT_HEX_DUMP(KERN_EMERG, "uuid_from_block_dev "
-					"returning ", DUMP_PREFIX_NONE, 16, 1,
-					uuid, 16, 0);
-			result = 0;
-			break;
+			__free_page(last_mount);
 		}
+		break;
 	}
 
 	if (data_page)
@@ -447,6 +482,6 @@ int uuid_from_block_dev(struct block_device *bdev, char *uuid)
 	if (uuid_data_page)
 		__free_page(uuid_data_page);
 
-	return result;
+	return fs_info;
 }
-EXPORT_SYMBOL_GPL(uuid_from_block_dev);
+EXPORT_SYMBOL_GPL(fs_info_from_block_dev);

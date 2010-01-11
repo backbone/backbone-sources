@@ -103,8 +103,9 @@ int toi_bio_mark_resume_attempted(int flag)
 
 int toi_bio_mark_have_image(void)
 {
-	int result;
+	int result = 0;
 	char buf[32];
+	struct fs_info *fs_info;
 
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "Recording that an image exists.");
 	memcpy(toi_sig_data->sig, tuxonice_signature,
@@ -114,8 +115,13 @@ int toi_bio_mark_have_image(void)
 	toi_sig_data->header_dev_t = get_header_dev_t();
 	toi_sig_data->have_uuid = 0;
 
-	result = uuid_from_block_dev(get_header_bdev(),
-			toi_sig_data->header_uuid);
+	fs_info = fs_info_from_block_dev(get_header_bdev());
+	if (fs_info && !IS_ERR(fs_info)) {
+		memcpy(toi_sig_data->header_uuid, &fs_info->uuid, 16);
+		free_fs_info(fs_info);
+	} else
+		result = (int) PTR_ERR(fs_info);
+
 	if (!result) {
 		toi_message(TOI_IO, TOI_VERBOSE, 0, "Got uuid for dev_t %s.",
 				format_dev_t(buf, get_header_dev_t()));
