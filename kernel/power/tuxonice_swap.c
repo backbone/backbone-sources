@@ -403,7 +403,7 @@ static int header_locations_read_sysfs(const char *page, int count)
 
 			path = d_path(&si->swap_file->f_path, path_page,
 					PAGE_SIZE);
-			path_len = snprintf(path_page, 31, "%s", path);
+			path_len = snprintf(path_page, PAGE_SIZE, "%s", path);
 
 			haveswap = 1;
 			swapf = si->swap_file->f_mapping->host;
