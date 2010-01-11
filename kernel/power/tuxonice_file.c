@@ -433,7 +433,7 @@ static void test_toi_file_target(void)
 			buf[2 * i + 1] = buf[3 * i + 1];
 		}
 		buf[32] = 0;
-		sprintf(resume_file, "UUID=%s:%llu", buf,
+		sprintf(resume_file, "UUID=%s:0x%llx", buf,
 				(unsigned long long) sector);
 		free_fs_info(fs_info);
 	}
