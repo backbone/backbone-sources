@@ -257,17 +257,8 @@ int toi_bio_image_exists(int quiet)
 		return -1;
 	}
 
-	if (!resume_block_device) {
-		toi_message(TOI_IO, TOI_VERBOSE, 0, "Opening resume_dev_t %lx.",
-				resume_dev_t);
-		resume_block_device = toi_open_bdev(NULL, resume_dev_t, 1);
-		if (IS_ERR(resume_block_device)) {
-			if (!quiet)
-				printk(KERN_INFO "Failed to open resume dev_t"
-						" (%x).\n", resume_dev_t);
-			return -1;
-		}
-	}
+	if (open_resume_dev_t(0, quiet))
+		return -1;
 
 	result = toi_check_for_signature();
 
@@ -294,6 +285,7 @@ out:
 	if (!orig_sig_page)
 		forget_signature_page();
 
+	close_resume_dev_t(0);
 	return result;
 }
 

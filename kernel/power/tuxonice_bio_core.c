@@ -1186,20 +1186,28 @@ static void toi_bio_load_config_info(char *buf, int size)
 	target_outstanding_io  = ints[0];
 }
 
-static void close_resume_dev_t(int force)
+void close_resume_dev_t(int force)
 {
-	if ((force || atomic_dec_and_test(&resume_bdev_open_count)) &&
-			resume_block_device) {
+	if (!resume_block_device)
+		return;
+
+	if (force)
+		atomic_set(&resume_bdev_open_count, 0);
+	else
+		atomic_dec(&resume_bdev_open_count);
+
+	if (!atomic_read(&resume_bdev_open_count)) {
 		toi_close_bdev(resume_block_device);
 		resume_block_device = NULL;
 	}
 }
 
-static int open_resume_dev_t(int force, int quiet)
+int open_resume_dev_t(int force, int quiet)
 {
-	if (force)
+	if (force) {
 		close_resume_dev_t(1);
-	else
+		atomic_set(&resume_bdev_open_count, 1);
+	} else
 		atomic_inc(&resume_bdev_open_count);
 
 	if (resume_block_device)
@@ -1212,6 +1220,8 @@ static int open_resume_dev_t(int force, int quiet)
 				"Failed to open device %x, where"
 				" the header should be found.",
 				resume_dev_t);
+		resume_block_device = NULL;
+		atomic_set(&resume_bdev_open_count, 0);
 		return 1;
 	}
 
@@ -1321,6 +1331,8 @@ static void toi_bio_cleanup(int finishing_cycle)
 		toi_close_bdev(header_block_device);
 
 	header_block_device = NULL;
+
+	close_resume_dev_t(0);
 }
 
 static int toi_bio_write_header_init(void)
