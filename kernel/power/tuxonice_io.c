@@ -710,7 +710,6 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	while (atomic_read(&toi_io_workers))
 		schedule();
 
-	set_toi_state(TOI_IO_STOPPED);
 	if (unlikely(test_toi_state(TOI_STOP_RESUME))) {
 		if (!atomic_read(&toi_io_workers)) {
 			rw_cleanup_modules(READ);
@@ -719,6 +718,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 		while (1)
 			schedule();
 	}
+	set_toi_state(TOI_IO_STOPPED);
 
 	if (!io_result && !result && !test_result_state(TOI_ABORTED)) {
 		unsigned long next;
