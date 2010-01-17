@@ -258,7 +258,7 @@ static int throttle_if_needed(int flags)
  * amount of I/O we submit at once, spreading out our waiting through the
  * whole job and letting userui get an opportunity to do its work.
  *
- * We don't start limiting I/O until 1/2s has gone so that we get a
+ * We don't start limiting I/O until 1/4s has gone so that we get a
  * decent sample for our initial limit, and keep updating it because
  * throughput may vary (on rotating media, eg) with our block number.
  *
@@ -267,7 +267,7 @@ static int throttle_if_needed(int flags)
 static void update_throughput_throttle(int jif_index)
 {
 	int done = atomic_read(&toi_io_done);
-	throughput_throttle = done / jif_index / 5;
+	throughput_throttle = done * jif_index * 2 / 5;
 }
 
 /**

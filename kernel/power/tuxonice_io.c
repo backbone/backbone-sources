@@ -505,6 +505,30 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 	}
 }
 
+static unsigned long status_update(int writing, unsigned long done,
+		unsigned long ticks)
+{
+	int cs_index = writing ? 0 : 1;
+	unsigned long ticks_so_far = toi_bkd.toi_io_time[cs_index][1] + ticks;
+	unsigned long msec = jiffies_to_msecs(abs(ticks_so_far));
+	unsigned long pgs_per_s, estimate = 0, pages_left;
+
+	if (msec) {
+		pages_left = io_barmax - done;
+		pgs_per_s = 1000 * done / msec;
+		if (pgs_per_s)
+			estimate = pages_left / pgs_per_s;
+	}
+
+	if (estimate && ticks > HZ / 2)
+		return toi_update_status(done, io_barmax,
+			" %d/%d MB (%lu sec left)",
+			MB(done+1), MB(io_barmax), estimate);
+
+	return toi_update_status(done, io_barmax, " %d/%d MB",
+		MB(done+1), MB(io_barmax));
+}
+
 /**
  * worker_rw_loop - main loop to read/write pages
  *
@@ -514,8 +538,8 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
  **/
 static int worker_rw_loop(void *data)
 {
-	unsigned long data_pfn, write_pfn, next_jiffies = jiffies + HZ / 2,
-		      jif_index = 1;
+	unsigned long data_pfn, write_pfn, next_jiffies = jiffies + HZ / 4,
+		      jif_index = 1, start_time = jiffies;
 	int result = 0, my_io_index = 0, last_worker;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
@@ -527,7 +551,7 @@ static int worker_rw_loop(void *data)
 
 	do {
 		if (data && jiffies > next_jiffies) {
-			next_jiffies += HZ / 2;
+			next_jiffies += HZ / 4;
 			if (toiActiveAllocator->update_throughput_throttle)
 				toiActiveAllocator->update_throughput_throttle(
 						jif_index);
@@ -576,9 +600,8 @@ static int worker_rw_loop(void *data)
 			use_read_page(write_pfn, buffer);
 
 		if (my_io_index + io_base == io_nextupdate)
-			io_nextupdate = toi_update_status(my_io_index +
-				io_base, io_barmax, " %d/%d MB ",
-				MB(io_base+my_io_index+1), MB(io_barmax));
+			io_nextupdate = status_update(io_write, my_io_index +
+					io_base, jiffies - start_time);
 
 		if (my_io_index == io_pc) {
 			printk(KERN_CONT "...%d%%", 20 * io_pc_step);
@@ -753,10 +776,11 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
  **/
 int write_pageset(struct pagedir *pagedir)
 {
-	int finish_at, base = 0, start_time, end_time;
+	int finish_at, base = 0;
 	int barmax = pagedir1.size + pagedir2.size;
 	long error = 0;
 	struct memory_bitmap *pageflags;
+	unsigned long start_time, end_time;
 
 	/*
 	 * Even if there is nothing to read or write, the allocator
@@ -818,10 +842,11 @@ int write_pageset(struct pagedir *pagedir)
  **/
 static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 {
-	int result = 0, base = 0, start_time, end_time;
+	int result = 0, base = 0;
 	int finish_at = pagedir->size;
 	int barmax = pagedir1.size + pagedir2.size;
 	struct memory_bitmap *pageflags;
+	unsigned long start_time, end_time;
 
 	if (pagedir->id == 1) {
 		toi_prepare_status(DONT_CLEAR_BAR,
