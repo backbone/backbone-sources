@@ -1530,6 +1530,17 @@ char *uuid_from_commandline(char *commandline)
 	return result;
 }
 
+#define retry_if_fails(command) \
+do { \
+	command; \
+	if (!resume_dev_t && !waited_for_device_probe) { \
+		wait_for_device_probe(); \
+		scsi_complete_async_scans(); \
+		command; \
+		waited_for_device_probe = 1; \
+	} \
+} while(0)
+
 /**
  * try_to_open_resume_device: Try to parse and open resume=
  *
@@ -1542,25 +1553,20 @@ static int try_to_open_resume_device(char *commandline, int quiet)
 	struct kstat stat;
 	int error = 0;
 	char *uuid = uuid_from_commandline(commandline);
+	int waited_for_device_probe = 0;
 
 	resume_dev_t = MKDEV(0, 0);
 
 	if (!strlen(commandline))
-		toi_bio_scan_for_image(quiet);
+		retry_if_fails(toi_bio_scan_for_image(quiet));
 
 	if (uuid) {
-		resume_dev_t = blk_lookup_uuid(uuid);
+		retry_if_fails(resume_dev_t = blk_lookup_uuid(uuid));
 		kfree(uuid);
 	}
 
 	if (!resume_dev_t)
-		resume_dev_t = name_to_dev_t(commandline);
-
-	if (!resume_dev_t) {
-		wait_for_device_probe();
-		scsi_complete_async_scans();
-		resume_dev_t = name_to_dev_t(commandline);
-	}
+		retry_if_fails(resume_dev_t = name_to_dev_t(commandline));
 
 	if (!resume_dev_t) {
 		struct file *file = filp_open(commandline,
