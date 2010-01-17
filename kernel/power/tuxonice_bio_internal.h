@@ -1,3 +1,14 @@
+/*
+ * kernel/power/tuxonice_bio_internal.h
+ *
+ * Copyright (C) 2009-2010 Nigel Cunningham (nigel at tuxonice net)
+ *
+ * Distributed under GPLv2.
+ *
+ * This file contains declarations for functions exported from
+ * tuxonice_bio.c, which contains low level io functions.
+ */
+
 /* Extent chains */
 void toi_extent_state_goto_start(void);
 void toi_extent_state_save(int slot);

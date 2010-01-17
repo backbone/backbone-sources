@@ -1,7 +1,7 @@
 /*
  * kernel/power/tuxonice_bio.c
  *
- * Copyright (C) 2004-2008 Nigel Cunningham (nigel at tuxonice net)
+ * Copyright (C) 2004-2010 Nigel Cunningham (nigel at tuxonice net)
  *
  * Distributed under GPLv2.
  *

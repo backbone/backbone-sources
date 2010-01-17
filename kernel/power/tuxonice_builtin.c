@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004-2008 Nigel Cunningham (nigel at tuxonice net)
+ * Copyright (C) 2004-2010 Nigel Cunningham (nigel at tuxonice net)
  *
  * This file is released under the GPLv2.
  */
