@@ -171,7 +171,7 @@ static struct page *read_bdev_page(struct block_device *dev, int page_num)
 	bio->bi_sector = page_num << 3;
 	bio->bi_end_io = uuid_end_bio;
 
-	PRINTK("Submitting bio on page %lx, page %d.\n",
+	PRINTK("Submitting bio on device %lx, page %d.\n",
 			(unsigned long) dev->bd_dev, page_num);
 
 	if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
