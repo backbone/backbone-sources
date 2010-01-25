@@ -254,8 +254,8 @@ static int throttle_if_needed(int flags)
  * update_throughput_throttle - update the raw throughput throttle
  * @jif_index: The number of times this function has been called.
  *
- * This function is called twice per second by the core, and used to limit the
- * amount of I/O we submit at once, spreading out our waiting through the
+ * This function is called four times per second by the core, and used to limit
+ * the amount of I/O we submit at once, spreading out our waiting through the
  * whole job and letting userui get an opportunity to do its work.
  *
  * We don't start limiting I/O until 1/4s has gone so that we get a
@@ -267,7 +267,7 @@ static int throttle_if_needed(int flags)
 static void update_throughput_throttle(int jif_index)
 {
 	int done = atomic_read(&toi_io_done);
-	throughput_throttle = done * jif_index * 2 / 5;
+	throughput_throttle = done * 2 / 5 / jif_index;
 }
 
 /**
