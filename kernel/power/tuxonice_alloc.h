@@ -7,7 +7,7 @@
  *
  */
 
-#define TOI_WAIT_GFP (GFP_KERNEL | __GFP_NOWARN)
+#define TOI_WAIT_GFP (GFP_NOFS | __GFP_NOWARN)
 #define TOI_ATOMIC_GFP (GFP_ATOMIC | __GFP_NOWARN)
 
 #ifdef CONFIG_PM_DEBUG
