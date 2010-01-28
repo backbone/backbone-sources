@@ -21,7 +21,7 @@
 #include "tuxonice_pageflags.h"
 #include "power.h"
 
-#define TOI_CORE_VERSION "3.0.99.45"
+#define TOI_CORE_VERSION "3.0.99.46"
 
 #define MY_BOOT_KERNEL_DATA_VERSION 3
 
