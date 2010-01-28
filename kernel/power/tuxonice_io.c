@@ -479,7 +479,7 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 		    *copy_page = final_page;
 	char *virt, *buffer_virt;
 
-	if (io_pageset == 1 && !load_direct(final_page)) {
+	if (io_pageset == 1 && !PagePageset1Copy(final_page)) {
 		copy_page = copy_page_from_orig_page(final_page);
 		BUG_ON(!copy_page);
 	}

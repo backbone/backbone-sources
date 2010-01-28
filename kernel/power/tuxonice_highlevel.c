@@ -1215,8 +1215,6 @@ static struct toi_sysfs_data sysfs_params[] = {
 			toi_bkd.toi_nosave_commandline, COMMAND_LINE_SIZE, 0,
 			NULL),
 	SYSFS_STRING("version", SYSFS_READONLY, TOI_CORE_VERSION, 0, 0, NULL),
-	SYSFS_BIT("no_load_direct", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_NO_DIRECT_LOAD, 0),
 	SYSFS_BIT("freezer_test", SYSFS_RW, &toi_bkd.toi_action,
 			TOI_FREEZER_TEST, 0),
 	SYSFS_BIT("test_bio", SYSFS_RW, &toi_bkd.toi_action, TOI_TEST_BIO, 0),

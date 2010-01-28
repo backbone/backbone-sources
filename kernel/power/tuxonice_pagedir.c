@@ -150,17 +150,7 @@ int toi_get_pageset1_load_addresses(void)
 		   *this_high_pbe = NULL;
 	int orig_low_pfn, orig_high_pfn;
 	int high_pbes_done = 0, low_pbes_done = 0;
-	int low_direct = 0, high_direct = 0;
-	int high_to_free, low_to_free, result = 0;
-
-	/*
-	 * We are about to allocate all available memory, and processes
-	 * might not have finished freezing yet. To avoid potential OOMs,
-	 * disable non boot cpus and do this with IRQs disabled
-	 */
-
-	disable_nonboot_cpus();
-	local_irq_disable();
+	int low_direct = 0, high_direct = 0, result = 0, i;
 
 	/*
 	 * We need to duplicate pageset1's map because memory_bm_next_pfn's
@@ -197,48 +187,31 @@ int toi_get_pageset1_load_addresses(void)
 	this_low_pbe = (struct pbe *) page_address(low_pbe_page);
 
 	/*
-	 * Next, allocate all possible memory to find where we can
-	 * load data directly into destination pages. I'd like to do
-	 * this in bigger chunks, but then we can't free pages
-	 * individually later.
+	 * Next, allocate the number of pages we need.
 	 */
+
+	i = low_needed + high_needed;
 
 	do {
-		page = toi_alloc_page(30, flags);
-		if (page)
-			SetPagePageset1Copy(page);
-	} while (page);
-
-	/*
-	 * Find out how many high- and lowmem pages we allocated above,
-	 * and how many pages we can reload directly to their original
-	 * location.
-	 */
-	memory_bm_position_reset(pageset1_copy_map);
-	for (pfn = memory_bm_next_pfn(pageset1_copy_map); pfn != BM_END_OF_MAP;
-			pfn = memory_bm_next_pfn(pageset1_copy_map)) {
 		int is_high;
-		page = pfn_to_page(pfn);
+		page = toi_alloc_page(30, flags);
+		BUG_ON(!page);
+
+		SetPagePageset1Copy(page);
 		is_high = PageHighMem(page);
 
 		if (PagePageset1(page)) {
-			if (test_action_state(TOI_NO_DIRECT_LOAD)) {
-				ClearPagePageset1Copy(page);
-				toi__free_page(30, page);
-				continue;
-			} else {
-				if (is_high)
-					high_direct++;
-				else
-					low_direct++;
-			}
+			if (is_high)
+				high_direct++;
+			else
+				low_direct++;
 		} else {
 			if (is_high)
 				highallocd++;
 			else
 				lowallocd++;
 		}
-	}
+	} while (--i);
 
 	high_needed -= high_direct;
 	low_needed -= low_direct;
@@ -252,9 +225,6 @@ int toi_get_pageset1_load_addresses(void)
 		high_needed -= low_pages_for_highmem;
 		low_needed += low_pages_for_highmem;
 	}
-
-	high_to_free = highallocd - high_needed;
-	low_to_free = lowallocd - low_needed;
 
 	/*
 	 * Now generate our pbes (which will be used for the atomic restore),
@@ -270,18 +240,6 @@ int toi_get_pageset1_load_addresses(void)
 		if (PagePageset1(page))
 			continue;
 
-		/* Free the page? */
-		if ((is_high && high_to_free) ||
-		    (!is_high && low_to_free)) {
-			ClearPagePageset1Copy(page);
-			toi__free_page(30, page);
-			if (is_high)
-				high_to_free--;
-			else
-				low_to_free--;
-			continue;
-		}
-
 		/* Nope. We're going to use this page. Add a pbe. */
 		if (is_high || low_pages_for_highmem) {
 			struct page *orig_page;
@@ -293,7 +251,7 @@ int toi_get_pageset1_load_addresses(void)
 				BUG_ON(orig_high_pfn == BM_END_OF_MAP);
 				orig_page = pfn_to_page(orig_high_pfn);
 			} while (!PageHighMem(orig_page) ||
-					load_direct(orig_page));
+					PagePageset1Copy(orig_page));
 
 			this_high_pbe->orig_address = orig_page;
 			this_high_pbe->address = page;
@@ -325,7 +283,7 @@ int toi_get_pageset1_load_addresses(void)
 				BUG_ON(orig_low_pfn == BM_END_OF_MAP);
 				orig_page = pfn_to_page(orig_low_pfn);
 			} while (PageHighMem(orig_page) ||
-					load_direct(orig_page));
+					PagePageset1Copy(orig_page));
 
 			this_low_pbe->orig_address = page_address(orig_page);
 			this_low_pbe->address = page_address(page);
@@ -355,9 +313,6 @@ int toi_get_pageset1_load_addresses(void)
 out:
 	memory_bm_free(&dup_map1, 0);
 	memory_bm_free(&dup_map2, 0);
-
-	local_irq_enable();
-	enable_nonboot_cpus();
 
 	return result;
 }

@@ -62,7 +62,7 @@ enum {
 	TOI_PAGESET2_FULL,
 	TOI_ABORT_ON_RESAVE_NEEDED,
 	TOI_NO_MULTITHREADED_IO,
-	TOI_NO_DIRECT_LOAD,
+	TOI_NO_DIRECT_LOAD, /* Obsolete */
 	TOI_LATE_CPU_HOTPLUG,
 	TOI_GET_MAX_MEM_ALLOCD,
 	TOI_NO_FLUSHER_THREAD,
@@ -200,12 +200,6 @@ extern unsigned long extra_pd1_pages_used;
 
 extern void toi_early_boot_message(int can_erase_image, int default_answer,
 	char *warning_reason, ...);
-
-static inline int load_direct(struct page *page)
-{
-	return test_action_state(TOI_NO_DIRECT_LOAD) ? 0 :
-		PagePageset1Copy(page);
-}
 
 extern int do_check_can_resume(void);
 extern int do_toi_step(int step);
