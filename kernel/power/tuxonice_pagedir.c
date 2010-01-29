@@ -194,6 +194,10 @@ int toi_get_pageset1_load_addresses(void)
 
 	do {
 		int is_high;
+
+		if (i == low_needed)
+			flags &= ~__GFP_HIGHMEM;
+
 		page = toi_alloc_page(30, flags);
 		BUG_ON(!page);
 
