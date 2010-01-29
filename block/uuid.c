@@ -159,14 +159,15 @@ static void uuid_end_bio(struct bio *bio, int err)
 static struct page *read_bdev_page(struct block_device *dev, int page_num)
 {
 	struct bio *bio = NULL;
-	struct page *page = alloc_page(GFP_KERNEL);
+	struct page *page = alloc_page(GFP_NOFS);
 
-	if (!page)
+	if (!page) {
+		printk(KERN_ERR "Failed to allocate a page for reading data "
+				"in UUID checks.");
 		return NULL;
+	}
 
-	lock_page(page);
-
-	bio = bio_alloc(GFP_KERNEL, 1);
+	bio = bio_alloc(GFP_NOFS, 1);
 	bio->bi_bdev = dev;
 	bio->bi_sector = page_num << 3;
 	bio->bi_end_io = uuid_end_bio;
@@ -184,6 +185,7 @@ static struct page *read_bdev_page(struct block_device *dev, int page_num)
 		return ERR_PTR(-EFAULT);
 	}
 
+	lock_page(page);
 	submit_bio(READ | (1 << BIO_RW_SYNCIO) |
 			(1 << BIO_RW_UNPLUG), bio);
 
@@ -235,6 +237,10 @@ int bdev_matches_key(struct block_device *bdev, const char *key)
 			if (data_page)
 				__free_page(data_page);
 			data_page = read_bdev_page(bdev, pg_num);
+			if (!data_page) {
+				result = -ENOMEM;
+				break;
+			}
 			data = page_address(data_page);
 		}
 
@@ -316,6 +322,10 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 			if (data_page)
 				__free_page(data_page);
 			data_page = read_bdev_page(bdev, pg_num);
+			if (!data_page) {
+				result = -ENOMEM;
+				break;
+			}
 			data = page_address(data_page);
 		}
 
@@ -332,6 +342,10 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 			if (uuid_data_page)
 				__free_page(uuid_data_page);
 			uuid_data_page = read_bdev_page(bdev, uuid_pg_num);
+			if (!uuid_data_page) {
+				result = -ENOMEM;
+				break;
+			}
 			uuid_data = page_address(uuid_data_page);
 		}
 
@@ -409,6 +423,10 @@ struct fs_info *fs_info_from_block_dev(struct block_device *bdev)
 			if (data_page)
 				__free_page(data_page);
 			data_page = read_bdev_page(bdev, pg_num);
+			if (!data_page) {
+				fs_info = ERR_PTR(-ENOMEM);
+				break;
+			}
 			data = page_address(data_page);
 		}
 
@@ -436,6 +454,10 @@ struct fs_info *fs_info_from_block_dev(struct block_device *bdev)
 			if (uuid_data_page)
 				__free_page(uuid_data_page);
 			uuid_data_page = read_bdev_page(bdev, uuid_pg_num);
+			if (!uuid_data_page) {
+				fs_info = ERR_PTR(-ENOMEM);
+				break;
+			}
 			uuid_data = page_address(uuid_data_page);
 		}
 
@@ -448,12 +470,19 @@ no_uuid:
 				fs_info->uuid, 16, 0);
 
 		if (dat->last_mount_size) {
-			int pg = dat->last_mount_offset >> 12;
+			int pg = dat->last_mount_offset >> 12, sz;
 			int off = dat->last_mount_offset & 0xfff;
 			struct page *last_mount = read_bdev_page(bdev, pg);
-			unsigned char *last_mount_data = page_address(last_mount);
-			int sz = dat->last_mount_size;
-			char *ptr = kmalloc(sz, GFP_KERNEL);
+			unsigned char *last_mount_data;
+			char *ptr;
+
+			if (!last_mount) {
+				fs_info = ERR_PTR(-ENOMEM);
+				break;
+			}
+			last_mount_data = page_address(last_mount);
+			sz = dat->last_mount_size;
+			ptr = kmalloc(sz, GFP_KERNEL);
 
 			if (!ptr) {
 				printk(KERN_EMERG "fs_info_from_block_dev "
