@@ -24,9 +24,17 @@ struct sig_data *toi_sig_data;
 
 /* Struct of swap header pages */
 
+struct old_sig_data {
+	dev_t device;
+	unsigned long sector;
+	int resume_attempted;
+	int orig_sig_type;
+};
+
 union diskpage {
 	union swap_header swh;	/* swh.magic is the only member used */
 	struct sig_data sig_data;
+	struct old_sig_data old_sig_data;
 };
 
 union p_diskpage {
@@ -38,6 +46,7 @@ union p_diskpage {
 char *toi_cur_sig_page;
 char *toi_orig_sig_page;
 int have_image;
+int have_old_image;
 
 int get_signature_page(void)
 {
@@ -141,6 +150,46 @@ int toi_bio_mark_have_image(void)
 		resume_firstblock, virt_to_page(toi_cur_sig_page));
 }
 
+int remove_old_signature(void)
+{
+	union p_diskpage swap_header_page = (union p_diskpage) toi_cur_sig_page;
+	char *orig_sig, *no_image_signature_contents;
+	char *header_start = (char *) toi_get_zeroed_page(38, TOI_ATOMIC_GFP);
+	int result;
+	struct block_device *header_bdev;
+	struct old_sig_data *old_sig_data =
+		&swap_header_page.pointer->old_sig_data;
+
+	header_bdev = toi_open_bdev(NULL, old_sig_data->device, 1);
+	result = toi_bio_ops.bdev_page_io(READ, header_bdev,
+			old_sig_data->sector, virt_to_page(header_start));
+
+	if (result)
+		goto out;
+
+	/*
+	 * TODO: Get the original contents of the first bytes of the swap
+	 * header page.
+	 */
+	if (!old_sig_data->orig_sig_type)
+		orig_sig = "SWAP-SPACE";
+	else
+		orig_sig = "SWAPSPACE2";
+
+	memcpy(swap_header_page.pointer->swh.magic.magic, orig_sig, 10);
+	memcpy(swap_header_page.ptr, header_start,
+			sizeof(no_image_signature_contents));
+
+	result = toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
+		resume_firstblock, virt_to_page(swap_header_page.ptr));
+
+out:
+	toi_close_bdev(header_bdev);
+	have_old_image = 0;
+	toi_free_page(38, (unsigned long) header_start);
+	return result;
+}
+
 /*
  * toi_bio_restore_original_signature - restore the original signature
  *
@@ -152,6 +201,9 @@ int toi_bio_mark_have_image(void)
 int toi_bio_restore_original_signature(void)
 {
 	char *use = toi_orig_sig_page ? toi_orig_sig_page : toi_cur_sig_page;
+
+	if (have_old_image)
+		return remove_old_signature();
 
 	if (!use) {
 		printk("toi_bio_restore_original_signature: No signature "
@@ -234,6 +286,15 @@ int toi_check_for_signature(void)
 					strlen(swsusp_sigs[type])))
 			return 2;
 
+	/* Old TuxOnIce version? */
+	if (!memcmp(tuxonice_signature, swap_header,
+				sizeof(tuxonice_signature) - 1)) {
+		toi_message(TOI_IO, TOI_VERBOSE, 0, "Found old TuxOnIce "
+				"signature.");
+		have_old_image = 1;
+		return 3;
+	}
+
 	return -1;
 }
 
@@ -278,6 +339,8 @@ int toi_bio_image_exists(int quiet)
 		msg = "TuxOnIce: Image found.\n";
 	else if (result == 2)
 		msg = "TuxOnIce: uswsusp or swsusp image found.\n";
+	else if (result == 3)
+		msg = "TuxOnIce: Old implementation's signature found.\n";
 
 	printk(KERN_INFO "%s", msg);
 

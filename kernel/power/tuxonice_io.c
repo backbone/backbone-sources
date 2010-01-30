@@ -1396,6 +1396,13 @@ static int __read_pageset1(void)
 
 	/* Check for an image */
 	result = toiActiveAllocator->image_exists(1);
+	if (result == 3) {
+		result = -ENODATA;
+		toi_early_boot_message(1, 0, "The signature from an older "
+				"version of TuxOnIce has been detected.");
+		goto out_remove_image;
+	}
+
 	if (result != 1) {
 		result = -ENODATA;
 		noresume_reset_modules();
