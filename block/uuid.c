@@ -2,14 +2,18 @@
 #include <linux/ctype.h>
 #include <linux/uuid.h>
 
-#if 0
-#define PRINTK(fmt, args...) printk(KERN_DEBUG fmt, ## args)
-#define PRINT_HEX_DUMP(v1, v2, v3, v4, v5, v6, v7, v8) \
-	print_hex_dump(v1, v2, v3, v4, v5, v6, v7, v8)
-#else
-#define PRINTK(fmt, args...)
-#define PRINT_HEX_DUMP(v1, v2, v3, v4, v5, v6, v7, v8)
-#endif
+static int debug_enabled;
+
+#define PRINTK(fmt, args...) do {					\
+	if (debug_enabled)						\
+		printk(KERN_DEBUG fmt, ## args);			\
+	} while(0)
+
+#define PRINT_HEX_DUMP(v1, v2, v3, v4, v5, v6, v7, v8)			\
+	do {								\
+		if (debug_enabled)					\
+			print_hex_dump(v1, v2, v3, v4, v5, v6, v7, v8);	\
+	} while(0)
 
 /*
  * Simple UUID translation
@@ -510,3 +514,15 @@ no_uuid:
 	return fs_info;
 }
 EXPORT_SYMBOL_GPL(fs_info_from_block_dev);
+
+static int __init uuid_debug_setup(char *str)
+{
+	int value;
+
+	if (sscanf(str, "=%d", &value))
+		debug_enabled = value;
+
+	return 1;
+}
+
+__setup("uuid_debug", uuid_debug_setup);
