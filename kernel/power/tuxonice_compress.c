@@ -41,39 +41,6 @@ struct cpu_context {
 
 static DEFINE_PER_CPU(struct cpu_context, contexts);
 
-static int toi_compress_prepare_result;
-
-/*
- * toi_compress_cleanup
- *
- * Frees memory allocated for our labours.
- */
-static void toi_compress_cleanup(int toi_or_resume)
-{
-	int cpu;
-
-	if (!toi_or_resume)
-		return;
-
-	for_each_online_cpu(cpu) {
-		struct cpu_context *this = &per_cpu(contexts, cpu);
-		if (this->transform) {
-			crypto_free_comp(this->transform);
-			this->transform = NULL;
-		}
-
-		if (this->page_buffer)
-			toi_free_page(16, (unsigned long) this->page_buffer);
-
-		this->page_buffer = NULL;
-
-		if (this->output_buffer)
-			vfree(this->output_buffer);
-
-		this->output_buffer = NULL;
-	}
-}
-
 /*
  * toi_crypto_prepare
  *
@@ -125,6 +92,31 @@ static int toi_compress_crypto_prepare(void)
 	return 0;
 }
 
+static int toi_compress_rw_cleanup(int writing)
+{
+	int cpu;
+
+	for_each_online_cpu(cpu) {
+		struct cpu_context *this = &per_cpu(contexts, cpu);
+		if (this->transform) {
+			crypto_free_comp(this->transform);
+			this->transform = NULL;
+		}
+
+		if (this->page_buffer)
+			toi_free_page(16, (unsigned long) this->page_buffer);
+
+		this->page_buffer = NULL;
+
+		if (this->output_buffer)
+			vfree(this->output_buffer);
+
+		this->output_buffer = NULL;
+	}
+
+	return 0;
+}
+
 /*
  * toi_compress_init
  */
@@ -139,12 +131,7 @@ static int toi_compress_init(int toi_or_resume)
 
 	next_driver = toi_get_next_filter(&toi_compression_ops);
 
-	if (!next_driver)
-		return -ECHILD;
-
-	toi_compress_prepare_result = toi_compress_crypto_prepare();
-
-	return 0;
+	return next_driver ? 0 : -ECHILD;
 }
 
 /*
@@ -153,7 +140,7 @@ static int toi_compress_init(int toi_or_resume)
 
 static int toi_compress_rw_init(int rw, int stream_number)
 {
-	if (toi_compress_prepare_result) {
+	if (toi_compress_crypto_prepare()) {
 		printk(KERN_ERR "Failed to initialise compression "
 				"algorithm.\n");
 		if (rw == READ) {
@@ -358,12 +345,9 @@ static void toi_compress_load_config_info(char *buffer, int size)
 				sizeof(unsigned long)));
 	namelen = *((unsigned long *) (buffer + 3 * sizeof(unsigned long)));
 	if (strncmp(toi_compressor_name, buffer + 4 * sizeof(unsigned long),
-				namelen)) {
-		toi_compress_cleanup(1);
+				namelen))
 		strncpy(toi_compressor_name, buffer + 4 * sizeof(unsigned long),
 			namelen);
-		toi_compress_crypto_prepare();
-	}
 	return;
 }
 
@@ -416,7 +400,6 @@ static struct toi_module_ops toi_compression_ops = {
 	.directory		= "compression",
 	.module			= THIS_MODULE,
 	.initialise		= toi_compress_init,
-	.cleanup		= toi_compress_cleanup,
 	.memory_needed 		= toi_compress_memory_needed,
 	.print_debug_info	= toi_compress_print_debug_stats,
 	.save_config_info	= toi_compress_save_config_info,
@@ -428,6 +411,7 @@ static struct toi_module_ops toi_compression_ops = {
 	.post_atomic_restore	= toi_compress_post_atomic_restore,
 
 	.rw_init		= toi_compress_rw_init,
+	.rw_cleanup		= toi_compress_rw_cleanup,
 
 	.write_page		= toi_compress_write_page,
 	.read_page		= toi_compress_read_page,
