@@ -1290,10 +1290,13 @@ int write_image_header(void)
 			"Failure to fill header information!");
 		goto write_image_header_abort;
 	}
-	toiActiveAllocator->rw_header_chunk(WRITE, NULL,
-			header_buffer, sizeof(struct toi_header));
 
-	toi_free_page(24, (unsigned long) header_buffer);
+	if (toiActiveAllocator->rw_header_chunk(WRITE, NULL,
+			header_buffer, sizeof(struct toi_header))) {
+		abort_hibernate(TOI_OUT_OF_MEMORY,
+			"Failure to write header info.");
+		goto write_image_header_abort;
+	}
 
 	/* Write filesystem info */
 	if (fs_info_save())
@@ -1307,7 +1310,12 @@ int write_image_header(void)
 		goto write_image_header_abort;
 	}
 
-	memory_bm_write(pageset1_map, toiActiveAllocator->rw_header_chunk);
+	if (memory_bm_write(pageset1_map,
+				toiActiveAllocator->rw_header_chunk)) {
+		abort_hibernate(TOI_FAILED_IO,
+				"Failed to write bitmaps.");
+		goto write_image_header_abort;
+	}
 
 	/* Flush data and let allocator cleanup */
 	if (toiActiveAllocator->write_header_cleanup()) {
@@ -1321,12 +1329,15 @@ int write_image_header(void)
 
 	toi_update_status(total, total, NULL);
 
-	return 0;
+out:
+	if (header_buffer)
+		toi_free_page(24, (unsigned long) header_buffer);
+	return ret;
 
 write_image_header_abort:
 	toiActiveAllocator->write_header_cleanup();
-write_image_header_abort_no_cleanup:
-	return -1;
+	ret = -1;
+	goto out;
 }
 
 /**
