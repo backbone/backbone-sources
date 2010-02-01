@@ -1771,6 +1771,7 @@ struct toi_module_ops toi_blockwriter_ops = {
 	.write_header_cleanup		= toi_bio_write_header_cleanup,
 	.read_header_init		= toi_bio_read_header_init,
 	.read_header_cleanup		= toi_bio_read_header_cleanup,
+	.get_header_version		= toi_bio_get_header_version,
 	.remove_image			= toi_bio_remove_image,
 	.parse_sig_location		= toi_bio_parse_sig_location,
 

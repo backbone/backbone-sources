@@ -121,6 +121,9 @@ struct toi_module_ops {
 	int (*read_header_init) (void);
 	int (*read_header_cleanup) (void);
 
+	/* To be called after read_header_init */
+	int (*get_header_version) (void);
+
 	int (*rw_header_chunk) (int rw, struct toi_module_ops *owner,
 			char *buffer_start, int buffer_size);
 

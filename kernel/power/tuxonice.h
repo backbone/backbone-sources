@@ -22,7 +22,7 @@
 #include "power.h"
 
 #define TOI_CORE_VERSION "3.0.99.46"
-
+#define	TOI_HEADER_VERSION 1
 #define MY_BOOT_KERNEL_DATA_VERSION 3
 
 struct toi_boot_kernel_data {

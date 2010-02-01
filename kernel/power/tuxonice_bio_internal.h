@@ -42,6 +42,10 @@ struct sig_data {
 	char header_uuid[17];
 	dev_t header_dev_t;
 	unsigned long first_header_block;
+
+	/* Repeat the signature to be sure we have a header version */
+	char sig2[sig_size];
+	int header_version;
 };
 
 void forget_signature_page(void);
@@ -76,6 +80,7 @@ extern unsigned long raw_pages_allocd, header_pages_reserved;
 int toi_bio_chains_debug_info(char *buffer, int size);
 void toi_bio_chains_post_atomic(struct toi_boot_kernel_data *bkd);
 int toi_bio_scan_for_image(int quiet);
+int toi_bio_get_header_version(void);
 
 void close_resume_dev_t(int force);
 int open_resume_dev_t(int force, int quiet);

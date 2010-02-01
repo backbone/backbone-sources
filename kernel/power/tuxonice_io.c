@@ -38,6 +38,18 @@
 #include "tuxonice_alloc.h"
 char alt_resume_param[256];
 
+/* Version read from image header at resume */
+static int toi_image_header_version;
+
+#define read_if_version(VERS, VAR, DESC) do {					\
+	if (likely(toi_image_header_version >= VERS))				\
+		if (toiActiveAllocator->rw_header_chunk(READ, NULL,		\
+					(char *) &VAR, sizeof(VAR))) {		\
+			abort_hibernate(TOI_FAILED_IO, "Failed to read DESC.");	\
+			goto out_remove_image;					\
+		}								\
+} while(0)									\
+
 /* Variables shared between threads and updated under the mutex */
 static int io_write, io_finish_at, io_base, io_barmax, io_pageset, io_result;
 static int io_index, io_nextupdate, io_pc, io_pc_step;
@@ -1457,6 +1469,8 @@ static int __read_pageset1(void)
 	}
 
 	clear_toi_state(TOI_CONTINUE_REQ);
+
+	toi_image_header_version = toiActiveAllocator->get_header_version();
 
 	/* Read hibernate header */
 	result = toiActiveAllocator->rw_header_chunk(READ, NULL,

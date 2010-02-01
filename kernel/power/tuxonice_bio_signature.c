@@ -146,6 +146,10 @@ int toi_bio_mark_have_image(void)
 			"is %d.", toi_sig_data->header_dev_t,
 			toi_sig_data->first_header_block);
 
+	memcpy(toi_sig_data->sig2, tuxonice_signature,
+			sizeof(tuxonice_signature));
+	toi_sig_data->header_version = TOI_HEADER_VERSION;
+
 	return toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
 		resume_firstblock, virt_to_page(toi_cur_sig_page));
 }
@@ -395,4 +399,12 @@ int toi_bio_scan_for_image(int quiet)
 		printk(KERN_DEBUG "TuxOnIce scan: No image found.\n");
 	strcpy(resume_file, default_name);
 	return 0;
+}
+
+int toi_bio_get_header_version(void)
+{
+	return (memcmp(toi_sig_data->sig2, tuxonice_signature,
+				sizeof(tuxonice_signature))) ?
+		0 : toi_sig_data->header_version;
+
 }
