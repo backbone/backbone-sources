@@ -71,6 +71,8 @@ EXPORT_SYMBOL_GPL(toi_bio_queue_flusher_should_finish);
 /* Indicates that this thread should be used for checking throughput */
 #define MONITOR ((void *) 1)
 
+int toi_max_workers;
+
 /**
  * toi_attempt_to_parse_resume_device - determine if we can hibernate
  *
@@ -659,6 +661,9 @@ static int start_other_threads(void)
 	struct task_struct *p;
 
 	for_each_online_cpu(cpu) {
+		if (toi_max_workers && (num_started + 1) == toi_max_workers)
+			break;
+
 		if (cpu == smp_processor_id())
 			continue;
 
@@ -1310,6 +1315,13 @@ int write_image_header(void)
 		goto write_image_header_abort;
 	}
 
+	if (toiActiveAllocator->rw_header_chunk(WRITE, NULL,
+			(char *) &toi_max_workers, sizeof(toi_max_workers))) {
+		abort_hibernate(TOI_OUT_OF_MEMORY,
+			"Failure to number of workers to use.");
+		goto write_image_header_abort;
+	}
+
 	/* Write filesystem info */
 	if (fs_info_save())
 		goto write_image_header_abort;
@@ -1521,6 +1533,8 @@ static int __read_pageset1(void)
 
 	set_toi_state(TOI_BOOT_KERNEL);
 	boot_kernel_data_buffer = toi_header->bkd;
+
+	read_if_version(1, toi_max_workers, "TuxOnIce max workers");
 
 	/* Read filesystem info */
 	if (fs_info_load_and_check()) {

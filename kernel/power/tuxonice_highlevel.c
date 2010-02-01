@@ -1228,6 +1228,8 @@ static struct toi_sysfs_data sysfs_params[] = {
 			TOI_LATE_CPU_HOTPLUG, 0),
 	SYSFS_STRING("binary_signature", SYSFS_READONLY,
 			tuxonice_signature, 9, 0, NULL),
+	SYSFS_INT("max_workers", SYSFS_RW, &toi_max_workers, 0, NR_CPUS, 0,
+			NULL),
 #ifdef CONFIG_TOI_KEEP_IMAGE
 	SYSFS_BIT("keep_image", SYSFS_RW , &toi_bkd.toi_action, TOI_KEEP_IMAGE,
 			0),
