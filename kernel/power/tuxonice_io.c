@@ -1348,6 +1348,7 @@ out:
 
 write_image_header_abort:
 	toiActiveAllocator->write_header_cleanup();
+write_image_header_abort_no_cleanup:
 	ret = -1;
 	goto out;
 }
