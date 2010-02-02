@@ -105,7 +105,7 @@ EXPORT_SYMBOL_GPL(tuxonice_signature);
 unsigned long boot_kernel_data_buffer;
 
 static char *result_strings[] = {
-	"Hiberation was aborted",
+	"Hibernation was aborted",
 	"The user requested that we cancel the hibernation",
 	"No storage was available",
 	"Insufficient storage was available",
