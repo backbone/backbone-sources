@@ -73,6 +73,9 @@ EXPORT_SYMBOL_GPL(toi_bio_queue_flusher_should_finish);
 
 int toi_max_workers;
 
+static char *image_version_error = "The image header version is newer than " \
+	"this kernel supports.";
+
 /**
  * toi_attempt_to_parse_resume_device - determine if we can hibernate
  *
@@ -1484,6 +1487,15 @@ static int __read_pageset1(void)
 	clear_toi_state(TOI_CONTINUE_REQ);
 
 	toi_image_header_version = toiActiveAllocator->get_header_version();
+
+	if (unlikely(toi_image_header_version > TOI_HEADER_VERSION)) {
+		toi_early_boot_message(1, 0, image_version_error);
+		if (!(test_toi_state(TOI_CONTINUE_REQ))) {
+			printk(KERN_INFO "TuxOnIce: Header version too new: "
+					"Invalidated image.\n");
+			goto out_remove_image;
+		}
+	}
 
 	/* Read hibernate header */
 	result = toiActiveAllocator->rw_header_chunk(READ, NULL,
