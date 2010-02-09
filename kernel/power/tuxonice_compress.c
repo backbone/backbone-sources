@@ -177,7 +177,7 @@ static int check_compression(struct cpu_context *ctx, struct page *buffer_page,
 		int buf_size)
 {
 	char *original = kmap(buffer_page);
-	int output_size, okay, ret;
+	int output_size = PAGE_SIZE, okay, ret;
 
 	ret = crypto_comp_decompress(ctx->transform, ctx->output_buffer,
 			ctx->len, ctx->check_buffer, &output_size);
