@@ -870,7 +870,10 @@ top:
 			bio_queue_tail = NULL;
 		atomic_dec(&toi_bio_queue_size);
 		spin_unlock_irqrestore(&bio_queue_lock, flags);
-		result = toi_bio_rw_page(WRITE, page, 0, 11);
+
+		/* Don't generate more error messages if already had one */
+		if (!result)
+			result = toi_bio_rw_page(WRITE, page, 0, 11);
 		/*
 		 * If writing the page failed, don't drop out.
 		 * Flush the rest of the queue too.
