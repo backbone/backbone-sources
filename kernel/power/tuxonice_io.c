@@ -416,6 +416,7 @@ static int write_next_page(unsigned long *data_pfn, int *my_io_index,
 					"still %d.\n", atomic_read(&io_count));
 			BUG();
 		}
+		mutex_unlock(&io_mutex);
 		return -ENODATA;
 	}
 
