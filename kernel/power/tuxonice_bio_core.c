@@ -626,16 +626,15 @@ static void toi_bio_queue_write(char **full_buffer)
  **/
 static int toi_rw_cleanup(int writing)
 {
-	int i, result;
+	int i, result = 0;
 
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "toi_rw_cleanup.");
 	if (writing) {
-		int result;
-
 		if (toi_writer_buffer_posn && !test_result_state(TOI_ABORTED))
 			toi_bio_queue_write(&toi_writer_buffer);
 
-		result = toi_bio_queue_flush_pages(0);
+		while (bio_queue_head && !result)
+			result = toi_bio_queue_flush_pages(0);
 
 		if (result)
 			return result;
