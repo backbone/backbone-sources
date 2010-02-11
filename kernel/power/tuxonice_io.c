@@ -575,7 +575,6 @@ static int worker_rw_loop(void *data)
 
 	current->flags |= PF_NOFREEZE;
 
-	atomic_inc(&toi_io_workers);
 	mutex_lock(&io_mutex);
 
 	do {
@@ -678,9 +677,12 @@ static int start_other_threads(void)
 {
 	int cpu, num_started = 0;
 	struct task_struct *p;
+	int to_start = (toi_max_workers ? toi_max_workers : num_online_cpus()) - 1;
+
+	atomic_set(&toi_io_workers, to_start);
 
 	for_each_online_cpu(cpu) {
-		if (toi_max_workers && (num_started + 1) == toi_max_workers)
+		if (num_started == to_start)
 			break;
 
 		if (cpu == smp_processor_id())
@@ -690,6 +692,7 @@ static int start_other_threads(void)
 				"ktoi_io/%d", cpu);
 		if (IS_ERR(p)) {
 			printk(KERN_ERR "ktoi_io for %i failed\n", cpu);
+			atomic_dec(&toi_io_workers);
 			continue;
 		}
 		kthread_bind(p, cpu);
@@ -761,9 +764,10 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 		num_other_threads = start_other_threads();
 
 	if (!num_other_threads || !toiActiveAllocator->io_flusher ||
-		test_action_state(TOI_NO_FLUSHER_THREAD))
+		test_action_state(TOI_NO_FLUSHER_THREAD)) {
+		atomic_inc(&toi_io_workers);
 		worker_rw_loop(num_other_threads ? NULL : MONITOR);
-	else
+	} else
 		result = toiActiveAllocator->io_flusher(write);
 
 	while (atomic_read(&toi_io_workers))
