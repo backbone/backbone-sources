@@ -153,7 +153,7 @@ static unsigned long toi_extent_state_next(int blocks, int current_stream)
 	int i;
 
 	if (!toi_writer_posn.current_chain)
-		return -ENODATA;
+		return -ENOSPC;
 
 	/* Assume chains always have lengths that are multiples of @blocks */
 	for (i = 0; i < blocks; i++)
@@ -164,7 +164,7 @@ static unsigned long toi_extent_state_next(int blocks, int current_stream)
 	    !toi_writer_posn.current_chain->blocks.current_extent)
 		find_next_chain();
 
-	return  toi_writer_posn.current_chain ? 0 : -ENODATA;
+	return  toi_writer_posn.current_chain ? 0 : -ENOSPC;
 }
 
 static void toi_insert_chain_in_prio_list(struct toi_bdev_info *this)
@@ -777,7 +777,7 @@ int go_next_page(int writing, int section_barrier)
 		}
 		toi_message(TOI_IO, TOI_VERBOSE, 0, "Ran out of extents to "
 				"read/write. (Not necessarily a fatal error.");
-		return -ENODATA;
+		return -ENOSPC;
 	}
 
 	return 0;
@@ -817,7 +817,7 @@ int toi_bio_rw_page(int writing, struct page *page,
 	if (result) {
 		toi_message(TOI_IO, TOI_VERBOSE, 0, "Seeking to read/write "
 				"another page when stream has ended.");
-		return -ENODATA;
+		return -ENOSPC;
 	}
 
 	toi_message(TOI_IO, TOI_VERBOSE, 0,
@@ -886,7 +886,7 @@ static int apply_header_reservation(void)
 
 	for (i = 0; i < header_pages_reserved; i++)
 		if (go_next_page(1, 0))
-			return -ENODATA;
+			return -ENOSPC;
 
 	/* The end of header pages will be the start of pageset 2 */
 	toi_extent_state_save(2);
