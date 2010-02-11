@@ -224,7 +224,7 @@ static int toi_compress_write_page(unsigned long index,
 
 	ctx->buffer_start = kmap(buffer_page);
 
-	ctx->len = buf_size;
+	ctx->len = PAGE_SIZE;
 
 	ret = crypto_comp_compress(ctx->transform,
 			ctx->buffer_start, buf_size,
