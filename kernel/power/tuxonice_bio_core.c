@@ -229,7 +229,8 @@ static int throttle_if_needed(int flags)
 
 	/* Getting low on memory and I/O is in progress? */
 	while (unlikely(free_pages < free_mem_throttle) &&
-			atomic_read(&toi_io_in_progress)) {
+			atomic_read(&toi_io_in_progress) &&
+			!test_result_state(TOI_ABORTED)) {
 		if (!(flags & THROTTLE_WAIT))
 			return -ENOMEM;
 		do_bio_wait(4);
@@ -237,7 +238,8 @@ static int throttle_if_needed(int flags)
 	}
 
 	while (!(flags & MEMORY_ONLY) && throughput_throttle &&
-		TOTAL_OUTSTANDING_IO >= throughput_throttle) {
+		TOTAL_OUTSTANDING_IO >= throughput_throttle &&
+		!test_result_state(TOI_ABORTED)) {
 		int result = toi_bio_queue_flush_pages(0);
 		if (result)
 			return result;
