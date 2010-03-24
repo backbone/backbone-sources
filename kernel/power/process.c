@@ -20,7 +20,7 @@
 int freezer_state;
 EXPORT_SYMBOL_GPL(freezer_state);
 
-int freezer_sync;
+int freezer_sync = 1;
 EXPORT_SYMBOL_GPL(freezer_sync);
 
 /* 
