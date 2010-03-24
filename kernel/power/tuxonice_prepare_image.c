@@ -364,7 +364,8 @@ unsigned long real_nr_free_pages(unsigned long zone_idx_mask)
 			continue;
 
 		for_each_online_cpu(cpu) {
-			struct per_cpu_pageset *pset = zone_pcp(zone, cpu);
+			struct per_cpu_pageset *pset =
+				per_cpu_ptr(zone->pageset, cpu);
 			struct per_cpu_pages *pcp = &pset->pcp;
 			result += pcp->count;
 		}
@@ -691,7 +692,8 @@ static void generate_free_page_map(void)
 		}
 
 		for_each_online_cpu(cpu) {
-			struct per_cpu_pageset *pset = zone_pcp(zone, cpu);
+			struct per_cpu_pageset *pset =
+				per_cpu_ptr(zone->pageset, cpu);
 			struct per_cpu_pages *pcp = &pset->pcp;
 			struct page *page;
 			int t;
