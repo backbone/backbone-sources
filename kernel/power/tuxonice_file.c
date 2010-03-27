@@ -398,7 +398,7 @@ static void test_toi_file_target(void)
 {
 	int result = toi_file_register_storage();
 	sector_t sector;
-	char buf[33];
+	char buf[50];
 	struct fs_info *fs_info;
 
 	if (result || !file_chain)
