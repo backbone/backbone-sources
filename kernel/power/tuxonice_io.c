@@ -1280,7 +1280,7 @@ out_lmt:
 
 static int fs_info_load_and_check(void)
 {
-	int to_do, result;
+	int to_do, result = 0;
 
 	if (toiActiveAllocator->rw_header_chunk(READ, NULL, (char *) &to_do,
 				sizeof(int))) {
