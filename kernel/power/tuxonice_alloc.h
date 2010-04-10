@@ -7,6 +7,7 @@
  *
  */
 
+#include <linux/slab.h>
 #define TOI_WAIT_GFP (GFP_NOFS | __GFP_NOWARN)
 #define TOI_ATOMIC_GFP (GFP_ATOMIC | __GFP_NOWARN)
 
