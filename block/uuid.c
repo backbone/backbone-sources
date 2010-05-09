@@ -305,9 +305,6 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 		goto out;
 	}
 
-	PRINT_HEX_DUMP(KERN_EMERG, "part_matches_uuid looking for ",
-			DUMP_PREFIX_NONE, 16, 1, uuid, 16, 0);
-
 	for (i = 0; uuid_list[i].name; i++) {
 		struct uuid_info *dat = &uuid_list[i];
 		dev_offset = (dat->bkoff << 10) + dat->sboff;
@@ -356,12 +353,13 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 
 		last_uuid_pg_num = uuid_pg_num;
 
-		PRINT_HEX_DUMP(KERN_EMERG, "part_matches_uuid considering ",
-				DUMP_PREFIX_NONE, 16, 1,
+		if (!memcmp(&uuid_data[uuid_pg_off], uuid, 16)) {
+			PRINT_HEX_DUMP(KERN_EMERG, "part_matches_uuid "
+				"matched ",	DUMP_PREFIX_NONE, 16, 1,
 				&uuid_data[uuid_pg_off], 16, 0);
 
-		if (!memcmp(&uuid_data[uuid_pg_off], uuid, 16)) {
-			PRINTK("We have a match.\n");
+			PRINTK("UUID found on device %s, type %s.\n", buf,
+					dat->name);
 			result = 1;
 			break;
 		}
