@@ -310,7 +310,6 @@ int toi_check_for_signature(void)
 int toi_bio_image_exists(int quiet)
 {
 	int result;
-	char *orig_sig_page = toi_cur_sig_page;
 	char *msg = NULL;
 
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "toi_bio_image_exists.");
@@ -332,7 +331,7 @@ int toi_bio_image_exists(int quiet)
 		set_toi_state(TOI_RESUMED_BEFORE);
 
 	if (quiet || result == -ENOMEM)
-		goto out;
+		return result;
 
 	if (result == -1)
 		msg = "TuxOnIce: Unable to find a signature."
@@ -348,11 +347,6 @@ int toi_bio_image_exists(int quiet)
 
 	printk(KERN_INFO "%s", msg);
 
-out:
-	if (!orig_sig_page)
-		forget_signature_page();
-
-	close_resume_dev_t(0);
 	return result;
 }
 

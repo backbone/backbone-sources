@@ -1689,7 +1689,6 @@ static int toi_bio_parse_sig_location(char *commandline,
 			printk(KERN_ERR "TuxOnIce: Block I/O: No "
 				"signature found at %s.\n", devstart);
 
-	close_resume_dev_t(0);
 	return result;
 }
 
