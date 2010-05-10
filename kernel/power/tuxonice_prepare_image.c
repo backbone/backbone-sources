@@ -491,7 +491,7 @@ static unsigned long ram_still_required(void)
 {
 	unsigned long needed = MIN_FREE_RAM + toi_memory_for_modules(0) +
 		2 * extra_pd1_pages_allowance,
-		  available = real_nr_free_low_pages();
+		  available = real_nr_free_low_pages() + extra_pages_allocated;
 	return needed > available ? needed - available : 0;
 }
 
@@ -582,6 +582,8 @@ static void display_failure_reason(int tries_exceeded)
 				2 * extra_pd1_pages_allowance);
 		printk(KERN_INFO "   - Currently free   : %8lu\n",
 				real_nr_free_low_pages());
+		printk(KERN_INFO "   - Pages allocd     : %8lu\n",
+				extra_pages_allocated);
 		printk(KERN_INFO "                      : ========\n");
 		printk(KERN_INFO "     Still needed     : %8lu\n",
 				ram_required);
