@@ -973,7 +973,10 @@ static void eat_memory(void)
 
 	if (amount_wanted > 0 && !test_result_state(TOI_ABORTED) &&
 			image_size_limit != -1) {
-		unsigned long request = amount_wanted + 50;
+		unsigned long request = amount_wanted;
+		unsigned long high_req = max(highpages_ps1_to_free(),
+				any_to_free(1));
+		unsigned long low_req = lowpages_ps1_to_free();
 
 		toi_prepare_status(CLEAR_BAR,
 				"Seeking to free %ldMB of memory.",
@@ -985,7 +988,11 @@ static void eat_memory(void)
 		 * Ask for too many because shrink_all_memory doesn't
 		 * currently return enough most of the time.
 		 */
-		shrink_all_memory(request);
+		
+		if (high_req)
+			shrink_memory_mask(high_req, GFP_HIGHUSER);
+		if (low_req)
+			shrink_memory_mask(low_req, GFP_KERNEL);
 
 		did_eat_memory = 1;
 
@@ -993,8 +1000,9 @@ static void eat_memory(void)
 
 		amount_wanted = amount_needed(1);
 
-		printk(KERN_DEBUG "Asked shrink_all_memory for %ld pages,"
-				"got %ld.\n", request,
+		printk(KERN_DEBUG "Asked shrink_all_memory for %ld low pages &"
+				" %ld pages from anywhere, got %ld.\n",
+				high_req, low_req,
 				request - amount_wanted);
 
 		toi_cond_pause(0, NULL);
