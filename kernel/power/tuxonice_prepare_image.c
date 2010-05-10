@@ -979,6 +979,7 @@ static void eat_memory(void)
 		unsigned long high_req = max(highpages_ps1_to_free(),
 				any_to_free(1));
 		unsigned long low_req = lowpages_ps1_to_free();
+		unsigned long got = 0;
 
 		toi_prepare_status(CLEAR_BAR,
 				"Seeking to free %ldMB of memory.",
@@ -991,10 +992,10 @@ static void eat_memory(void)
 		 * currently return enough most of the time.
 		 */
 		
-		if (high_req)
-			shrink_memory_mask(high_req, GFP_HIGHUSER);
 		if (low_req)
-			shrink_memory_mask(low_req, GFP_KERNEL);
+			got = shrink_memory_mask(low_req, GFP_KERNEL);
+		if (high_req)
+			shrink_memory_mask(high_req - got, GFP_HIGHUSER);
 
 		did_eat_memory = 1;
 
