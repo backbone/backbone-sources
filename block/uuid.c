@@ -145,7 +145,8 @@ static void uuid_end_bio(struct bio *bio, int err)
 {
 	struct page *page = bio->bi_io_vec[0].bv_page;
 
-	BUG_ON(!test_bit(BIO_UPTODATE, &bio->bi_flags));
+	if(!test_bit(BIO_UPTODATE, &bio->bi_flags))
+		SetPageError(page);
 
 	unlock_page(page);
 	bio_put(bio);
@@ -187,7 +188,7 @@ static struct page *read_bdev_page(struct block_device *dev, int page_num)
 		__free_page(page);
 		printk(KERN_DEBUG "read_bdev_page freed page %p (in error "
 				"path).\n", page);
-		return ERR_PTR(-EFAULT);
+		return NULL;
 	}
 
 	lock_page(page);
@@ -195,6 +196,10 @@ static struct page *read_bdev_page(struct block_device *dev, int page_num)
 			(1 << BIO_RW_UNPLUG), bio);
 
 	wait_on_page_locked(page);
+	if (PageError(page)) {
+		__free_page(page);
+		page = NULL;
+	}
 	return page;
 }
 
@@ -242,10 +247,8 @@ int bdev_matches_key(struct block_device *bdev, const char *key)
 			if (data_page)
 				__free_page(data_page);
 			data_page = read_bdev_page(bdev, pg_num);
-			if (!data_page) {
-				result = -ENOMEM;
-				break;
-			}
+			if (!data_page)
+				continue;
 			data = page_address(data_page);
 		}
 
@@ -324,10 +327,8 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 			if (data_page)
 				__free_page(data_page);
 			data_page = read_bdev_page(bdev, pg_num);
-			if (!data_page) {
-				result = -ENOMEM;
-				break;
-			}
+			if (!data_page)
+				continue;
 			data = page_address(data_page);
 		}
 
@@ -344,10 +345,8 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 			if (uuid_data_page)
 				__free_page(uuid_data_page);
 			uuid_data_page = read_bdev_page(bdev, uuid_pg_num);
-			if (!uuid_data_page) {
-				result = -ENOMEM;
-				break;
-			}
+			if (!uuid_data_page)
+				continue;
 			uuid_data = page_address(uuid_data_page);
 		}
 
@@ -426,10 +425,8 @@ struct fs_info *fs_info_from_block_dev(struct block_device *bdev)
 			if (data_page)
 				__free_page(data_page);
 			data_page = read_bdev_page(bdev, pg_num);
-			if (!data_page) {
-				fs_info = ERR_PTR(-ENOMEM);
-				break;
-			}
+			if (!data_page)
+				continue;
 			data = page_address(data_page);
 		}
 
@@ -457,10 +454,8 @@ struct fs_info *fs_info_from_block_dev(struct block_device *bdev)
 			if (uuid_data_page)
 				__free_page(uuid_data_page);
 			uuid_data_page = read_bdev_page(bdev, uuid_pg_num);
-			if (!uuid_data_page) {
-				fs_info = ERR_PTR(-ENOMEM);
-				break;
-			}
+			if (!uuid_data_page)
+				continue;
 			uuid_data = page_address(uuid_data_page);
 		}
 
