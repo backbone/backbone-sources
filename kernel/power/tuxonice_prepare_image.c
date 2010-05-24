@@ -37,6 +37,7 @@
 #include "tuxonice_sysfs.h"
 #include "tuxonice_alloc.h"
 #include "tuxonice_atomic_copy.h"
+#include "tuxonice_builtin.h"
 
 static unsigned long num_nosave, main_storage_allocated, storage_limit,
 	    header_storage_needed;
@@ -75,11 +76,11 @@ static int build_attention_list(void)
 	/*
 	 * Count all userspace process (with task->mm) marked PF_NOFREEZE.
 	 */
-	read_lock(&tasklist_lock);
+	toi_read_lock_tasklist();
 	for_each_process(p)
 		if ((p->flags & PF_NOFREEZE) || p == current)
 			task_count++;
-	read_unlock(&tasklist_lock);
+	toi_read_unlock_tasklist();
 
 	/*
 	 * Allocate attention list structs.
@@ -101,13 +102,13 @@ static int build_attention_list(void)
 	}
 
 	next = attention_list;
-	read_lock(&tasklist_lock);
+	toi_read_lock_tasklist();
 	for_each_process(p)
 		if ((p->flags & PF_NOFREEZE) || p == current) {
 			next->task = p;
 			next = next->next;
 		}
-	read_unlock(&tasklist_lock);
+	toi_read_unlock_tasklist();
 	return 0;
 }
 
@@ -193,7 +194,7 @@ static void mark_tasks(int pageset)
 {
 	struct task_struct *p;
 
-	read_lock(&tasklist_lock);
+	toi_read_lock_tasklist();
 	for_each_process(p) {
 		if (!p->mm)
 			continue;
@@ -203,7 +204,7 @@ static void mark_tasks(int pageset)
 
 		toi_mark_task_as_pageset(p, pageset);
 	}
-	read_unlock(&tasklist_lock);
+	toi_read_unlock_tasklist();
 
 }
 

@@ -297,6 +297,18 @@ EXPORT_SYMBOL_GPL(toi_in_hibernate);
 __nosavedata struct pbe *restore_highmem_pblist;
 EXPORT_SYMBOL_GPL(restore_highmem_pblist);
 
+void toi_read_lock_tasklist(void)
+{
+	read_lock(&tasklist_lock);
+}
+EXPORT_SYMBOL_GPL(toi_read_lock_tasklist);
+
+void toi_read_unlock_tasklist(void)
+{
+	read_unlock(&tasklist_lock);
+}
+EXPORT_SYMBOL_GPL(toi_read_unlock_tasklist);
+
 static int __init toi_wait_setup(char *str)
 {
 	int value;

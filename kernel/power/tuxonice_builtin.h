@@ -28,3 +28,5 @@ extern void toi_close_bdev(struct block_device *bdev);
 extern int toi_wait;
 extern int toi_translate_err_default;
 extern int toi_force_no_multithreaded;
+extern void toi_read_lock_tasklist(void);
+extern void toi_read_unlock_tasklist(void);
