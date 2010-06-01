@@ -295,7 +295,7 @@ int part_matches_fs_info(struct hd_struct *part, struct fs_info *seek)
 
 	bdev = bdget(part_devt(part));
 
-	PRINTK("part_matches fs info considering %lx.\n", part_devt(part));
+	PRINTK("part_matches fs info considering %x.\n", part_devt(part));
 
 	if (blkdev_get(bdev, FMODE_READ)) {
 		PRINTK("blkdev_get failed.\n");
@@ -334,11 +334,11 @@ int part_matches_fs_info(struct hd_struct *part, struct fs_info *seek)
 				result = 3;
 				PRINTK(" Matching dev_t.\n");
 			} else
-				PRINTK("Dev_ts differ (%lx vs %lx).\n", part_devt(part), seek->dev_t);
+				PRINTK("Dev_ts differ (%x vs %x).\n", part_devt(part), seek->dev_t);
 		}
 	}
 
-	PRINTK(" Score for %lx is %d.\n", part_devt(part), result);
+	PRINTK(" Score for %x is %d.\n", part_devt(part), result);
 	free_fs_info(got);
 out:
 	blkdev_put(bdev, FMODE_READ);
