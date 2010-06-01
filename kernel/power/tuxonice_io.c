@@ -41,12 +41,12 @@ char alt_resume_param[256];
 /* Version read from image header at resume */
 static int toi_image_header_version;
 
-#define read_if_version(VERS, VAR, DESC) do {					\
+#define read_if_version(VERS, VAR, DESC, ERR_ACT) do {					\
 	if (likely(toi_image_header_version >= VERS))				\
 		if (toiActiveAllocator->rw_header_chunk(READ, NULL,		\
 					(char *) &VAR, sizeof(VAR))) {		\
 			abort_hibernate(TOI_FAILED_IO, "Failed to read DESC.");	\
-			goto out_remove_image;					\
+			ERR_ACT;					\
 		}								\
 } while(0)									\
 
@@ -1147,7 +1147,8 @@ int fs_info_space_needed(void)
 
 		fs = fs_info_from_block_dev(sb->s_bdev);
 		if (save_fs_info(fs, sb->s_bdev))
-			result += 16 + sizeof(int) + fs->last_mount_size;
+			result += 16 + sizeof(dev_t) + sizeof(int) +
+				fs->last_mount_size;
 		free_fs_info(fs);
 	}
 	return result;
@@ -1200,6 +1201,12 @@ static int fs_info_save(void)
 				return -EIO;
 			}
 			if (toiActiveAllocator->rw_header_chunk(WRITE, NULL,
+					(char *) &fs->dev_t, sizeof(dev_t))) {
+				abort_hibernate(TOI_FAILED_IO, "Failed to "
+						"write dev_t.");
+				return -EIO;
+			}
+			if (toiActiveAllocator->rw_header_chunk(WRITE, NULL,
 					(char *) &fs->last_mount_size, sizeof(int))) {
 				abort_hibernate(TOI_FAILED_IO, "Failed to "
 						"write last mount length.");
@@ -1223,12 +1230,14 @@ static int fs_info_load_and_check_one(void)
 	int result = 0, ln;
 	dev_t dev_t;
 	struct block_device *dev;
-	struct fs_info *fs_info;
+	struct fs_info *fs_info, seek;
 
 	if (toiActiveAllocator->rw_header_chunk(READ, NULL, uuid, 16)) {
 		abort_hibernate(TOI_FAILED_IO, "Failed to read uuid.");
 		return -EIO;
 	}
+
+	read_if_version(3, dev_t, "uuid dev_t field", return -EIO);
 
 	if (toiActiveAllocator->rw_header_chunk(READ, NULL, (char *) &ln,
 				sizeof(int))) {
@@ -1249,7 +1258,11 @@ static int fs_info_load_and_check_one(void)
 		goto out_lmt;
 	}
 
-	dev_t = blk_lookup_uuid(uuid);
+	strncpy((char *) &seek.uuid, uuid, 16);
+	seek.dev_t = dev_t;
+	seek.last_mount_size = ln;
+	seek.last_mount = last_mount;
+	dev_t = blk_lookup_fs_info(&seek);
 	if (!dev_t)
 		goto out_lmt;
 
@@ -1566,7 +1579,8 @@ static int __read_pageset1(void)
 	set_toi_state(TOI_BOOT_KERNEL);
 	boot_kernel_data_buffer = toi_header->bkd;
 
-	read_if_version(1, toi_max_workers, "TuxOnIce max workers");
+	read_if_version(1, toi_max_workers, "TuxOnIce max workers",
+			goto out_remove_image);
 
 	/* Read filesystem info */
 	if (fs_info_load_and_check()) {

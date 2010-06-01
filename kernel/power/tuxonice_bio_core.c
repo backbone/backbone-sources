@@ -148,7 +148,11 @@ struct block_device *toi_open_bdev(char *uuid, dev_t default_device,
 	char buf[32];
 
 	if (uuid) {
-		device = blk_lookup_uuid(uuid);
+		struct fs_info seek;
+		strncpy((char *) &seek.uuid, uuid, 16);
+		seek.dev_t = 0;
+		seek.last_mount_size = 0;
+		device = blk_lookup_fs_info(&seek);
 		if (!device) {
 			device = default_device;
 			printk(KERN_DEBUG "Unable to resolve uuid. Falling back"
@@ -1430,10 +1434,15 @@ static int toi_bio_read_header_init(void)
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "Header dev_t is %lx.",
 			toi_sig_data->header_dev_t);
 	if (toi_sig_data->have_uuid) {
+		struct fs_info seek;
 		dev_t device;
-		device = blk_lookup_uuid(toi_sig_data->header_uuid);
+
+		strncpy((char *) seek.uuid, toi_sig_data->header_uuid, 16);
+		seek.dev_t = toi_sig_data->header_dev_t;
+		seek.last_mount_size = 0;
+		device = blk_lookup_fs_info(&seek);
 		if (device) {
-			printk("Using dev_t %s, returned by blk_lookup_uuid.\n",
+			printk("Using dev_t %s, returned by blk_lookup_fs_info.\n",
 					format_dev_t(buf, device));
 			toi_sig_data->header_dev_t = device;
 		}
@@ -1565,7 +1574,11 @@ static int try_to_open_resume_device(char *commandline, int quiet)
 		retry_if_fails(toi_bio_scan_for_image(quiet));
 
 	if (uuid) {
-		retry_if_fails(resume_dev_t = blk_lookup_uuid(uuid));
+		struct fs_info seek;
+		strncpy((char *) &seek.uuid, uuid, 16);
+		seek.dev_t = resume_dev_t;
+		seek.last_mount_size = 0;
+		retry_if_fails(resume_dev_t = blk_lookup_fs_info(&seek));
 		kfree(uuid);
 	}
 

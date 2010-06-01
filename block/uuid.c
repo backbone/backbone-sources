@@ -267,29 +267,35 @@ int bdev_matches_key(struct block_device *bdev, const char *key)
 	return result;
 }
 
-int part_matches_uuid(struct hd_struct *part, const char *uuid)
+/* 
+ * part_matches_fs_info - Does the given partition match the details given?
+ *
+ * Returns a score saying how good the match is.
+ * 0 = no UUID match.
+ * 1 = UUID but last mount time differs.
+ * 2 = UUID, last mount time but not dev_t
+ * 3 = perfect match
+ *
+ * This lets us cope elegantly with probing resulting in dev_ts changing
+ * from boot to boot, and with the case where a user copies a partition
+ * (UUID is non unique), and we need to check the last mount time of the
+ * correct partition.
+ */
+int part_matches_fs_info(struct hd_struct *part, struct fs_info *seek)
 {
 	struct block_device *bdev;
-	unsigned char *data = NULL;
-	struct page *data_page = NULL;
-
-	int dev_offset, pg_num, pg_off;
-	int uuid_pg_num, uuid_pg_off, i;
-	unsigned char *uuid_data = NULL;
-	struct page *uuid_data_page = NULL;
-
-	int last_pg_num = -1, last_uuid_pg_num = 0;
+	struct fs_info *got;
 	int result = 0;
 	char buf[50];
 
-	if (null_uuid(uuid)) {
+	if (null_uuid((char *) &seek->uuid)) {
 		PRINTK("Refusing to find a NULL uuid.\n");
 		return 0;
 	}
 
 	bdev = bdget(part_devt(part));
 
-	PRINTK("blkdev_get %p.\n", part);
+	PRINTK("part_matches fs info considering %lx.\n", part_devt(part));
 
 	if (blkdev_get(bdev, FMODE_READ)) {
 		PRINTK("blkdev_get failed.\n");
@@ -308,68 +314,32 @@ int part_matches_uuid(struct hd_struct *part, const char *uuid)
 		goto out;
 	}
 
-	for (i = 0; uuid_list[i].name; i++) {
-		struct uuid_info *dat = &uuid_list[i];
-		dev_offset = (dat->bkoff << 10) + dat->sboff;
-		pg_num = dev_offset >> 12;
-		pg_off = dev_offset & 0xfff;
-		uuid_pg_num = dat->uuid_offset >> 12;
-		uuid_pg_off = dat->uuid_offset & 0xfff;
+	got = fs_info_from_block_dev(bdev);
 
-		if ((((pg_num + 1) << 3) - 1) > part->nr_sects >> 1)
-			continue;
+	if (got && !memcmp(got->uuid, seek->uuid, 16)) {
+		PRINTK(" Having matching UUID.\n");
+		PRINTK(" Got: LMS %d, LM %p.\n", got->last_mount_size, got->last_mount);
+		PRINTK(" Seek: LMS %d, LM %p.\n", seek->last_mount_size, seek->last_mount);
+		result = 1;
 
-		/* Ignore partition types with no UUID offset */
-		if (!dat->uuid_offset)
-			continue;
+		if (got->last_mount_size == seek->last_mount_size &&
+		    got->last_mount && seek->last_mount &&
+		    !memcmp(got->last_mount, seek->last_mount,
+			    got->last_mount_size)) {
+			result = 2;
 
-		if (pg_num != last_pg_num) {
-			if (data_page)
-				__free_page(data_page);
-			data_page = read_bdev_page(bdev, pg_num);
-			if (!data_page)
-				continue;
-			data = page_address(data_page);
-		}
+			PRINTK(" Matching last mount time.\n");
 
-		last_pg_num = pg_num;
-
-		if (strncmp(&data[pg_off], dat->magic, dat->sig_len))
-			continue;
-
-		/* Does the UUID match? */
-		if (uuid_pg_num > part->nr_sects >> 3)
-			continue;
-
-		if (!uuid_data || uuid_pg_num != last_uuid_pg_num) {
-			if (uuid_data_page)
-				__free_page(uuid_data_page);
-			uuid_data_page = read_bdev_page(bdev, uuid_pg_num);
-			if (!uuid_data_page)
-				continue;
-			uuid_data = page_address(uuid_data_page);
-		}
-
-		last_uuid_pg_num = uuid_pg_num;
-
-		if (!memcmp(&uuid_data[uuid_pg_off], uuid, 16)) {
-			PRINT_HEX_DUMP(KERN_EMERG, "part_matches_uuid "
-				"matched ",	DUMP_PREFIX_NONE, 16, 1,
-				&uuid_data[uuid_pg_off], 16, 0);
-
-			PRINTK("UUID found on device %s, type %s.\n", buf,
-					dat->name);
-			result = 1;
-			break;
+			if (part_devt(part) == seek->dev_t) {
+				result = 3;
+				PRINTK(" Matching dev_t.\n");
+			} else
+				PRINTK("Dev_ts differ (%lx vs %lx).\n", part_devt(part), seek->dev_t);
 		}
 	}
 
-	if (data_page)
-		__free_page(data_page);
-
-	if (uuid_data_page)
-		__free_page(uuid_data_page);
-
+	PRINTK(" Score for %lx is %d.\n", part_devt(part), result);
+	free_fs_info(got);
 out:
 	blkdev_put(bdev, FMODE_READ);
 	return result;
@@ -461,6 +431,7 @@ struct fs_info *fs_info_from_block_dev(struct block_device *bdev)
 
 		last_uuid_pg_num = uuid_pg_num;
 		memcpy(&fs_info->uuid, &uuid_data[uuid_pg_off], 16);
+		fs_info->dev_t = bdev->bd_dev;
 
 no_uuid:
 		PRINT_HEX_DUMP(KERN_EMERG, "fs_info_from_block_dev "

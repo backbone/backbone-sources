@@ -1289,11 +1289,12 @@ int invalidate_partition(struct gendisk *disk, int partno)
 
 EXPORT_SYMBOL(invalidate_partition);
 
-dev_t blk_lookup_uuid(const char *uuid)
+dev_t blk_lookup_fs_info(struct fs_info *seek)
 {
 	dev_t devt = MKDEV(0, 0);
 	struct class_dev_iter iter;
 	struct device *dev;
+	int best_score = 0;
 
 	class_dev_iter_init(&iter, &block_class, NULL, &disk_type);
 	while (!devt && (dev = class_dev_iter_next(&iter))) {
@@ -1304,9 +1305,13 @@ dev_t blk_lookup_uuid(const char *uuid)
 		disk_part_iter_init(&piter, disk, DISK_PITER_INCL_PART0);
 
 		while ((part = disk_part_iter_next(&piter))) {
-			if (part_matches_uuid(part, uuid)) {
+			int score = part_matches_fs_info(part, seek);
+			if (score > best_score) {
 				devt = part_devt(part);
-				break;
+				best_score = score;
+				/* Perfect match? */
+				if (best_score == 3)
+					break;
 			}
 		}
 		disk_part_iter_exit(&piter);
@@ -1314,7 +1319,7 @@ dev_t blk_lookup_uuid(const char *uuid)
 	class_dev_iter_exit(&iter);
 	return devt;
 }
-EXPORT_SYMBOL_GPL(blk_lookup_uuid);
+EXPORT_SYMBOL_GPL(blk_lookup_fs_info);
 
 /* Caller uses NULL, key to start. For each match found, we return a bdev on
  * which we have done blkdev_get, and we do the blkdev_put on block devices
