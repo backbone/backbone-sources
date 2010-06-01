@@ -15,7 +15,7 @@
 #include <linux/syscalls.h>
 #include <linux/suspend.h>
 #include <linux/ctype.h>
-#include <linux/uuid.h>
+#include <linux/fs_uuid.h>
 #include <scsi/scsi_scan.h>
 
 #include "tuxonice.h"

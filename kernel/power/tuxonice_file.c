@@ -32,7 +32,7 @@
 #include <linux/blkdev.h>
 #include <linux/mount.h>
 #include <linux/fs.h>
-#include <linux/uuid.h>
+#include <linux/fs_uuid.h>
 
 #include "tuxonice.h"
 #include "tuxonice_modules.h"

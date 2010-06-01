@@ -1,6 +1,6 @@
 #include <linux/blkdev.h>
 #include <linux/ctype.h>
-#include <linux/uuid.h>
+#include <linux/fs_uuid.h>
 #include <linux/slab.h>
 
 static int debug_enabled;

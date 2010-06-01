@@ -21,7 +21,7 @@
 #include <linux/cpu.h>
 #include <linux/fs_struct.h>
 #include <linux/bio.h>
-#include <linux/uuid.h>
+#include <linux/fs_uuid.h>
 #include <asm/tlbflush.h>
 
 #include "tuxonice.h"

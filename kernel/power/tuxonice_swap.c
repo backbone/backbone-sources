@@ -14,7 +14,7 @@
 #include <linux/swapops.h>
 #include <linux/swap.h>
 #include <linux/syscalls.h>
-#include <linux/uuid.h>
+#include <linux/fs_uuid.h>
 
 #include "tuxonice.h"
 #include "tuxonice_sysfs.h"

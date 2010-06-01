@@ -19,7 +19,7 @@
 #include <linux/mutex.h>
 #include <linux/idr.h>
 #include <linux/ctype.h>
-#include <linux/uuid.h>
+#include <linux/fs_uuid.h>
 
 #include "blk.h"
 

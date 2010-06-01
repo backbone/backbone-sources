@@ -7,7 +7,7 @@
  *
  */
 
-#include <linux/uuid.h>
+#include <linux/fs_uuid.h>
 
 #include "tuxonice.h"
 #include "tuxonice_sysfs.h"
