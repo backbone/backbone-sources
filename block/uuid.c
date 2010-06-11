@@ -373,8 +373,7 @@ struct fs_info *fs_info_from_block_dev(struct block_device *bdev)
 
 	bdevname(bdev, buf);
 
-	PRINTK(KERN_EMERG "uuid_from_block_dev looking for partition type "
-			"of %s.\n", buf);
+	PRINTK("uuid_from_block_dev looking for partition type of %s.\n", buf);
 
 	for (i = 0; uuid_list[i].name; i++) {
 		struct uuid_info *dat = &uuid_list[i];
