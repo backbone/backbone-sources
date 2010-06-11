@@ -1297,21 +1297,18 @@ dev_t blk_lookup_fs_info(struct fs_info *seek)
 	int best_score = 0;
 
 	class_dev_iter_init(&iter, &block_class, NULL, &disk_type);
-	while (!devt && (dev = class_dev_iter_next(&iter))) {
+	while (best_score < 3 && (dev = class_dev_iter_next(&iter))) {
 		struct gendisk *disk = dev_to_disk(dev);
 		struct disk_part_iter piter;
 		struct hd_struct *part;
 
 		disk_part_iter_init(&piter, disk, DISK_PITER_INCL_PART0);
 
-		while ((part = disk_part_iter_next(&piter))) {
+		while (best_score < 3 && (part = disk_part_iter_next(&piter))) {
 			int score = part_matches_fs_info(part, seek);
 			if (score > best_score) {
 				devt = part_devt(part);
 				best_score = score;
-				/* Perfect match? */
-				if (best_score == 3)
-					break;
 			}
 		}
 		disk_part_iter_exit(&piter);
