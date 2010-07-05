@@ -146,7 +146,9 @@ struct block_device *toi_open_bdev(char *uuid, dev_t default_device,
 	struct block_device *bdev;
 	dev_t device = default_device;
 	char buf[32];
+	int retried = 0;
 
+retry:
 	if (uuid) {
 		struct fs_info seek;
 		strncpy((char *) &seek.uuid, uuid, 16);
@@ -171,6 +173,12 @@ struct block_device *toi_open_bdev(char *uuid, dev_t default_device,
 	bdev = toi_open_by_devnum(device);
 
 	if (IS_ERR(bdev) || !bdev) {
+		if (!retried) {
+			retried = 1;
+			wait_for_device_probe();
+			scsi_complete_async_scans();
+			goto retry;
+		}
 		if (display_errs)
 			toi_early_boot_message(1, TOI_CONTINUE_REQ,
 				"Failed to get access to block device "
