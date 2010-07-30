@@ -225,8 +225,19 @@ int __toi_post_context_save(void)
 		 * Highlevel code will see this, clear the state and
 		 * retry if we haven't already done so twice.
 		 */
-		set_abort_result(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL);
-		return 1;
+		if (any_to_free(1)) {
+			set_abort_result(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL);
+			return 1;
+		}
+		if (try_allocate_extra_memory()) {
+			printk(KERN_INFO "Failed to allocate the extra memory"
+					" needed. Restarting the process.");
+			set_abort_result(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL);
+			return 1;
+		}
+		printk(KERN_INFO "However it looks like there's enough"
+			" free ram and storage to handle this, so "
+			" continuing anyway.");
 	}
 
 	if (!test_action_state(TOI_TEST_FILTER_SPEED) &&

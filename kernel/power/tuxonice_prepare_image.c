@@ -496,7 +496,7 @@ static unsigned long ram_still_required(void)
 	return needed > available ? needed - available : 0;
 }
 
-static unsigned long any_to_free(int use_image_size_limit)
+unsigned long any_to_free(int use_image_size_limit)
 {
 	int use_soft_limit = use_image_size_limit && image_size_limit > 0;
 	unsigned long current_size = current_image_size(),
@@ -839,6 +839,23 @@ void toi_recalculate_image_contents(int atomic_copy)
 	}
 }
 
+int try_allocate_extra_memory(void)
+{
+	unsigned long wanted = pagedir1.size +  extra_pd1_pages_allowance -
+		get_lowmem_size(pagedir2);
+	if (wanted > extra_pages_allocated) {
+		unsigned long got = toi_allocate_extra_pagedir_memory(wanted);
+		if (wanted < got) {
+			toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
+				"Want %d extra pages for pageset1, got %d.\n",
+				wanted, got);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+
 /* update_image
  *
  * Allocate [more] memory and storage for the image.
@@ -846,20 +863,10 @@ void toi_recalculate_image_contents(int atomic_copy)
 static void update_image(int ps2_recalc)
 {
 	int old_header_req;
-	unsigned long seek, wanted, got;
+	unsigned long seek;
 
-	/* Include allowance for growth in pagedir1 while writing pagedir 2 */
-	wanted = pagedir1.size +  extra_pd1_pages_allowance -
-		get_lowmem_size(pagedir2);
-	if (wanted > extra_pages_allocated) {
-		got = toi_allocate_extra_pagedir_memory(wanted);
-		if (wanted < got) {
-			toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
-				"Want %d extra pages for pageset1, got %d.\n",
-				wanted, got);
-			return;
-		}
-	}
+	if (try_allocate_extra_memory())
+		return;
 
 	if (ps2_recalc)
 		goto recalc;

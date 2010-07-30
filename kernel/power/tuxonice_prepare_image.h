@@ -34,3 +34,5 @@ extern void free_attention_list(void);
 #endif
 
 unsigned long get_header_storage_needed(void);
+unsigned long any_to_free(int use_image_size_limit);
+int try_allocate_extra_memory(void);
