@@ -801,8 +801,8 @@ static int bio_io_flusher(int writing)
  **/
 static int toi_bio_get_next_page_read(int no_readahead)
 {
-	unsigned long *virt;
-	struct page *next;
+	char *virt;
+	struct page *old_readahead_list_head;
 
 	/*
 	 * When reading the second page of the header, we have to
@@ -840,10 +840,12 @@ static int toi_bio_get_next_page_read(int no_readahead)
 
 	virt = page_address(readahead_list_head);
 	memcpy(toi_writer_buffer, virt, PAGE_SIZE);
-
-	next = (struct page *) readahead_list_head->private;
-	toi__free_page(12, readahead_list_head);
-	readahead_list_head = next;
+	
+	mutex_lock(&toi_bio_readahead_mutex);
+	old_readahead_list_head = readahead_list_head;
+	readahead_list_head = (struct page *) readahead_list_head->private;
+	mutex_unlock(&toi_bio_readahead_mutex);
+	toi__free_page(12, old_readahead_list_head);
 	return 0;
 }
 
