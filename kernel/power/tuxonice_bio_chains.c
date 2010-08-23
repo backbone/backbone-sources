@@ -821,9 +821,9 @@ int toi_bio_rw_page(int writing, struct page *page,
 	}
 
 	toi_message(TOI_IO, TOI_VERBOSE, 0,
-			"%sing device %lx, sector %d << %d.",
+			"%sing device %lx, sector %ld << %d.",
 			writing ? "Writ" : "Read",
-			dev_info->bdev, dev_info->blocks.current_offset,
+			dev_info->dev_t, dev_info->blocks.current_offset,
 			dev_info->bmap_shift);
 
 	result = toi_do_io(writing, dev_info->bdev,
