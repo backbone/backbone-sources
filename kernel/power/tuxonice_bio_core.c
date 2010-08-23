@@ -399,14 +399,17 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 	}
 
 
-	if (unlikely(test_action_state(TOI_TEST_BIO))) {
+	/* Still read the header! */
+	if (unlikely(test_action_state(TOI_TEST_BIO) && writing)) {
 		/* Fake having done the hard work */
 		set_bit(BIO_UPTODATE, &bio->bi_flags);
 		toi_end_bio(bio, 0);
 	} else
-		submit_bio(writing | (1 << BIO_RW_SYNCIO) |
-				(1 << BIO_RW_TUXONICE) |
-				(1 << BIO_RW_UNPLUG), bio);
+		submit_bio(writing
+				| (1 << BIO_RW_SYNCIO)
+				| (1 << BIO_RW_TUXONICE)
+				| (1 << BIO_RW_UNPLUG)
+				/* | (1 << BIO_RW_NOIDLE) */, bio);
 
 	return 0;
 }

@@ -711,7 +711,8 @@ Failed:
 	temp_result = write_pageset(&pagedir1);
 
 	/* We didn't overwrite any memory, so no reread needs to be done. */
-	if (test_action_state(TOI_TEST_FILTER_SPEED))
+	if (test_action_state(TOI_TEST_FILTER_SPEED) ||
+	    test_action_state(TOI_TEST_BIO))
 		return 1;
 
 	if (temp_result == 1 || test_result_state(TOI_ABORTED))
@@ -723,9 +724,6 @@ Failed:
 		goto abort_reloading_pagedir_two;
 
 	temp_result = write_image_header();
-
-	if (test_action_state(TOI_TEST_BIO))
-		return 1;
 
 	if (!temp_result && !test_result_state(TOI_ABORTED))
 		return 0;
