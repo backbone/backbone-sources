@@ -815,8 +815,13 @@ int toi_bio_rw_page(int writing, struct page *page,
 	struct toi_bdev_info *dev_info = toi_writer_posn.current_chain;
 
 	if (result) {
-		toi_message(TOI_IO, TOI_VERBOSE, 0, "Seeking to read/write "
-				"another page when stream has ended.");
+		if (writing)
+			abort_hibernate(TOI_INSUFFICIENT_STORAGE,
+				"Insufficient storage for your image.");
+		else
+			toi_message(TOI_IO, TOI_VERBOSE, 0, "Seeking to "
+				"read/write another page when stream has "
+				"ended.");
 		return -ENOSPC;
 	}
 
