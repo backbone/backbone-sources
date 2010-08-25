@@ -192,8 +192,7 @@ static struct page *read_bdev_page(struct block_device *dev, int page_num)
 	}
 
 	lock_page(page);
-	submit_bio(READ | (1 << BIO_RW_SYNCIO) |
-			(1 << BIO_RW_UNPLUG), bio);
+	submit_bio(READ | REQ_SYNC | REQ_UNPLUG, bio);
 
 	wait_on_page_locked(page);
 	if (PageError(page)) {
@@ -334,11 +333,11 @@ int part_matches_fs_info(struct hd_struct *part, struct fs_info *seek)
 				result = 3;
 				PRINTK(" Matching dev_t.\n");
 			} else
-				PRINTK("Dev_ts differ (%lx vs %lx).\n", part_devt(part), seek->dev_t);
+				PRINTK("Dev_ts differ (%x vs %x).\n", part_devt(part), seek->dev_t);
 		}
 	}
 
-	PRINTK(" Score for %lx is %d.\n", part_devt(part), result);
+	PRINTK(" Score for %x is %d.\n", part_devt(part), result);
 	free_fs_info(got);
 out:
 	blkdev_put(bdev, FMODE_READ);

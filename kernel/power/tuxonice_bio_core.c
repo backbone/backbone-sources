@@ -405,11 +405,7 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 		set_bit(BIO_UPTODATE, &bio->bi_flags);
 		toi_end_bio(bio, 0);
 	} else
-		submit_bio(writing
-				| (1 << BIO_RW_SYNCIO)
-				| (1 << BIO_RW_TUXONICE)
-				| (1 << BIO_RW_UNPLUG)
-				/* | (1 << BIO_RW_NOIDLE) */, bio);
+		submit_bio(writing | REQ_TOI | REQ_SYNC | REQ_UNPLUG, bio);
 
 	return 0;
 }

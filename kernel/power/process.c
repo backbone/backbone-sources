@@ -16,6 +16,7 @@
 #include <linux/freezer.h>
 #include <linux/delay.h>
 #include <linux/buffer_head.h>
+#include <linux/workqueue.h>
 
 int freezer_state;
 EXPORT_SYMBOL_GPL(freezer_state);
@@ -42,6 +43,7 @@ static int try_to_freeze_tasks(bool sig_only)
 	struct task_struct *g, *p;
 	unsigned long end_time;
 	unsigned int todo;
+	bool wq_busy = false;
 	struct timeval start, end;
 	u64 elapsed_csecs64;
 	unsigned int elapsed_csecs;
@@ -49,6 +51,10 @@ static int try_to_freeze_tasks(bool sig_only)
 	do_gettimeofday(&start);
 
 	end_time = jiffies + TIMEOUT;
+
+	if (!sig_only)
+		freeze_workqueues_begin();
+
 	while (true) {
 		todo = 0;
 		read_lock(&tasklist_lock);
@@ -70,6 +76,12 @@ static int try_to_freeze_tasks(bool sig_only)
 				todo++;
 		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);
+
+		if (!sig_only) {
+			wq_busy = freeze_workqueues_busy();
+			todo += wq_busy;
+		}
+
 		if (!todo || time_after(jiffies, end_time))
 			break;
 
@@ -93,8 +105,12 @@ static int try_to_freeze_tasks(bool sig_only)
 		 */
 		printk("\n");
 		printk(KERN_ERR "Freezing of tasks failed after %d.%02d seconds "
-				"(%d tasks refusing to freeze):\n",
-				elapsed_csecs / 100, elapsed_csecs % 100, todo);
+		       "(%d tasks refusing to freeze, wq_busy=%d):\n",
+		       elapsed_csecs / 100, elapsed_csecs % 100,
+		       todo - wq_busy, wq_busy);
+
+		thaw_workqueues();
+
 		read_lock(&tasklist_lock);
 		do_each_thread(g, p) {
 			task_lock(p);
@@ -184,10 +200,11 @@ void thaw_processes(void)
 	thaw_filesystems(FS_FREEZER_ALL);
 
 	printk(KERN_INFO "Restarting tasks ... ");
-	if (old_state == FREEZER_FULLY_ON)
+	if (old_state == FREEZER_FULLY_ON) {
+		thaw_workqueues();
 		thaw_tasks(true);
+	}
 
-	printk("Restarting tasks ... ");
 	thaw_tasks(false);
 	schedule();
 	printk("done.\n");
@@ -199,6 +216,7 @@ void thaw_kernel_threads(void)
 	freezer_state = FREEZER_USERSPACE_FROZEN;
 	printk(KERN_INFO "Restarting normal filesystems.\n");
 	thaw_filesystems(FS_FREEZER_NORMAL);
+	thaw_workqueues();
 	thaw_tasks(true);
 }
 
