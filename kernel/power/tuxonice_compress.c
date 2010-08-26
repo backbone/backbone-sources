@@ -35,9 +35,9 @@ struct cpu_context {
 	u8 *page_buffer;
 	struct crypto_comp *transform;
 	unsigned int len;
-	char *buffer_start;
-	char *output_buffer;
-	char *check_buffer;
+	u8 *buffer_start;
+	u8 *output_buffer;
+	u8 *check_buffer;
 };
 
 static DEFINE_PER_CPU(struct cpu_context, contexts);
