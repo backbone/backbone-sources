@@ -76,6 +76,8 @@ int toi_max_workers;
 static char *image_version_error = "The image header version is newer than " \
 	"this kernel supports.";
 
+struct toi_module_ops *first_filter;
+
 /**
  * toi_attempt_to_parse_resume_device - determine if we can hibernate
  *
@@ -395,13 +397,12 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
  * @data_pfn: The pfn where the next data to write is located.
  * @my_io_index: The index of the page in the pageset.
  * @write_pfn: The pfn number to write in the image (where the data belongs).
- * @first_filter: Where to send the page (optimisation).
  *
  * Get the pfn of the next page to write, map the page if necessary and do the
  * write.
  **/
 static int write_next_page(unsigned long *data_pfn, int *my_io_index,
-		unsigned long *write_pfn, struct toi_module_ops *first_filter)
+		unsigned long *write_pfn)
 {
 	struct page *page;
 	char **my_checksum_locn = &__get_cpu_var(checksum_locn);
@@ -463,7 +464,7 @@ static int write_next_page(unsigned long *data_pfn, int *my_io_index,
  **/
 
 static int read_next_page(int *my_io_index, unsigned long *write_pfn,
-		struct page *buffer, struct toi_module_ops *first_filter)
+		struct page *buffer)
 {
 	unsigned int buf_size = PAGE_SIZE;
 	unsigned long left = atomic_read(&io_count);
@@ -571,7 +572,6 @@ static int worker_rw_loop(void *data)
 	unsigned long data_pfn, write_pfn, next_jiffies = jiffies + HZ / 4,
 		      jif_index = 1, start_time = jiffies;
 	int result = 0, my_io_index = 0, last_worker;
-	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
 
 	current->flags |= PF_NOFREEZE;
@@ -595,10 +595,10 @@ static int worker_rw_loop(void *data)
 		 */
 		if (io_write)
 			result = write_next_page(&data_pfn, &my_io_index,
-					&write_pfn, first_filter);
+					&write_pfn);
 		else /* Reading */
 			result = read_next_page(&my_io_index, &write_pfn,
-					buffer, first_filter);
+					buffer);
 
 		if (result) {
 			mutex_lock(&io_mutex);
@@ -716,6 +716,8 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	int index = 0, cpu, num_other_threads = 0, result = 0, flusher = 0;
 	int workers_started = 0;
 	unsigned long pfn;
+
+	first_filter = toi_get_next_filter(NULL);
 
 	if (!finish_at)
 		return 0;
