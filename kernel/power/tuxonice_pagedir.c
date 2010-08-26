@@ -144,12 +144,13 @@ int toi_get_pageset1_load_addresses(void)
 	int low_pages_for_highmem = 0;
 	gfp_t flags = GFP_ATOMIC | __GFP_NOWARN | __GFP_HIGHMEM;
 	struct page *page, *high_pbe_page = NULL, *last_high_pbe_page = NULL,
-		    *low_pbe_page;
+		    *low_pbe_page, *last_low_pbe_page = NULL;
 	struct pbe **last_high_pbe_ptr = &restore_highmem_pblist,
 		   *this_high_pbe = NULL;
 	int orig_low_pfn, orig_high_pfn;
 	int high_pbes_done = 0, low_pbes_done = 0;
 	int low_direct = 0, high_direct = 0, result = 0, i;
+	int high_page = 1, high_offset = 0, low_page = 1, low_offset = 0;
 
 	memory_bm_set_iterators(pageset1_map, 3);
 	memory_bm_position_reset(pageset1_map);
@@ -251,14 +252,22 @@ int toi_get_pageset1_load_addresses(void)
 			this_high_pbe->orig_address = orig_page;
 			this_high_pbe->address = page;
 			this_high_pbe->next = NULL;
+			toi_message(TOI_PAGEDIR, TOI_VERBOSE, 0, "High pbe %d/%d: %p(%d)=>%p",
+					high_page, high_offset, page, orig_high_pfn, orig_page);
 			if (last_high_pbe_page != high_pbe_page) {
 				*last_high_pbe_ptr =
 					(struct pbe *) high_pbe_page;
-				if (last_high_pbe_page)
+				if (last_high_pbe_page) {
 					kunmap(last_high_pbe_page);
+					high_page++;
+					high_offset = 0;
+				} else
+					high_offset++;
 				last_high_pbe_page = high_pbe_page;
-			} else
+			} else {
 				*last_high_pbe_ptr = this_high_pbe;
+				high_offset++;
+			}
 			last_high_pbe_ptr = &this_high_pbe->next;
 			this_high_pbe = get_next_pbe(&high_pbe_page,
 					this_high_pbe, 1);
@@ -280,10 +289,21 @@ int toi_get_pageset1_load_addresses(void)
 			this_low_pbe->orig_address = page_address(orig_page);
 			this_low_pbe->address = page_address(page);
 			this_low_pbe->next = NULL;
+			toi_message(TOI_PAGEDIR, TOI_VERBOSE, 0, "Low pbe %d/%d: %p(%d)=>%p",
+					low_page, low_offset, this_low_pbe->orig_address,
+					orig_low_pfn, this_low_pbe->address);
 			*last_low_pbe_ptr = this_low_pbe;
 			last_low_pbe_ptr = &this_low_pbe->next;
 			this_low_pbe = get_next_pbe(&low_pbe_page,
 					this_low_pbe, 0);
+			if (low_pbe_page != last_low_pbe_page) {
+				if (last_low_pbe_page) {
+					low_page++;
+					low_offset = 0;
+				}
+				last_low_pbe_page = low_pbe_page;
+			} else
+				low_offset++;
 			if (IS_ERR(this_low_pbe)) {
 				printk(KERN_INFO "this_low_pbe is an error.\n");
 				return -ENOMEM;

@@ -133,6 +133,7 @@ enum {
 	TOI_HEADER,
 	TOI_WRITER,
 	TOI_MEMORY,
+	TOI_PAGEDIR,
 };
 
 #define set_debug_state(bit) (test_and_set_bit(bit, &toi_bkd.toi_debug_state))
