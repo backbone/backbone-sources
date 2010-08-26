@@ -37,11 +37,9 @@ struct cpu_context {
 	unsigned int len;
 	u8 *buffer_start;
 	u8 *output_buffer;
-	u8 *check_buffer;
 };
 
 static DEFINE_PER_CPU(struct cpu_context, contexts);
-static int toi_check_compression;
 
 /*
  * toi_crypto_prepare
@@ -88,17 +86,6 @@ static int toi_compress_crypto_prepare(void)
 			  "compression driver.\n");
 			return -ENOMEM;
 		}
-
-		this->check_buffer =
-			(char *) toi_get_zeroed_page(16, TOI_ATOMIC_GFP);
-
-		if (!this->check_buffer) {
-			printk(KERN_ERR
-			  "Failed to allocate a check buffer for TuxOnIce "
-			  "compression driver.\n");
-			return -ENOMEM;
-		}
-
 	}
 
 	return 0;
@@ -124,11 +111,6 @@ static int toi_compress_rw_cleanup(int writing)
 			vfree(this->output_buffer);
 
 		this->output_buffer = NULL;
-
-		if (this->check_buffer)
-			toi_free_page(16, (unsigned long) this->check_buffer);
-
-		this->check_buffer = NULL;
 	}
 
 	return 0;
@@ -173,33 +155,6 @@ static int toi_compress_rw_init(int rw, int stream_number)
 	return 0;
 }
 
-static int check_compression(struct cpu_context *ctx, struct page *buffer_page,
-		int buf_size)
-{
-	char *original = kmap(buffer_page);
-	int output_size = PAGE_SIZE, okay, ret;
-
-	ret = crypto_comp_decompress(ctx->transform, ctx->output_buffer,
-			ctx->len, ctx->check_buffer, &output_size);
-	okay = (!ret && output_size == PAGE_SIZE &&
-			!memcmp(ctx->check_buffer, original, PAGE_SIZE));
-
-	if (!okay) {
-		printk("Compression test failed.\n");
-		print_hex_dump(KERN_ERR, "Original page: ", DUMP_PREFIX_NONE,
-				16, 1, original, PAGE_SIZE, 0);
-		printk(KERN_ERR "\nOutput %d bytes. Result %d.", ctx->len, ret);
-		print_hex_dump(KERN_ERR, "Compressed to: ", DUMP_PREFIX_NONE,
-				16, 1, ctx->output_buffer, ctx->len, 0);
-		printk(KERN_ERR "\nRestored to %d bytes.\n", output_size);
-		print_hex_dump(KERN_ERR, "Decompressed : ", DUMP_PREFIX_NONE,
-				16, 1, ctx->check_buffer, output_size, 0);
-	}
-	kunmap(buffer_page);
-
-	return okay;
-}
-
 /*
  * toi_compress_write_page()
  *
@@ -238,13 +193,6 @@ static int toi_compress_write_page(unsigned long index,
 	mutex_unlock(&stats_lock);
 
 	if (!ret && ctx->len < buf_size) { /* some compression */
-		if (unlikely(toi_check_compression)) {
-			ret = check_compression(ctx, buffer_page, buf_size);
-			if (!ret)
-				return next_driver->write_page(index,
-						buffer_page, buf_size);
-		}
-
 		memcpy(ctx->page_buffer, ctx->output_buffer, ctx->len);
 		return next_driver->write_page(index,
 				virt_to_page(ctx->page_buffer),
@@ -438,8 +386,6 @@ static struct toi_sysfs_data sysfs_params[] = {
 	SYSFS_INT("expected_compression", SYSFS_RW, &toi_expected_compression,
 			0, 99, 0, NULL),
 	SYSFS_INT("enabled", SYSFS_RW, &toi_compression_ops.enabled, 0, 1, 0,
-			NULL),
-	SYSFS_INT("check", SYSFS_RW, &toi_check_compression, 0, 1, 0,
 			NULL),
 	SYSFS_STRING("algorithm", SYSFS_RW, toi_compressor_name, 31, 0, NULL),
 };
