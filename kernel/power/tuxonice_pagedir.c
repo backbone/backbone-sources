@@ -254,15 +254,12 @@ int toi_get_pageset1_load_addresses(void)
 			if (last_high_pbe_page != high_pbe_page) {
 				*last_high_pbe_ptr =
 					(struct pbe *) high_pbe_page;
-				if (!last_high_pbe_page)
-					last_high_pbe_page = high_pbe_page;
+				if (last_high_pbe_page)
+					kunmap(last_high_pbe_page);
+				last_high_pbe_page = high_pbe_page;
 			} else
 				*last_high_pbe_ptr = this_high_pbe;
 			last_high_pbe_ptr = &this_high_pbe->next;
-			if (last_high_pbe_page != high_pbe_page) {
-				kunmap(last_high_pbe_page);
-				last_high_pbe_page = high_pbe_page;
-			}
 			this_high_pbe = get_next_pbe(&high_pbe_page,
 					this_high_pbe, 1);
 			if (IS_ERR(this_high_pbe)) {
