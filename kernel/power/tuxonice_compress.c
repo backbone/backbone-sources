@@ -308,7 +308,8 @@ static int toi_compress_memory_needed(void)
 
 static int toi_compress_storage_needed(void)
 {
-	return 4 * sizeof(unsigned long) + strlen(toi_compressor_name) + 1;
+	return 2 * sizeof(unsigned long) + 2 * sizeof(int) +
+		strlen(toi_compressor_name) + 1;
 }
 
 /*
@@ -320,16 +321,18 @@ static int toi_compress_storage_needed(void)
  */
 static int toi_compress_save_config_info(char *buffer)
 {
-	int len = strlen(toi_compressor_name) + 1;
+	int len = strlen(toi_compressor_name) + 1, offset = 0;
 
 	*((unsigned long *) buffer) = toi_compress_bytes_in;
-	*((unsigned long *) (buffer + 1 * sizeof(unsigned long))) =
-		toi_compress_bytes_out;
-	*((unsigned long *) (buffer + 2 * sizeof(unsigned long))) =
-		toi_expected_compression;
-	*((unsigned long *) (buffer + 3 * sizeof(unsigned long))) = len;
-	strncpy(buffer + 4 * sizeof(unsigned long), toi_compressor_name, len);
-	return 4 * sizeof(unsigned long) + len;
+	offset += sizeof(unsigned long);
+	*((unsigned long *) (buffer + offset)) = toi_compress_bytes_out;
+	offset += sizeof(unsigned long);
+	*((int *) (buffer + offset)) = toi_expected_compression;
+	offset += sizeof(int);
+	*((int *) (buffer + offset)) = len;
+	offset += sizeof(int);
+	strncpy(buffer + offset, toi_compressor_name, len);
+	return offset + len;
 }
 
 /* toi_compress_load_config_info
@@ -341,18 +344,17 @@ static int toi_compress_save_config_info(char *buffer)
  */
 static void toi_compress_load_config_info(char *buffer, int size)
 {
-	int len;
+	int len, offset = 0;
 
 	toi_compress_bytes_in = *((unsigned long *) buffer);
-	toi_compress_bytes_out = *((unsigned long *) (buffer + 1 *
-				sizeof(unsigned long)));
-	toi_expected_compression = *((unsigned long *) (buffer + 2 *
-				sizeof(unsigned long)));
-	len = *((unsigned long *) (buffer + 3 * sizeof(unsigned long)));
-	if (strncmp(toi_compressor_name, buffer + 4 * sizeof(unsigned long),
-				len))
-		strncpy(toi_compressor_name, buffer + 4 * sizeof(unsigned long),
-			len);
+	offset += sizeof(unsigned long);
+	toi_compress_bytes_out = *((unsigned long *) (buffer + offset));
+	offset += sizeof(unsigned long);
+	toi_expected_compression = *((int *) (buffer + offset));
+	offset += sizeof(int);
+	len = *((int *) (buffer + offset));
+	offset += sizeof(int);
+	strncpy(toi_compressor_name, buffer + offset, len);
 }
 
 static void toi_compress_pre_atomic_restore(struct toi_boot_kernel_data *bkd)
