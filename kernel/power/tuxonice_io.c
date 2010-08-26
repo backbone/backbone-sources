@@ -507,13 +507,15 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 	struct page *final_page = pfn_to_page(write_pfn),
 		    *copy_page = final_page;
 	char *virt, *buffer_virt;
+	int cpu = smp_processor_id();
 
-	if (io_pageset == 1 && !PagePageset1Copy(final_page)) {
+	if (io_pageset == 1 && (!pageset1_copy_map ||
+			!memory_bm_test_bit_index(pageset1_copy_map, write_pfn, cpu))) {
 		copy_page = copy_page_from_orig_page(final_page);
 		BUG_ON(!copy_page);
 	}
 
-	if (memory_bm_test_bit(io_map, write_pfn)) {
+	if (!memory_bm_test_bit_index(io_map, write_pfn, cpu)) {
 		int was_present;
 
 		virt = kmap(copy_page);
@@ -526,7 +528,7 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 			kernel_map_pages(copy_page, 1, 0);
 		kunmap(copy_page);
 		kunmap(buffer);
-		memory_bm_clear_bit(io_map, write_pfn);
+		memory_bm_clear_bit_index(io_map, write_pfn, cpu);
 	} else {
 		mutex_lock(&io_mutex);
 		atomic_inc(&io_count);
@@ -712,7 +714,8 @@ static int start_other_threads(void)
 static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 		int base, int barmax, int pageset)
 {
-	int index = 0, cpu, num_other_threads = 0, result = 0;
+	int index = 0, cpu, num_other_threads = 0, result = 0, flusher = 0;
+	int workers_started = 0;
 	unsigned long pfn;
 
 	if (!finish_at)
@@ -757,7 +760,6 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	memory_bm_position_reset(pageset1_map);
 
 	clear_toi_state(TOI_IO_STOPPED);
-	memory_bm_position_reset(io_map);
 
 	if (!test_action_state(TOI_NO_MULTITHREADED_IO) &&
 		(write || !toi_force_no_multithreaded))
@@ -766,9 +768,21 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	if (!num_other_threads || !toiActiveAllocator->io_flusher ||
 		test_action_state(TOI_NO_FLUSHER_THREAD)) {
 		atomic_inc(&toi_io_workers);
-		worker_rw_loop(num_other_threads ? NULL : MONITOR);
 	} else
+		flusher = 1;
+
+	workers_started = atomic_read(&toi_io_workers);
+
+	memory_bm_set_iterators(io_map, workers_started);
+	memory_bm_position_reset(io_map);
+
+	memory_bm_set_iterators(pageset1_copy_map, workers_started);
+	memory_bm_position_reset(pageset1_copy_map);
+
+	if (flusher)
 		result = toiActiveAllocator->io_flusher(write);
+	else
+		worker_rw_loop(num_other_threads ? NULL : MONITOR);
 
 	while (atomic_read(&toi_io_workers))
 		schedule();
