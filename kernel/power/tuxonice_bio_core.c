@@ -292,6 +292,8 @@ static void update_throughput_throttle(int jif_index)
 static int toi_finish_all_io(void)
 {
 	int result = toi_bio_queue_flush_pages(0);
+	toi_bio_queue_flusher_should_finish = 1;
+	wake_up(&toi_io_queue_flusher);
 	wait_event(num_in_progress_wait, !TOTAL_OUTSTANDING_IO);
 	return result;
 }
@@ -1025,13 +1027,15 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	 * Structure in the image:
 	 *	[destination pfn|page size|page data]
 	 * buf_size is PAGE_SIZE
+	 * We can validly find there's nothing to read in a multithreaded
+	 * situation.
 	 */
 	if (toi_rw_buffer(READ, (char *) &this_idx, sizeof(int), 0) ||
 	    toi_rw_buffer(READ, (char *) pfn, sizeof(unsigned long), 0) ||
 	    toi_rw_buffer(READ, (char *) buf_size, sizeof(int), 0) ||
 	    toi_rw_buffer(READ, buffer_virt, *buf_size, 0)) {
-		abort_hibernate(TOI_FAILED_IO, "Read of data failed.");
-		result = 1;
+		result = -ENODATA;
+		goto out_unlock;
 	}
 
 	if (reset_idx) {
@@ -1039,11 +1043,14 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 		reset_idx = 0;
 	} else {
 		page_idx++;
-		if (page_idx != this_idx)
+		if (!this_idx)
+			result = -ENODATA;
+		else if (page_idx != this_idx)
 			printk(KERN_ERR "Got page index %d, expected %d.\n",
 					this_idx, page_idx);
 	}
 
+out_unlock:
 	my_mutex_unlock(0, &toi_bio_mutex);
 out:
 	kunmap(buffer_page);
@@ -1072,7 +1079,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 
 	if (test_result_state(TOI_ABORTED)) {
 		my_mutex_unlock(1, &toi_bio_mutex);
-		return -EIO;
+		return 0;
 	}
 
 	buffer_virt = kmap(buffer_page);
