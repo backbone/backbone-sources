@@ -192,6 +192,10 @@ static int toi_compress_write_page(unsigned long index,
 	toi_compress_bytes_out += ctx->len;
 	mutex_unlock(&stats_lock);
 
+	toi_message(TOI_COMPRESS, TOI_VERBOSE, 0,
+			"CPU %d, index %lu: compressed %d bytes into %d.",
+			cpu, index, buf_size, ctx->len);
+
 	if (!ret && ctx->len < buf_size) { /* some compression */
 		memcpy(ctx->page_buffer, ctx->output_buffer, ctx->len);
 		return next_driver->write_page(index,
@@ -238,6 +242,11 @@ static int toi_compress_read_page(unsigned long *index,
 			ctx->transform,
 			ctx->page_buffer,
 			len, buffer_start, &outlen);
+
+	toi_message(TOI_COMPRESS, TOI_VERBOSE, 0,
+			"CPU %d, index %lu: decompressed %d bytes into %d (result %d).",
+			cpu, *index, len, outlen, ret);
+
 	if (ret)
 		abort_hibernate(TOI_FAILED_IO,
 			"Compress_read returned %d.\n", ret);

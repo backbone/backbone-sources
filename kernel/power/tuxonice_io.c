@@ -510,7 +510,7 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 	char *virt, *buffer_virt;
 	int was_present, cpu = smp_processor_id();
 
-	toi_message(TOI_IO, TOI_VERBOSE, 0, "Seeking to use pfn %ld.\n", write_pfn);
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "Seeking to use pfn %ld.", write_pfn);
 	if (io_pageset == 1 && (!pageset1_copy_map ||
 			!memory_bm_test_bit_index(pageset1_copy_map, write_pfn, cpu))) {
 		copy_page = copy_page_from_orig_page(final_page);
@@ -518,7 +518,7 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 	}
 
 	if (!memory_bm_test_bit_index(io_map, write_pfn, cpu)) {
-		toi_message(TOI_IO, TOI_VERBOSE, 0, "Ignoring read of pfn %ld.\n", write_pfn);
+		toi_message(TOI_IO, TOI_VERBOSE, 0, "Ignoring read of pfn %ld.", write_pfn);
 		return;
 	}
 
@@ -659,7 +659,7 @@ static int worker_rw_loop(void *data)
 		 */
 
 		mutex_lock(&io_mutex);
-		toi_message(TOI_IO, TOI_VERBOSE, 0, "%d pages still to read, %d workers running.\n",
+		toi_message(TOI_IO, TOI_VERBOSE, 0, "%d pages still to do, %d workers running.",
 				atomic_read(&io_count), atomic_read(&toi_io_workers));
 
 	} while (atomic_read(&io_count) >= atomic_read(&toi_io_workers) &&
