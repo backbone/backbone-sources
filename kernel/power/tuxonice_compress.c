@@ -168,16 +168,17 @@ static int toi_compress_rw_init(int rw, int stream_number)
  * 		modules, -ECHILD if we have a broken pipeline or -EIO if
  * 		zlib errs.
  */
-static int toi_compress_write_page(unsigned long index,
-		struct page *buffer_page, unsigned int buf_size)
+static int toi_compress_write_page(unsigned long index, int buf_type,
+		void *buffer_page, unsigned int buf_size)
 {
 	int ret, cpu = smp_processor_id();
 	struct cpu_context *ctx = &per_cpu(contexts, cpu);
 
 	if (!ctx->transform)
-		return next_driver->write_page(index, buffer_page, buf_size);
+		return next_driver->write_page(index, TOI_PAGE, buffer_page,
+				buf_size);
 
-	ctx->buffer_start = kmap(buffer_page);
+	ctx->buffer_start = TOI_MAP(buf_type, buffer_page);
 
 	ctx->len = PAGE_SIZE;
 
@@ -185,7 +186,7 @@ static int toi_compress_write_page(unsigned long index,
 			ctx->buffer_start, buf_size,
 			ctx->output_buffer, &ctx->len);
 
-	kunmap(buffer_page);
+	TOI_UNMAP(buf_type, buffer_page);
 
 	mutex_lock(&stats_lock);
 	toi_compress_bytes_in += buf_size;
@@ -196,13 +197,12 @@ static int toi_compress_write_page(unsigned long index,
 			"CPU %d, index %lu: compressed %d bytes into %d.",
 			cpu, index, buf_size, ctx->len);
 
-	if (!ret && ctx->len < buf_size) { /* some compression */
-		memcpy(ctx->page_buffer, ctx->output_buffer, ctx->len);
-		return next_driver->write_page(index,
-				virt_to_page(ctx->page_buffer),
-				ctx->len);
-	} else
-		return next_driver->write_page(index, buffer_page, buf_size);
+	if (!ret && ctx->len < buf_size) /* some compression */
+		return next_driver->write_page(index, TOI_VIRT,
+				ctx->output_buffer, ctx->len);
+	else
+		return next_driver->write_page(index, TOI_PAGE, buffer_page,
+				buf_size);
 }
 
 /*
@@ -213,8 +213,8 @@ static int toi_compress_write_page(unsigned long index,
  * is filled.
  * Zero if successful. Error condition from me or from downstream on failure.
  */
-static int toi_compress_read_page(unsigned long *index,
-		struct page *buffer_page, unsigned int *buf_size)
+static int toi_compress_read_page(unsigned long *index, int buf_type,
+		void *buffer_page, unsigned int *buf_size)
 {
 	int ret, cpu = smp_processor_id();
 	unsigned int len;
@@ -223,21 +223,24 @@ static int toi_compress_read_page(unsigned long *index,
 	struct cpu_context *ctx = &per_cpu(contexts, cpu);
 
 	if (!ctx->transform)
-		return next_driver->read_page(index, buffer_page, buf_size);
+		return next_driver->read_page(index, TOI_PAGE, buffer_page,
+				buf_size);
 
 	/*
 	 * All our reads must be synchronous - we can't decompress
 	 * data that hasn't been read yet.
 	 */
 
-	ret = next_driver->read_page(index, buffer_page, &len);
-
-	/* Error or uncompressed data */
-	if (ret || len == PAGE_SIZE)
-		return ret;
+	ret = next_driver->read_page(index, TOI_VIRT, ctx->page_buffer, &len);
 
 	buffer_start = kmap(buffer_page);
-	memcpy(ctx->page_buffer, buffer_start, len);
+
+	/* Error or uncompressed data */
+	if (ret || len == PAGE_SIZE) {
+		memcpy(buffer_start, ctx->page_buffer, len);
+		goto out;
+	}
+
 	ret = crypto_comp_decompress(
 			ctx->transform,
 			ctx->page_buffer,
@@ -259,7 +262,8 @@ static int toi_compress_read_page(unsigned long *index,
 		ret = -EIO;
 		*buf_size = outlen;
 	}
-	kunmap(buffer_page);
+out:
+	TOI_UNMAP(buf_type, buffer_page);
 	return ret;
 }
 

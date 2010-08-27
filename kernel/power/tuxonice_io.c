@@ -442,7 +442,8 @@ static int write_next_page(unsigned long *data_pfn, int *my_io_index,
 	if (io_pageset == 2 && tuxonice_calc_checksum(page, *my_checksum_locn))
 		return 1;
 
-	result = first_filter->write_page(*write_pfn, page, PAGE_SIZE);
+	result = first_filter->write_page(*write_pfn, TOI_PAGE, page,
+			PAGE_SIZE);
 
 	if (!was_present)
 		kernel_map_pages(page, 1, 0);
@@ -500,7 +501,7 @@ static int read_next_page(int *my_io_index, unsigned long *write_pfn,
 	 * See toi_bio_read_page in tuxonice_bio.c:
 	 * read the next page in the image.
 	 */
-	return first_filter->read_page(write_pfn, buffer, &buf_size);
+	return first_filter->read_page(write_pfn, TOI_PAGE, buffer, &buf_size);
 }
 
 static void use_read_page(unsigned long write_pfn, struct page *buffer)

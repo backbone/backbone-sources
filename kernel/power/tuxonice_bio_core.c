@@ -1000,12 +1000,12 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
  * Read a (possibly compressed) page from the image, into buffer_page,
  * returning its pfn and the buffer size.
  **/
-static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
-		unsigned int *buf_size)
+static int toi_bio_read_page(unsigned long *pfn, int buf_type,
+		void *buffer_page, unsigned int *buf_size)
 {
 	int result = 0;
 	int this_idx;
-	char *buffer_virt = kmap(buffer_page);
+	char *buffer_virt = TOI_MAP(buf_type, buffer_page);
 
 	/*
 	 * Only call start_new_readahead if we don't have a dedicated thread
@@ -1053,7 +1053,7 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 out_unlock:
 	my_mutex_unlock(0, &toi_bio_mutex);
 out:
-	kunmap(buffer_page);
+	TOI_UNMAP(buf_type, buffer_page);
 	return result;
 }
 
@@ -1066,8 +1066,8 @@ out:
  * Write a (possibly compressed) page to the image from the buffer, together
  * with it's index and buffer size.
  **/
-static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
-		unsigned int buf_size)
+static int toi_bio_write_page(unsigned long pfn, int buf_type,
+		void *buffer_page, unsigned int buf_size)
 {
 	char *buffer_virt;
 	int result = 0, result2 = 0;
@@ -1082,7 +1082,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 		return 0;
 	}
 
-	buffer_virt = kmap(buffer_page);
+	buffer_virt = TOI_MAP(buf_type, buffer_page);
 	page_idx++;
 
 	/*
@@ -1099,7 +1099,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 		result = -EIO;
 	}
 
-	kunmap(buffer_page);
+	TOI_UNMAP(buf_type, buffer_page);
 	my_mutex_unlock(1, &toi_bio_mutex);
 
 	if (current == toi_queue_flusher)
