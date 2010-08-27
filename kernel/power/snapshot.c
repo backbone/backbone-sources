@@ -588,6 +588,7 @@ int memory_bm_test_bit(struct memory_bitmap *bm, unsigned long pfn)
 {
 	return memory_bm_test_bit_index(bm, pfn, 0);
 }
+EXPORT_SYMBOL_GPL(memory_bm_test_bit);
 
 static bool memory_bm_pfn_present(struct memory_bitmap *bm, unsigned long pfn)
 {
