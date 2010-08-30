@@ -50,7 +50,7 @@ static struct uuid_info uuid_list[] = {
  { "vfat", "vfat", 0, 0, 1, "\353", 0x0, 0, 0 },
  { "vfat", "vfat", 0, 0, 1, "\351", 0x0, 0, 0 },
  { "vfat", "vfat", 0, 0x1fe, 2, "\125\252", 0x0, 0, 0 },
- { "xfs", "xfs", 0, 0, 4, "XFSB", 0x14, 0, 0 },
+ { "xfs", "xfs", 0, 0, 4, "XFSB", 0x20, 0, 0 },
  { "romfs", "romfs", 0, 0, 8, "-rom1fs-", 0x0, 0, 0 },
  { "bfs", "bfs", 0, 0, 4, "\316\372\173\033", 0, 0, 0 },
  { "cramfs", "cramfs", 0, 0, 4, "E=\315\050", 0x0, 0, 0 },
