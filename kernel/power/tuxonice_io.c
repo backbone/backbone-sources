@@ -637,14 +637,17 @@ static int worker_rw_loop(void *data)
 		if (!io_write && !PageResave(pfn_to_page(write_pfn)))
 			use_read_page(write_pfn, buffer);
 
-		if (my_io_index + io_base == io_nextupdate)
-			io_nextupdate = status_update(io_write, my_io_index +
-					io_base, jiffies - start_time);
+		if (data) {
+			if(my_io_index + io_base > io_nextupdate)
+				io_nextupdate = status_update(io_write,
+						my_io_index + io_base,
+						jiffies - start_time);
 
-		if (my_io_index == io_pc) {
-			printk(KERN_CONT "...%d%%", 20 * io_pc_step);
-			io_pc_step++;
-			io_pc = io_finish_at * io_pc_step / 5;
+			if (my_io_index > io_pc) {
+				printk(KERN_CONT "...%d%%", 20 * io_pc_step);
+				io_pc_step++;
+				io_pc = io_finish_at * io_pc_step / 5;
+			}
 		}
 
 		toi_cond_pause(0, NULL);
