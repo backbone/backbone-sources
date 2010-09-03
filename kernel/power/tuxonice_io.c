@@ -764,6 +764,8 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 
 	memory_bm_position_reset(pageset1_map);
 
+	mutex_lock(&io_mutex);
+
 	clear_toi_state(TOI_IO_STOPPED);
 
 	if (!test_action_state(TOI_NO_MULTITHREADED_IO) &&
@@ -783,6 +785,8 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 
 	memory_bm_set_iterators(pageset1_copy_map, workers_started);
 	memory_bm_position_reset(pageset1_copy_map);
+
+	mutex_unlock(&io_mutex);
 
 	if (flusher)
 		result = toiActiveAllocator->io_flusher(write);
