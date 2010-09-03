@@ -471,7 +471,7 @@ static int read_next_page(int *my_io_index, unsigned long *write_pfn,
 	unsigned long left = atomic_read(&io_count);
 
 	if (left)
-		*my_io_index = io_finish_at - atomic_read(&io_count);
+		*my_io_index = io_finish_at - left;
 
 	mutex_unlock(&io_mutex);
 
