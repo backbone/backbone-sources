@@ -607,7 +607,7 @@ static int worker_rw_loop(void *data)
 			if (result == -ENODATA) {
 				toi_message(TOI_IO, TOI_VERBOSE, 0,
 					"Thread %d has no more work.",
-					(int) data);
+					smp_processor_id());
 				break;
 			}
 
