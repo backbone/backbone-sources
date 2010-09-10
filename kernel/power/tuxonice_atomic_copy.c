@@ -330,6 +330,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 {
 	if (suspend_time && platform_begin(1)) {
 		set_abort_result(TOI_PLATFORM_PREP_FAILED);
+		toi_end_atomic(ATOMIC_STEP_PLATFORM_END, suspend_time, 3);
 		return 1;
 	}
 
@@ -389,6 +390,11 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		return 1;
 	}
 
+	if (!pm_check_wakeup_events()) {
+		set_abort_result(TOI_WAKEUP_EVENT);
+		toi_end_atomic(ATOMIC_STEP_SYSDEV_RESUME, suspend_time, 1);
+		return 1;
+	}
 	return 0;
 }
 
@@ -402,8 +408,11 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 {
 	switch (stage) {
 	case ATOMIC_ALL_STEPS:
-		if (!suspend_time)
+		if (!suspend_time) {
+			events_check_enabled = false;
 			platform_leave(1);
+		}
+	case ATOMIC_STEP_SYSDEV_RESUME:
 		sysdev_resume();
 	case ATOMIC_STEP_IRQS:
 		local_irq_enable();
@@ -422,6 +431,7 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 			((error & 1) ? PMSG_RECOVER : PMSG_THAW) :
 			PMSG_RESTORE);
 		resume_console();
+	case ATOMIC_STEP_PLATFORM_END:
 		platform_end(1);
 
 		toi_prepare_status(DONT_CLEAR_BAR, "Post atomic.");
