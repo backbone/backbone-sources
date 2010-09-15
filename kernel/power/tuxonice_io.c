@@ -437,7 +437,7 @@ static int write_next_page(unsigned long *data_pfn, int *my_io_index,
 		*my_checksum_locn = tuxonice_get_next_checksum();
 	}
 
-	toi_message(TOI_IO, TOI_VERBOSE, 0, "Write %ld.", *write_pfn);
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "Write %d:%ld.", *my_io_index, *write_pfn);
 
 	mutex_unlock(&io_mutex);
 
@@ -539,8 +539,7 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 	kunmap(copy_page);
 	kunmap(buffer);
 	memory_bm_clear_bit_index(io_map, write_pfn, cpu);
-	atomic_dec(&io_count);
-	toi_message(TOI_IO, TOI_VERBOSE, 0, "Read %ld", write_pfn);
+	toi_message(TOI_IO, TOI_VERBOSE, 0, "Read %d:%ld", idx, write_pfn);
 }
 
 static unsigned long status_update(int writing, unsigned long done,
