@@ -472,8 +472,11 @@ static int read_next_page(int *my_io_index, unsigned long *write_pfn,
 	unsigned int buf_size = PAGE_SIZE;
 	unsigned long left = atomic_read(&io_count);
 
-	if (left)
-		*my_io_index = io_finish_at - left;
+	if (!left)
+		return -ENODATA;
+
+	/* Start off assuming the page we read isn't resaved */
+	*my_io_index = io_finish_at - atomic_sub_return(1, &io_count);
 
 	mutex_unlock(&io_mutex);
 
@@ -496,9 +499,6 @@ static int read_next_page(int *my_io_index, unsigned long *write_pfn,
 			schedule();
 	}
 
-	if (!left)
-		return -ENODATA;
-
 	/*
 	 * See toi_bio_read_page in tuxonice_bio.c:
 	 * read the next page in the image.
@@ -512,6 +512,7 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 		    *copy_page = final_page;
 	char *virt, *buffer_virt;
 	int was_present, cpu = smp_processor_id();
+	unsigned long idx;
 
 	if (io_pageset == 1 && (!pageset1_copy_map ||
 			!memory_bm_test_bit_index(pageset1_copy_map, write_pfn, cpu))) {
@@ -521,6 +522,9 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 
 	if (!memory_bm_test_bit_index(io_map, write_pfn, cpu)) {
 		toi_message(TOI_IO, TOI_VERBOSE, 0, "Discard %ld.", write_pfn);
+		mutex_lock(&io_mutex);
+		idx = atomic_add_return(1, &io_count);
+		mutex_unlock(&io_mutex);
 		return;
 	}
 
@@ -636,8 +640,17 @@ static int worker_rw_loop(void *data)
 		 * Discard reads of resaved pages while reading ps2
 		 * and unwanted pages while rereading ps2 when aborting.
 		 */
-		if (!io_write && !PageResave(pfn_to_page(write_pfn)))
-			use_read_page(write_pfn, buffer);
+		if (!io_write) {
+			if (!PageResave(pfn_to_page(write_pfn)))
+				use_read_page(write_pfn, buffer);
+			else {
+				mutex_lock(&io_mutex);
+				toi_message(TOI_IO, TOI_VERBOSE, 0,
+						"Resaved %ld.", write_pfn);
+				atomic_inc(&io_count);
+				mutex_unlock(&io_mutex);
+			}
+		}
 
 		if (data) {
 			if(my_io_index + io_base > io_nextupdate)
