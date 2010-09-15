@@ -135,6 +135,7 @@ enum {
 	TOI_MEMORY,
 	TOI_PAGEDIR,
 	TOI_COMPRESS,
+	TOI_BIO,
 };
 
 #define set_debug_state(bit) (test_and_set_bit(bit, &toi_bkd.toi_debug_state))
