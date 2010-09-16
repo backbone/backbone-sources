@@ -177,7 +177,6 @@ static int toi_swap_initialise(int starting_cycle)
 		return 0;
 
 	enable_swapfile();
-	hibernation_freeze_swap();
 	return 0;
 }
 
@@ -186,7 +185,6 @@ static void toi_swap_cleanup(int ending_cycle)
 	if (!ending_cycle)
 		return;
 
-	hibernation_thaw_swap();
 	disable_swapfile();
 }
 
@@ -201,7 +199,7 @@ static void toi_swap_free_storage(struct toi_bdev_info *chain)
 
 	swap_allocated -= chain->allocations.size;
 	toi_extent_for_each(&chain->allocations, extentpointer, extentvalue)
-		swap_free_for_hibernation((swp_entry_t) { extentvalue });
+		swap_free((swp_entry_t) { extentvalue });
 
 	toi_put_extent_chain(&chain->allocations);
 }
@@ -211,7 +209,7 @@ static void free_swap_range(unsigned long min, unsigned long max)
 	int j;
 
 	for (j = min; j <= max; j++)
-		swap_free_for_hibernation((swp_entry_t) { j });
+		swap_free((swp_entry_t) { j });
 	swap_allocated -= (max - min + 1);
 }
 
@@ -234,7 +232,7 @@ static int toi_swap_allocate_storage(struct toi_bdev_info *chain,
 		swp_entry_t entry;
 		unsigned long new_value;
 
-		entry = get_swap_for_hibernation(chain->allocator_index);
+		entry = get_swap_page_of_type(chain->allocator_index);
 		if (!entry.val)
 			break;
 
@@ -259,7 +257,7 @@ static int toi_swap_allocate_storage(struct toi_bdev_info *chain,
 			printk(KERN_INFO "Failed to allocate extent for "
 					"%lu-%lu.\n", extent_min, extent_max);
 			free_swap_range(extent_min, extent_max);
-			swap_free_for_hibernation(entry);
+			swap_free(entry);
 			gotten -= (extent_max - extent_min);
 			/* Don't try to add again below */
 			to_add = 0;
