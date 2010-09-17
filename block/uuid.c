@@ -316,7 +316,7 @@ int part_matches_fs_info(struct hd_struct *part, struct fs_info *seek)
 	got = fs_info_from_block_dev(bdev);
 
 	if (got && !memcmp(got->uuid, seek->uuid, 16)) {
-		PRINTK(" Having matching UUID.\n");
+		PRINTK(" Have matching UUID.\n");
 		PRINTK(" Got: LMS %d, LM %p.\n", got->last_mount_size, got->last_mount);
 		PRINTK(" Seek: LMS %d, LM %p.\n", seek->last_mount_size, seek->last_mount);
 		result = 1;
