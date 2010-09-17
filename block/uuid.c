@@ -419,12 +419,17 @@ struct fs_info *fs_info_from_block_dev(struct block_device *bdev)
 			goto no_uuid;
 
 		if (!uuid_data || uuid_pg_num != last_uuid_pg_num) {
-			if (uuid_data_page)
-				__free_page(uuid_data_page);
-			uuid_data_page = read_bdev_page(bdev, uuid_pg_num);
-			if (!uuid_data_page)
-				continue;
-			uuid_data = page_address(uuid_data_page);
+			/* No need to reread the page from above */
+			if (uuid_pg_num == pg_num && uuid_data)
+				memcpy(uuid_data, data, PAGE_SIZE);
+			else {
+				if (uuid_data_page)
+					__free_page(uuid_data_page);
+				uuid_data_page = read_bdev_page(bdev, uuid_pg_num);
+				if (!uuid_data_page)
+					continue;
+				uuid_data = page_address(uuid_data_page);
+			}
 		}
 
 		last_uuid_pg_num = uuid_pg_num;
