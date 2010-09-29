@@ -29,8 +29,6 @@
 
 #define MAX_LINKS 32		
 
-struct net;
-
 struct sockaddr_nl {
 	sa_family_t	nl_family;	/* AF_NETLINK	*/
 	unsigned short	nl_pad;		/* zero		*/
@@ -152,6 +150,8 @@ struct nlattr {
 
 #include <linux/capability.h>
 #include <linux/skbuff.h>
+
+struct net;
 
 static inline struct nlmsghdr *nlmsg_hdr(const struct sk_buff *skb)
 {
