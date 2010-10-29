@@ -50,6 +50,7 @@
 #define N_V253		19	/* Codec control over voice modem */
 #define N_CAIF		20      /* CAIF protocol for talking to modems */
 #define N_GSM0710	21	/* GSM 0710 Mux */
+#define N_TI_WL	22	/* for TI's WL BT, FM, GPS combo chips */
 
 /*
  * This character is the same as _POSIX_VDISABLE: it cannot be used as
@@ -256,6 +257,7 @@ struct tty_operations;
 struct tty_struct {
 	int	magic;
 	struct kref kref;
+	struct device *dev;
 	struct tty_driver *driver;
 	const struct tty_operations *ops;
 	int index;
@@ -465,7 +467,7 @@ extern void proc_clear_tty(struct task_struct *p);
 extern struct tty_struct *get_current_tty(void);
 extern void tty_default_fops(struct file_operations *fops);
 extern struct tty_struct *alloc_tty_struct(void);
-extern void tty_add_file(struct tty_struct *tty, struct file *file);
+extern int tty_add_file(struct tty_struct *tty, struct file *file);
 extern void free_tty_struct(struct tty_struct *tty);
 extern void initialize_tty_struct(struct tty_struct *tty,
 		struct tty_driver *driver, int idx);

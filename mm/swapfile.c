@@ -30,6 +30,7 @@
 #include <linux/capability.h>
 #include <linux/syscalls.h>
 #include <linux/memcontrol.h>
+#include <linux/poll.h>
 
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
@@ -56,6 +57,10 @@ static struct swap_list_t swap_list = {-1, -1};
 static struct swap_info_struct *swap_info[MAX_SWAPFILES];
 
 static DEFINE_MUTEX(swapon_mutex);
+
+static DECLARE_WAIT_QUEUE_HEAD(proc_poll_wait);
+/* Activity counter to indicate that a swapon or swapoff has occurred */
+static atomic_t proc_poll_event = ATOMIC_INIT(0);
 
 static inline unsigned char swap_count(unsigned char ent)
 {
@@ -138,7 +143,7 @@ static int discard_swap(struct swap_info_struct *si)
 	nr_blocks = ((sector_t)se->nr_pages - 1) << (PAGE_SHIFT - 9);
 	if (nr_blocks) {
 		err = blkdev_issue_discard(si->bdev, start_block,
-				nr_blocks, GFP_KERNEL, BLKDEV_IFL_WAIT);
+				nr_blocks, GFP_KERNEL, 0);
 		if (err)
 			return err;
 		cond_resched();
@@ -149,7 +154,7 @@ static int discard_swap(struct swap_info_struct *si)
 		nr_blocks = (sector_t)se->nr_pages << (PAGE_SHIFT - 9);
 
 		err = blkdev_issue_discard(si->bdev, start_block,
-				nr_blocks, GFP_KERNEL, BLKDEV_IFL_WAIT);
+				nr_blocks, GFP_KERNEL, 0);
 		if (err)
 			break;
 
@@ -188,7 +193,7 @@ static void discard_swap_cluster(struct swap_info_struct *si,
 			start_block <<= PAGE_SHIFT - 9;
 			nr_blocks <<= PAGE_SHIFT - 9;
 			if (blkdev_issue_discard(si->bdev, start_block,
-				    nr_blocks, GFP_NOIO, BLKDEV_IFL_WAIT))
+				    nr_blocks, GFP_NOIO, 0))
 				break;
 		}
 
@@ -1683,6 +1688,8 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	}
 	filp_close(swap_file, NULL);
 	err = 0;
+	atomic_inc(&proc_poll_event);
+	wake_up_interruptible(&proc_poll_wait);
 
 out_dput:
 	filp_close(victim, NULL);
@@ -1692,6 +1699,25 @@ out:
 EXPORT_SYMBOL_GPL(sys_swapoff);
 
 #ifdef CONFIG_PROC_FS
+struct proc_swaps {
+	struct seq_file seq;
+	int event;
+};
+
+static unsigned swaps_poll(struct file *file, poll_table *wait)
+{
+	struct proc_swaps *s = file->private_data;
+
+	poll_wait(file, &proc_poll_wait, wait);
+
+	if (s->event != atomic_read(&proc_poll_event)) {
+		s->event = atomic_read(&proc_poll_event);
+		return POLLIN | POLLRDNORM | POLLERR | POLLPRI;
+	}
+
+	return POLLIN | POLLRDNORM;
+}
+
 /* iterator */
 static void *swap_start(struct seq_file *swap, loff_t *pos)
 {
@@ -1775,7 +1801,24 @@ static const struct seq_operations swaps_op = {
 
 static int swaps_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &swaps_op);
+	struct proc_swaps *s;
+	int ret;
+
+	s = kmalloc(sizeof(struct proc_swaps), GFP_KERNEL);
+	if (!s)
+		return -ENOMEM;
+
+	file->private_data = s;
+
+	ret = seq_open(file, &swaps_op);
+	if (ret) {
+		kfree(s);
+		return ret;
+	}
+
+	s->seq.private = s;
+	s->event = atomic_read(&proc_poll_event);
+	return ret;
 }
 
 static const struct file_operations proc_swaps_operations = {
@@ -1783,6 +1826,7 @@ static const struct file_operations proc_swaps_operations = {
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= seq_release,
+	.poll		= swaps_poll,
 };
 
 static int __init procswaps_init(void)
@@ -2088,6 +2132,9 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 		swap_info[prev]->next = type;
 	spin_unlock(&swap_lock);
 	mutex_unlock(&swapon_mutex);
+	atomic_inc(&proc_poll_event);
+	wake_up_interruptible(&proc_poll_wait);
+
 	error = 0;
 	goto out;
 bad_swap:

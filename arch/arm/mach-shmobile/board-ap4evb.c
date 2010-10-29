@@ -235,6 +235,18 @@ static struct platform_device smc911x_device = {
 	},
 };
 
+/*
+ * The card detect pin of the top SD/MMC slot (CN7) is active low and is
+ * connected to GPIO A22 of SH7372 (GPIO_PORT41).
+ */
+static int slot_cn7_get_cd(struct platform_device *pdev)
+{
+	if (gpio_is_valid(GPIO_PORT41))
+		return !gpio_get_value(GPIO_PORT41);
+	else
+		return -ENXIO;
+}
+
 /* SH_MMCIF */
 static struct resource sh_mmcif_resources[] = {
 	[0] = {
@@ -261,6 +273,7 @@ static struct sh_mmcif_plat_data sh_mmcif_plat = {
 	.caps		= MMC_CAP_4_BIT_DATA |
 			  MMC_CAP_8_BIT_DATA |
 			  MMC_CAP_NEEDS_POLL,
+	.get_cd		= slot_cn7_get_cd,
 };
 
 static struct platform_device sh_mmcif_device = {
@@ -310,6 +323,8 @@ static struct sh_mobile_sdhi_info sdhi1_info = {
 	.dma_slave_rx	= SHDMA_SLAVE_SDHI1_RX,
 	.tmio_ocr_mask	= MMC_VDD_165_195,
 	.tmio_flags	= TMIO_MMC_WRPROTECT_DISABLE,
+	.tmio_caps	= MMC_CAP_NEEDS_POLL,
+	.get_cd		= slot_cn7_get_cd,
 };
 
 static struct resource sdhi1_resources[] = {
@@ -948,6 +963,10 @@ static void __init ap4evb_init(void)
 	gpio_no_direction(GPIO_PORT9CR);  /* FSIAOBT needs no direction */
 	gpio_no_direction(GPIO_PORT10CR); /* FSIAOLR needs no direction */
 
+	/* card detect pin for MMC slot (CN7) */
+	gpio_request(GPIO_PORT41, NULL);
+	gpio_direction_input(GPIO_PORT41);
+
 	/* set SPU2 clock to 119.6 MHz */
 	clk = clk_get(NULL, "spu_clk");
 	if (!IS_ERR(clk)) {
@@ -1105,8 +1124,6 @@ static struct sys_timer ap4evb_timer = {
 };
 
 MACHINE_START(AP4EVB, "ap4evb")
-	.phys_io	= 0xe6000000,
-	.io_pg_offst	= ((0xe6000000) >> 18) & 0xfffc,
 	.map_io		= ap4evb_map_io,
 	.init_irq	= sh7372_init_irq,
 	.init_machine	= ap4evb_init,

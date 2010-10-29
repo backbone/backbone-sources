@@ -180,6 +180,7 @@ const struct file_operations pmem_fops = {
 	.mmap = pmem_mmap,
 	.open = pmem_open,
 	.unlocked_ioctl = pmem_ioctl,
+	.llseek = noop_llseek,
 };
 
 static int get_id(struct file *file)
@@ -1204,6 +1205,7 @@ static ssize_t debug_read(struct file *file, char __user *buf, size_t count,
 static struct file_operations debug_fops = {
 	.read = debug_read,
 	.open = debug_open,
+	.llseek = default_llseek,
 };
 #endif
 
@@ -1231,7 +1233,7 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 	pmem[id].ioctl = ioctl;
 	pmem[id].release = release;
 	init_rwsem(&pmem[id].bitmap_sem);
-	init_MUTEX(&pmem[id].data_list_sem);
+	sema_init(&pmem[id].data_list_sem, 1);
 	INIT_LIST_HEAD(&pmem[id].data_list);
 	pmem[id].dev.name = pdata->name;
 	pmem[id].dev.minor = id;

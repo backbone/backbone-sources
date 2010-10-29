@@ -1,6 +1,3 @@
-# x86 configuration
-mainmenu "Linux Kernel Configuration for x86"
-
 # Select 32 or 64 bit
 config 64BIT
 	bool "64-bit kernel" if ARCH = "x86"
@@ -28,6 +25,7 @@ config X86
 	select HAVE_IRQ_WORK
 	select HAVE_IOREMAP_PROT
 	select HAVE_KPROBES
+	select HAVE_MEMBLOCK
 	select ARCH_WANT_OPTIONAL_GPIOLIB
 	select ARCH_WANT_FRAME_POINTERS
 	select HAVE_DMA_ATTRS
@@ -201,9 +199,6 @@ config ARCH_SUPPORTS_OPTIMIZED_INLINING
 config ARCH_SUPPORTS_DEBUG_PAGEALLOC
 	def_bool y
 
-config HAVE_EARLY_RES
-	def_bool y
-
 config HAVE_INTEL_TXT
 	def_bool y
 	depends on EXPERIMENTAL && DMAR && ACPI
@@ -349,6 +344,7 @@ endif
 
 config X86_VSMP
 	bool "ScaleMP vSMP"
+	select PARAVIRT_GUEST
 	select PARAVIRT
 	depends on X86_64 && PCI
 	depends on X86_EXTENDED_PLATFORM
@@ -548,16 +544,7 @@ config PARAVIRT_DEBUG
 	  a paravirt_op is missing when it is called.
 
 config NO_BOOTMEM
-	default y
-	bool "Disable Bootmem code"
-	---help---
-	  Use early_res directly instead of bootmem before slab is ready.
-		- allocator (buddy) [generic]
-		- early allocator (bootmem) [generic]
-		- very early allocator (reserve_early*()) [x86]
-		- very very early allocator (early brk model) [x86]
-	  So reduce one layer between early allocator to final allocator
-
+	def_bool y
 
 config MEMTEST
 	bool "Memtest"
@@ -1905,6 +1892,11 @@ config PCI_MMCONFIG
 config PCI_OLPC
 	def_bool y
 	depends on PCI && OLPC && (PCI_GOOLPC || PCI_GOANY)
+
+config PCI_XEN
+	def_bool y
+	depends on PCI && XEN
+	select SWIOTLB_XEN
 
 config PCI_DOMAINS
 	def_bool y

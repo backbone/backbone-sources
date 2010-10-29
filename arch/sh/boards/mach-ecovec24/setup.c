@@ -620,7 +620,6 @@ static struct soc_camera_link tw9910_link = {
 	.bus_id		= 1,
 	.power		= tw9910_power,
 	.board_info	= &i2c_camera[0],
-	.module_name	= "tw9910",
 	.priv		= &tw9910_info,
 };
 
@@ -644,7 +643,6 @@ static struct soc_camera_link mt9t112_link1 = {
 	.power		= mt9t112_power1,
 	.bus_id		= 0,
 	.board_info	= &i2c_camera[1],
-	.module_name	= "mt9t112",
 	.priv		= &mt9t112_info1,
 };
 
@@ -667,7 +665,6 @@ static struct soc_camera_link mt9t112_link2 = {
 	.power		= mt9t112_power2,
 	.bus_id		= 1,
 	.board_info	= &i2c_camera[2],
-	.module_name	= "mt9t112",
 	.priv		= &mt9t112_info2,
 };
 
@@ -793,7 +790,6 @@ static struct sh_vou_pdata sh_vou_pdata = {
 	.flags		= SH_VOU_HSYNC_LOW | SH_VOU_VSYNC_LOW,
 	.board_info	= &ak8813,
 	.i2c_adap	= 0,
-	.module_name	= "ak881x",
 };
 
 static struct resource sh_vou_resources[] = {
@@ -1248,14 +1244,14 @@ static int __init arch_setup(void)
 
 	/* set SPU2 clock to 83.4 MHz */
 	clk = clk_get(NULL, "spu_clk");
-	if (clk) {
+	if (!IS_ERR(clk)) {
 		clk_set_rate(clk, clk_round_rate(clk, 83333333));
 		clk_put(clk);
 	}
 
 	/* change parent of FSI B */
 	clk = clk_get(NULL, "fsib_clk");
-	if (clk) {
+	if (!IS_ERR(clk)) {
 		clk_register(&fsimckb_clk);
 		clk_set_parent(clk, &fsimckb_clk);
 		clk_set_rate(clk, 11000);
@@ -1273,7 +1269,7 @@ static int __init arch_setup(void)
 
 	/* set VPU clock to 166 MHz */
 	clk = clk_get(NULL, "vpu_clk");
-	if (clk) {
+	if (!IS_ERR(clk)) {
 		clk_set_rate(clk, clk_round_rate(clk, 166000000));
 		clk_put(clk);
 	}

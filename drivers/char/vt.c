@@ -4183,6 +4183,11 @@ void vcs_scr_writew(struct vc_data *vc, u16 val, u16 *org)
 	}
 }
 
+void vcs_scr_updated(struct vc_data *vc)
+{
+	notify_update(vc);
+}
+
 /*
  *	Visible symbols for modules
  */

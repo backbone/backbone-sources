@@ -255,7 +255,7 @@ int simple_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	inc_nlink(inode);
-	atomic_inc(&inode->i_count);
+	ihold(inode);
 	dget(dentry);
 	d_instantiate(dentry, inode);
 	return 0;
@@ -892,10 +892,6 @@ EXPORT_SYMBOL_GPL(generic_fh_to_parent);
  */
 int generic_file_fsync(struct file *file, int datasync)
 {
-	struct writeback_control wbc = {
-		.sync_mode = WB_SYNC_ALL,
-		.nr_to_write = 0, /* metadata-only; caller takes care of data */
-	};
 	struct inode *inode = file->f_mapping->host;
 	int err;
 	int ret;
@@ -906,12 +902,41 @@ int generic_file_fsync(struct file *file, int datasync)
 	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))
 		return ret;
 
-	err = sync_inode(inode, &wbc);
+	err = sync_inode_metadata(inode, 1);
 	if (ret == 0)
 		ret = err;
 	return ret;
 }
 EXPORT_SYMBOL(generic_file_fsync);
+
+/**
+ * generic_check_addressable - Check addressability of file system
+ * @blocksize_bits:	log of file system block size
+ * @num_blocks:		number of blocks in file system
+ *
+ * Determine whether a file system with @num_blocks blocks (and a
+ * block size of 2**@blocksize_bits) is addressable by the sector_t
+ * and page cache of the system.  Return 0 if so and -EFBIG otherwise.
+ */
+int generic_check_addressable(unsigned blocksize_bits, u64 num_blocks)
+{
+	u64 last_fs_block = num_blocks - 1;
+	u64 last_fs_page =
+		last_fs_block >> (PAGE_CACHE_SHIFT - blocksize_bits);
+
+	if (unlikely(num_blocks == 0))
+		return 0;
+
+	if ((blocksize_bits < 9) || (blocksize_bits > PAGE_CACHE_SHIFT))
+		return -EINVAL;
+
+	if ((last_fs_block > (sector_t)(~0ULL) >> (blocksize_bits - 9)) ||
+	    (last_fs_page > (pgoff_t)(~0ULL))) {
+		return -EFBIG;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(generic_check_addressable);
 
 /*
  * No-op implementation of ->fsync for in-memory filesystems.

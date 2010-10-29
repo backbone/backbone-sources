@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/kmemleak.h>
 #include <linux/range.h>
+#include <linux/memblock.h>
 
 #include <asm/bug.h>
 #include <asm/io.h>
@@ -435,7 +436,8 @@ void __init free_bootmem_node(pg_data_t *pgdat, unsigned long physaddr,
 			      unsigned long size)
 {
 #ifdef CONFIG_NO_BOOTMEM
-	free_early(physaddr, physaddr + size);
+	kmemleak_free_part(__va(physaddr), size);
+	memblock_x86_free_range(physaddr, physaddr + size);
 #else
 	unsigned long start, end;
 
@@ -460,7 +462,8 @@ void __init free_bootmem_node(pg_data_t *pgdat, unsigned long physaddr,
 void __init free_bootmem(unsigned long addr, unsigned long size)
 {
 #ifdef CONFIG_NO_BOOTMEM
-	free_early(addr, addr + size);
+	kmemleak_free_part(__va(addr), size);
+	memblock_x86_free_range(addr, addr + size);
 #else
 	unsigned long start, end;
 
@@ -527,6 +530,12 @@ int __init reserve_bootmem(unsigned long addr, unsigned long size,
 }
 
 #ifndef CONFIG_NO_BOOTMEM
+int __weak __init reserve_bootmem_generic(unsigned long phys, unsigned long len,
+				   int flags)
+{
+	return reserve_bootmem(phys, len, flags);
+}
+
 static unsigned long __init align_idx(struct bootmem_data *bdata,
 				      unsigned long idx, unsigned long step)
 {
