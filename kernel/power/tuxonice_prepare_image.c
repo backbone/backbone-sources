@@ -331,10 +331,7 @@ static int toi_allocate_extra_pagedir_memory(int extra_pages_needed)
 
 		extras_entry->page = newpage;
 		extras_entry->order = order;
-		extras_entry->next = NULL;
-
-		if (extras_list)
-			extras_entry->next = extras_list;
+		extras_entry->next = extras_list;
 
 		extras_list = extras_entry;
 
