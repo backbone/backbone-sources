@@ -115,6 +115,7 @@ void pm_restore_gfp_mask(void)
 		saved_gfp_mask = 0;
 	}
 }
+EXPORT_SYMBOL_GPL(pm_restore_gfp_mask);
 
 void pm_restrict_gfp_mask(void)
 {
@@ -123,6 +124,7 @@ void pm_restrict_gfp_mask(void)
 	saved_gfp_mask = gfp_allowed_mask;
 	gfp_allowed_mask &= ~GFP_IOFS;
 }
+EXPORT_SYMBOL_GPL(pm_restrict_gfp_mask);
 #endif /* CONFIG_PM_SLEEP */
 
 #ifdef CONFIG_HUGETLB_PAGE_SIZE_VARIABLE

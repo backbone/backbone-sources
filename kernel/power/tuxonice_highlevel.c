@@ -154,6 +154,7 @@ void toi_finish_anything(int hibernate_or_resume)
 	toi_put_modules();
 	if (hibernate_or_resume) {
 		block_dump = block_dump_save;
+		pm_restore_gfp_mask();
 		set_cpus_allowed_ptr(current, cpu_all_mask);
 		toi_alloc_print_debug_stats();
 		atomic_inc(&snapshot_device_available);
@@ -184,6 +185,8 @@ int toi_start_anything(int hibernate_or_resume)
 
 		if (!atomic_add_unless(&snapshot_device_available, -1, 0))
 			goto snapshotdevice_unavailable;
+
+		pm_restrict_gfp_mask();
 	}
 
 	if (hibernate_or_resume == SYSFS_HIBERNATE)
@@ -218,8 +221,10 @@ early_init_err:
 	}
 	toi_put_modules();
 prehibernate_err:
-	if (hibernate_or_resume)
+	if (hibernate_or_resume) {
+		pm_restore_gfp_mask();
 		atomic_inc(&snapshot_device_available);
+	}
 snapshotdevice_unavailable:
 	if (hibernate_or_resume)
 		mutex_unlock(&pm_mutex);
