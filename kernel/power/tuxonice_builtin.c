@@ -27,6 +27,7 @@
 #include "tuxonice_modules.h"
 #include "tuxonice_builtin.h"
 #include "tuxonice_power_off.h"
+#include "tuxonice_alloc.h"
 
 unsigned long toi_bootflags_mask;
 EXPORT_SYMBOL_GPL(toi_bootflags_mask);
@@ -300,6 +301,9 @@ EXPORT_SYMBOL_GPL(toi_in_hibernate);
 __nosavedata struct pbe *restore_highmem_pblist;
 EXPORT_SYMBOL_GPL(restore_highmem_pblist);
 
+int toi_trace_allocs;
+EXPORT_SYMBOL_GPL(toi_trace_allocs);
+
 void toi_read_lock_tasklist(void)
 {
 	read_lock(&tasklist_lock);
@@ -356,6 +360,19 @@ static int __init toi_pause_setup(char *str)
 }
 
 __setup("toi_pause", toi_pause_setup);
+
+#ifdef CONFIG_PM_DEBUG
+static int __init toi_trace_allocs_setup(char *str)
+{
+	int value;
+
+	if (sscanf(str, "=%d", &value))
+		toi_trace_allocs = value;
+
+	return 1;
+}
+__setup("toi_trace_allocs", toi_trace_allocs_setup);
+#endif
 
 static int __init toi_ignore_late_initcall_setup(char *str)
 {

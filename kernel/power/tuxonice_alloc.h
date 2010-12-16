@@ -50,3 +50,5 @@ static inline void toi_alloc_exit(void) { }
 static inline void toi_alloc_print_debug_stats(void) { }
 
 #endif
+
+extern int toi_trace_allocs;
