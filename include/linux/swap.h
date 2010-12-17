@@ -347,6 +347,8 @@ extern struct swap_info_struct *get_swap_info_struct(unsigned);
 extern int reuse_swap_page(struct page *);
 extern int try_to_free_swap(struct page *);
 struct backing_dev_info;
+extern void get_swap_range_of_type(int type, swp_entry_t *start,
+		swp_entry_t *end, unsigned int limit);
 
 /* linux/mm/thrash.c */
 extern struct mm_struct *swap_token_mm;

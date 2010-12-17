@@ -220,62 +220,29 @@ static void free_swap_range(unsigned long min, unsigned long max)
 static int toi_swap_allocate_storage(struct toi_bdev_info *chain,
 		unsigned long request)
 {
-	int to_add = 0;
 	unsigned long gotten = 0;
-	unsigned long extent_min = 0, extent_max = 0;
 
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "  Swap allocate storage: Asked to"
 			" allocate %lu pages from device %d.", request,
 			chain->allocator_index);
 
 	while (gotten < request) {
-		swp_entry_t entry;
-		unsigned long new_value;
-
-		entry = get_swap_page_of_type(chain->allocator_index);
-		if (!entry.val)
+		swp_entry_t start, end;
+		get_swap_range_of_type(chain->allocator_index, &start, &end,
+				request - gotten + 1);
+		if (start.val) {
+			int added = end.val - start.val + 1;
+			if (toi_add_to_extent_chain(&chain->allocations,
+						start.val, end.val)) {
+				printk(KERN_INFO "Failed to allocate extent for "
+					"%lu-%lu.\n", start.val, end.val);
+				free_swap_range(start.val, end.val);
+				break;
+			}
+			gotten += added;
+			swap_allocated += added;
+		} else
 			break;
-
-		swap_allocated++;
-		new_value = entry.val;
-		gotten++;
-
-		if (!to_add) {
-			to_add = 1;
-			extent_min = new_value;
-			extent_max = new_value;
-			continue;
-		}
-
-		if (new_value == extent_max + 1) {
-			extent_max++;
-			continue;
-		}
-
-		if (toi_add_to_extent_chain(&chain->allocations, extent_min,
-					extent_max)) {
-			printk(KERN_INFO "Failed to allocate extent for "
-					"%lu-%lu.\n", extent_min, extent_max);
-			free_swap_range(extent_min, extent_max);
-			swap_free(entry);
-			gotten -= (extent_max - extent_min);
-			/* Don't try to add again below */
-			to_add = 0;
-			break;
-		}
-
-		extent_min = new_value;
-		extent_max = new_value;
-	}
-
-	if (to_add) {
-		int this_result = toi_add_to_extent_chain(&chain->allocations,
-				extent_min, extent_max);
-
-		if (this_result) {
-			free_swap_range(extent_min, extent_max);
-			gotten -= (extent_max - extent_min + 1);
-		}
 	}
 
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "  Allocated %lu pages.", gotten);
