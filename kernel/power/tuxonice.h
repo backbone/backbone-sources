@@ -68,6 +68,7 @@ enum {
 	TOI_NO_FLUSHER_THREAD,
 	TOI_NO_PS2_IF_UNNEEDED,
 	TOI_POST_RESUME_BREAKPOINT,
+	TOI_NO_READAHEAD,
 };
 
 extern unsigned long toi_bootflags_mask;

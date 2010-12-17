@@ -1244,6 +1244,8 @@ static struct toi_sysfs_data sysfs_params[] = {
 	SYSFS_BIT("post_resume_breakpoint", SYSFS_RW, &toi_bkd.toi_action,
 			TOI_POST_RESUME_BREAKPOINT, 0),
 #endif
+	SYSFS_BIT("no_readahead", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_NO_READAHEAD, 0),
 #ifdef CONFIG_TOI_KEEP_IMAGE
 	SYSFS_BIT("keep_image", SYSFS_RW , &toi_bkd.toi_action, TOI_KEEP_IMAGE,
 			0),

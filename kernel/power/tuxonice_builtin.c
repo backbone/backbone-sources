@@ -416,3 +416,17 @@ static int __init toi_post_resume_breakpoint_setup(char *str)
 
 __setup("toi_post_resume_break", toi_post_resume_breakpoint_setup);
 #endif
+
+static int __init toi_disable_readahead_setup(char *str)
+{
+	int value;
+
+	toi_bkd.toi_action &= ~(1 << TOI_NO_READAHEAD);
+	toi_bootflags_mask |= (1 << TOI_NO_READAHEAD);
+	if (sscanf(str, "=%d", &value) && value)
+		toi_bkd.toi_action |= (1 << TOI_NO_READAHEAD);
+
+	return 1;
+}
+
+__setup("toi_no_readahead", toi_disable_readahead_setup);

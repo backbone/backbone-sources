@@ -1011,7 +1011,8 @@ static int toi_bio_read_page(unsigned long *pfn, int buf_type,
 	 * Only call start_new_readahead if we don't have a dedicated thread
 	 * and we're the queue flusher.
 	 */
-	if (current == toi_queue_flusher && more_readahead) {
+	if (current == toi_queue_flusher && more_readahead &&
+			!test_action_state(TOI_NO_READAHEAD)) {
 		int result2 = toi_start_new_readahead(0);
 		if (result2) {
 			printk(KERN_DEBUG "Queue flusher and "
