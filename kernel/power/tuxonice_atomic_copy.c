@@ -227,6 +227,12 @@ int __toi_post_context_save(void)
 		printk(KERN_INFO "However it looks like there's enough"
 			" free ram and storage to handle this, so "
 			" continuing anyway.");
+		/* 
+		 * What if try_allocate_extra_memory above calls
+		 * toi_allocate_extra_pagedir_memory and it allocs a new
+		 * slab page via toi_kzalloc which should be in ps1? So...
+		 */
+		toi_recalculate_image_contents(1);
 	}
 
 	if (!test_action_state(TOI_TEST_FILTER_SPEED) &&
