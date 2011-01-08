@@ -158,8 +158,12 @@ u64 fuse_get_attr_version(struct fuse_conn *fc)
  */
 static int fuse_dentry_revalidate(struct dentry *entry, struct nameidata *nd)
 {
-	struct inode *inode = entry->d_inode;
+	struct inode *inode;
 
+	if (nd->flags & LOOKUP_RCU)
+		return -ECHILD;
+
+	inode = entry->d_inode;
 	if (inode && is_bad_inode(inode))
 		return 0;
 	else if (fuse_dentry_time(entry) < get_jiffies_64()) {
@@ -356,7 +360,7 @@ static struct dentry *fuse_lookup(struct inode *dir, struct dentry *entry,
 	}
 
 	entry = newent ? newent : entry;
-	entry->d_op = &fuse_dentry_operations;
+	d_set_d_op(entry, &fuse_dentry_operations);
 	if (outarg_valid)
 		fuse_change_entry_timeout(entry, &outarg);
 	else
@@ -1010,11 +1014,14 @@ static int fuse_access(struct inode *inode, int mask)
  * access request is sent.  Execute permission is still checked
  * locally based on file mode.
  */
-static int fuse_permission(struct inode *inode, int mask)
+static int fuse_permission(struct inode *inode, int mask, unsigned int flags)
 {
 	struct fuse_conn *fc = get_fuse_conn(inode);
 	bool refreshed = false;
 	int err = 0;
+
+	if (flags & IPERM_FLAG_RCU)
+		return -ECHILD;
 
 	if (!fuse_allow_task(fc, current))
 		return -EACCES;
@@ -1030,7 +1037,7 @@ static int fuse_permission(struct inode *inode, int mask)
 	}
 
 	if (fc->flags & FUSE_DEFAULT_PERMISSIONS) {
-		err = generic_permission(inode, mask, NULL);
+		err = generic_permission(inode, mask, flags, NULL);
 
 		/* If permission is denied, try to refresh file
 		   attributes.  This is also needed, because the root
@@ -1038,7 +1045,8 @@ static int fuse_permission(struct inode *inode, int mask)
 		if (err == -EACCES && !refreshed) {
 			err = fuse_do_getattr(inode, NULL, NULL);
 			if (!err)
-				err = generic_permission(inode, mask, NULL);
+				err = generic_permission(inode, mask,
+							flags, NULL);
 		}
 
 		/* Note: the opposite of the above test does not
