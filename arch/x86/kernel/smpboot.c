@@ -97,12 +97,12 @@ static DEFINE_PER_CPU(struct task_struct *, idle_thread_array);
  */
 static DEFINE_MUTEX(x86_cpu_hotplug_driver_mutex);
 
-void cpu_hotplug_driver_lock()
+void cpu_hotplug_driver_lock(void)
 {
         mutex_lock(&x86_cpu_hotplug_driver_mutex);
 }
 
-void cpu_hotplug_driver_unlock()
+void cpu_hotplug_driver_unlock(void)
 {
         mutex_unlock(&x86_cpu_hotplug_driver_mutex);
 }
@@ -427,7 +427,7 @@ void __cpuinit set_cpu_sibling_map(int cpu)
 
 	cpumask_set_cpu(cpu, c->llc_shared_map);
 
-	if (current_cpu_data.x86_max_cores == 1) {
+	if (__this_cpu_read(cpu_info.x86_max_cores) == 1) {
 		cpumask_copy(cpu_core_mask(cpu), cpu_sibling_mask(cpu));
 		c->booted_cores = 1;
 		return;
@@ -638,7 +638,7 @@ wakeup_secondary_cpu_via_init(int phys_apicid, unsigned long start_eip)
 	 * target processor state.
 	 */
 	startup_ipi_hook(phys_apicid, (unsigned long) start_secondary,
-			 (unsigned long)stack_start.sp);
+			 stack_start);
 
 	/*
 	 * Run STARTUP IPI loop.
@@ -785,7 +785,7 @@ do_rest:
 #endif
 	early_gdt_descr.address = (unsigned long)get_cpu_gdt_table(cpu);
 	initial_code = (unsigned long)start_secondary;
-	stack_start.sp = (void *) c_idle.idle->thread.sp;
+	stack_start  = c_idle.idle->thread.sp;
 
 	/* start_ip had better be page-aligned! */
 	start_ip = setup_trampoline();
@@ -1089,7 +1089,7 @@ void __init native_smp_prepare_cpus(unsigned int max_cpus)
 
 	preempt_disable();
 	smp_cpu_index_default();
-	current_cpu_data = boot_cpu_data;
+	memcpy(__this_cpu_ptr(&cpu_info), &boot_cpu_data, sizeof(cpu_info));
 	cpumask_copy(cpu_callin_mask, cpumask_of(0));
 	mb();
 	/*
@@ -1383,7 +1383,7 @@ void play_dead_common(void)
 
 	mb();
 	/* Ack it */
-	__get_cpu_var(cpu_state) = CPU_DEAD;
+	__this_cpu_write(cpu_state, CPU_DEAD);
 
 	/*
 	 * With physical CPU hotplug, we should halt the cpu
@@ -1402,12 +1402,13 @@ static inline void mwait_play_dead(void)
 	unsigned int highest_subcstate = 0;
 	int i;
 	void *mwait_ptr;
+	struct cpuinfo_x86 *c = __this_cpu_ptr(&cpu_info);
 
-	if (!cpu_has(&current_cpu_data, X86_FEATURE_MWAIT))
+	if (!(cpu_has(c, X86_FEATURE_MWAIT) && mwait_usable(c)))
 		return;
-	if (!cpu_has(&current_cpu_data, X86_FEATURE_CLFLSH))
+	if (!cpu_has(__this_cpu_ptr(&cpu_info), X86_FEATURE_CLFLSH))
 		return;
-	if (current_cpu_data.cpuid_level < CPUID_MWAIT_LEAF)
+	if (__this_cpu_read(cpu_info.cpuid_level) < CPUID_MWAIT_LEAF)
 		return;
 
 	eax = CPUID_MWAIT_LEAF;
@@ -1458,7 +1459,7 @@ static inline void mwait_play_dead(void)
 
 static inline void hlt_play_dead(void)
 {
-	if (current_cpu_data.x86 >= 4)
+	if (__this_cpu_read(cpu_info.x86) >= 4)
 		wbinvd();
 
 	while (1) {

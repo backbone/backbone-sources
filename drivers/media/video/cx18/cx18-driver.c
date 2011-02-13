@@ -267,8 +267,14 @@ static void request_modules(struct cx18 *dev)
 	INIT_WORK(&dev->request_module_wk, request_module_async);
 	schedule_work(&dev->request_module_wk);
 }
+
+static void flush_request_modules(struct cx18 *dev)
+{
+	flush_work_sync(&dev->request_module_wk);
+}
 #else
 #define request_modules(dev)
+#define flush_request_modules(dev)
 #endif /* CONFIG_MODULES */
 
 /* Generic utility functions */
@@ -658,21 +664,9 @@ static int __devinit cx18_create_in_workq(struct cx18 *cx)
 {
 	snprintf(cx->in_workq_name, sizeof(cx->in_workq_name), "%s-in",
 		 cx->v4l2_dev.name);
-	cx->in_work_queue = create_singlethread_workqueue(cx->in_workq_name);
+	cx->in_work_queue = alloc_ordered_workqueue(cx->in_workq_name, 0);
 	if (cx->in_work_queue == NULL) {
 		CX18_ERR("Unable to create incoming mailbox handler thread\n");
-		return -ENOMEM;
-	}
-	return 0;
-}
-
-static int __devinit cx18_create_out_workq(struct cx18 *cx)
-{
-	snprintf(cx->out_workq_name, sizeof(cx->out_workq_name), "%s-out",
-		 cx->v4l2_dev.name);
-	cx->out_work_queue = create_workqueue(cx->out_workq_name);
-	if (cx->out_work_queue == NULL) {
-		CX18_ERR("Unable to create outgoing mailbox handler threads\n");
 		return -ENOMEM;
 	}
 	return 0;
@@ -704,15 +698,9 @@ static int __devinit cx18_init_struct1(struct cx18 *cx)
 	mutex_init(&cx->epu2apu_mb_lock);
 	mutex_init(&cx->epu2cpu_mb_lock);
 
-	ret = cx18_create_out_workq(cx);
+	ret = cx18_create_in_workq(cx);
 	if (ret)
 		return ret;
-
-	ret = cx18_create_in_workq(cx);
-	if (ret) {
-		destroy_workqueue(cx->out_work_queue);
-		return ret;
-	}
 
 	cx18_init_in_work_orders(cx);
 
@@ -1101,7 +1089,6 @@ free_mem:
 	release_mem_region(cx->base_addr, CX18_MEM_SIZE);
 free_workqueues:
 	destroy_workqueue(cx->in_work_queue);
-	destroy_workqueue(cx->out_work_queue);
 err:
 	if (retval == 0)
 		retval = -ENODEV;
@@ -1233,6 +1220,8 @@ static void cx18_remove(struct pci_dev *pci_dev)
 
 	CX18_DEBUG_INFO("Removing Card\n");
 
+	flush_request_modules(cx);
+
 	/* Stop all captures */
 	CX18_DEBUG_INFO("Stopping all streams\n");
 	if (atomic_read(&cx->tot_capturing) > 0)
@@ -1251,7 +1240,6 @@ static void cx18_remove(struct pci_dev *pci_dev)
 	cx18_halt_firmware(cx);
 
 	destroy_workqueue(cx->in_work_queue);
-	destroy_workqueue(cx->out_work_queue);
 
 	cx18_streams_cleanup(cx, 1);
 

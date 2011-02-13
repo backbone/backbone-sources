@@ -1058,8 +1058,7 @@ static inline void security_free_mnt_opts(struct security_mnt_opts *opts)
  *	@cred points to the credentials to provide the context against which to
  *	evaluate the security data on the key.
  *	@perm describes the combination of permissions required of this key.
- *	Return 1 if permission granted, 0 if permission denied and -ve it the
- *	normal permissions model should be effected.
+ *	Return 0 if permission is granted, -ve error otherwise.
  * @key_getsecurity:
  *	Get a textual representation of the security context attached to a key
  *	for the purposes of honouring KEYCTL_GETSECURITY.  This function
@@ -1663,7 +1662,7 @@ int security_capset(struct cred *new, const struct cred *old,
 		    const kernel_cap_t *effective,
 		    const kernel_cap_t *inheritable,
 		    const kernel_cap_t *permitted);
-int security_capable(int cap);
+int security_capable(const struct cred *cred, int cap);
 int security_real_capable(struct task_struct *tsk, int cap);
 int security_real_capable_noaudit(struct task_struct *tsk, int cap);
 int security_sysctl(struct ctl_table *table, int op);
@@ -1857,9 +1856,9 @@ static inline int security_capset(struct cred *new,
 	return cap_capset(new, old, effective, inheritable, permitted);
 }
 
-static inline int security_capable(int cap)
+static inline int security_capable(const struct cred *cred, int cap)
 {
-	return cap_capable(current, current_cred(), cap, SECURITY_CAP_AUDIT);
+	return cap_capable(current, cred, cap, SECURITY_CAP_AUDIT);
 }
 
 static inline int security_real_capable(struct task_struct *tsk, int cap)

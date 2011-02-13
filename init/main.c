@@ -96,6 +96,15 @@ static inline void mark_rodata_ro(void) { }
 extern void tc_init(void);
 #endif
 
+/*
+ * Debug helper: via this flag we know that we are in 'early bootup code'
+ * where only the boot processor is running with IRQ disabled.  This means
+ * two things - IRQ must not be enabled before the flag is cleared and some
+ * operations which are not allowed with IRQ disabled are allowed while the
+ * flag is set.
+ */
+bool early_boot_irqs_disabled __read_mostly;
+
 enum system_states system_state __read_mostly;
 EXPORT_SYMBOL(system_state);
 
@@ -555,7 +564,7 @@ asmlinkage void __init start_kernel(void)
 	cgroup_init_early();
 
 	local_irq_disable();
-	early_boot_irqs_off();
+	early_boot_irqs_disabled = true;
 
 /*
  * Interrupts are still disabled. Do necessary setups, then
@@ -622,7 +631,7 @@ asmlinkage void __init start_kernel(void)
 	if (!irqs_disabled())
 		printk(KERN_CRIT "start_kernel(): bug: interrupts were "
 				 "enabled early\n");
-	early_boot_irqs_on();
+	early_boot_irqs_disabled = false;
 	local_irq_enable();
 
 	/* Interrupts are enabled now so all GFP allocations are safe. */
@@ -778,9 +787,6 @@ static void __init do_initcalls(void)
 
 	for (fn = __early_initcall_end; fn < __initcall_end; fn++)
 		do_one_initcall(*fn);
-
-	/* Make sure there is no pending stuff from the initcall sequence */
-	flush_scheduled_work();
 }
 
 /*
