@@ -566,6 +566,7 @@ bool pm_wakeup_pending(void)
 		pm_wakeup_update_hit_counts();
 	return ret;
 }
+EXPORT_SYMBOL_GPL(pm_wakeup_pending);
 
 /**
  * pm_get_wakeup_count - Read the number of registered wakeup events.
@@ -594,7 +595,6 @@ bool pm_get_wakeup_count(unsigned int *count)
 	*count = atomic_read(&event_count);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(pm_check_wakeup_events);
 
 /**
  * pm_save_wakeup_count - Save the current number of registered wakeup events.

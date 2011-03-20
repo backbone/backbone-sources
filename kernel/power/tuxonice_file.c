@@ -172,7 +172,8 @@ static int toi_file_register_storage(void)
 	if (!used_devt) {
 		if (S_ISBLK(target_inode->i_mode)) {
 			toi_file_target_bdev = I_BDEV(target_inode);
-			if (!bd_claim(toi_file_target_bdev, &toi_fileops))
+			if (!blkdev_get(toi_file_target_bdev, FMODE_WRITE |
+						FMODE_READ, NULL))
 				target_claim = 1;
 		} else
 			toi_file_target_bdev = target_inode->i_sb->s_bdev;
@@ -368,7 +369,7 @@ static void toi_file_cleanup(int finishing_cycle)
 {
 	if (toi_file_target_bdev) {
 		if (target_claim) {
-			bd_release(toi_file_target_bdev);
+			blkdev_put(toi_file_target_bdev, FMODE_WRITE | FMODE_READ);
 			target_claim = 0;
 		}
 

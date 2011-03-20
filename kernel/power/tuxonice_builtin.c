@@ -183,7 +183,7 @@ struct block_device *toi_open_by_devnum(dev_t dev)
 	struct block_device *bdev = bdget(dev);
 	int err = -ENOMEM;
 	if (bdev)
-		err = blkdev_get(bdev, FMODE_READ | FMODE_NDELAY);
+		err = blkdev_get(bdev, FMODE_READ | FMODE_NDELAY, NULL);
 	return err ? ERR_PTR(err) : bdev;
 }
 EXPORT_SYMBOL_GPL(toi_open_by_devnum);

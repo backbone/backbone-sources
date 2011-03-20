@@ -401,7 +401,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		return 1;
 	}
 
-	if (!pm_check_wakeup_events()) {
+	if (pm_wakeup_pending()) {
 		set_abort_result(TOI_WAKEUP_EVENT);
 		toi_end_atomic(ATOMIC_STEP_SYSDEV_RESUME, suspend_time, 1);
 		return 1;

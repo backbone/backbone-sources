@@ -105,13 +105,9 @@ extern unsigned int kobjsize(const void *objp);
 #define VM_NONLINEAR	0x00800000	/* Is non-linear (remap_file_pages) */
 #ifndef CONFIG_TRANSPARENT_HUGEPAGE
 #define VM_MAPPED_COPY	0x01000000	/* T if mapped copy of data (nommu mmap) */
-<<<<<<< HEAD
-#define VM_ATOMIC_COPY	0x01000000	/* TOI should do atomic copy (mmu) */
-=======
 #else
 #define VM_HUGEPAGE	0x01000000	/* MADV_HUGEPAGE marked this vma */
 #endif
->>>>>>> stable
 #define VM_INSERTPAGE	0x02000000	/* The vma has had "vm_insert_page()" done on it */
 #define VM_ALWAYSDUMP	0x04000000	/* Always include in core dumps */
 
@@ -859,7 +855,8 @@ extern void pagefault_out_of_memory(void);
 extern void show_free_areas(void);
 
 int shmem_lock(struct file *file, int lock, struct user_struct *user);
-struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags);
+struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags,
+		int atomic_copy);
 int shmem_zero_setup(struct vm_area_struct *);
 
 #ifndef CONFIG_MMU

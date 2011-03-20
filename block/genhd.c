@@ -1426,7 +1426,7 @@ struct block_device *next_bdev_of_type(struct block_device *last,
 				continue;
 			}
 
-			if (blkdev_get(bdev, FMODE_READ))
+			if (blkdev_get(bdev, FMODE_READ, 0))
 				continue;
 
 			if (bdev_matches_key(bdev, key)) {

@@ -296,7 +296,7 @@ int part_matches_fs_info(struct hd_struct *part, struct fs_info *seek)
 
 	PRINTK("part_matches fs info considering %x.\n", part_devt(part));
 
-	if (blkdev_get(bdev, FMODE_READ)) {
+	if (blkdev_get(bdev, FMODE_READ, 0)) {
 		PRINTK("blkdev_get failed.\n");
 		return 0;
 	}
