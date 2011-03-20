@@ -29,7 +29,7 @@ EXPORT_SYMBOL_GPL(freezer_sync);
  */
 #define TIMEOUT	(20 * HZ)
 
-static inline int freezeable(struct task_struct * p)
+static inline int freezable(struct task_struct * p)
 {
 	if ((p == current) ||
 	    (p->flags & PF_NOFREEZE) ||
@@ -60,7 +60,7 @@ static int try_to_freeze_tasks(bool sig_only)
 		todo = 0;
 		read_lock(&tasklist_lock);
 		do_each_thread(g, p) {
-			if (frozen(p) || !freezeable(p))
+			if (frozen(p) || !freezable(p))
 				continue;
 
 			if (!freeze_task(p, sig_only))
@@ -184,7 +184,7 @@ static void thaw_tasks(bool nosig_only)
 
 	read_lock(&tasklist_lock);
 	do_each_thread(g, p) {
-		if (!freezeable(p))
+		if (!freezable(p))
 			continue;
 
 		if (nosig_only && should_send_signal(p))
