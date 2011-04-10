@@ -1,4 +1,5 @@
-ccflags-$(CONFIG_PM_DEBUG)	:=	-DDEBUG
+
+ccflags-$(CONFIG_PM_DEBUG)	:= -DDEBUG
 
 tuxonice_core-y := tuxonice_modules.o
 

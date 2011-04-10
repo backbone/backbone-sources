@@ -13,6 +13,7 @@
 #include <linux/cpu.h>
 #include <linux/freezer.h>
 #include <linux/console.h>
+#include <linux/syscore_ops.h>
 #include <asm/suspend.h>
 #include "tuxonice.h"
 #include "tuxonice_storage.h"
@@ -401,6 +402,12 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		return 1;
 	}
 
+	if (syscore_suspend()) {
+		set_abort_result(TOI_SYSCORE_REFUSED);
+		toi_end_atomic(ATOMIC_STEP_SYSDEV_RESUME, suspend_time, 1);
+		return 1;
+	}
+
 	if (pm_wakeup_pending()) {
 		set_abort_result(TOI_WAKEUP_EVENT);
 		toi_end_atomic(ATOMIC_STEP_SYSDEV_RESUME, suspend_time, 1);
@@ -423,6 +430,8 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 			events_check_enabled = false;
 			platform_leave(1);
 		}
+	case ATOMIC_STEP_SYSCORE_RESUME:
+		syscore_resume();
 	case ATOMIC_STEP_SYSDEV_RESUME:
 		sysdev_resume();
 	case ATOMIC_STEP_IRQS:

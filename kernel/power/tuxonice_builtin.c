@@ -272,6 +272,7 @@ int toi_lowlevel_builtin(void)
 	}
 
 	restore_processor_state();
+	touch_softlockup_watchdog();
 
 	return error;
 }

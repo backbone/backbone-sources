@@ -226,7 +226,7 @@ static void fuse_prepare_release(struct fuse_file *ff, int flags, int opcode)
 		rb_erase(&ff->polled_node, &fc->polled_files);
 	spin_unlock(&fc->lock);
 
-	wake_up_interruptible_sync(&ff->poll_wait);
+	wake_up_interruptible_all(&ff->poll_wait);
 
 	inarg->fh = ff->fh;
 	inarg->flags = flags;
@@ -533,7 +533,7 @@ static int fuse_readpage(struct file *file, struct page *page)
 	FUSE_MIGHT_FREEZE(file->f_mapping->host->i_sb, "fuse_readpage");
 
 	/*
-	 * Page writeback can extend beyond the liftime of the
+	 * Page writeback can extend beyond the lifetime of the
 	 * page-cache page, so make sure we read a properly synced
 	 * page.
 	 */

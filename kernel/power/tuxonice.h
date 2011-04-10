@@ -108,6 +108,7 @@ enum {
 	TOI_CANT_USE_ALT_RESUME,
 	TOI_HEADER_TOO_BIG,
 	TOI_WAKEUP_EVENT,
+	TOI_SYSCORE_REFUSED,
 	TOI_NUM_RESULT_STATES	/* Used in printing debug info only */
 };
 
