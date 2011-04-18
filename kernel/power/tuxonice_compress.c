@@ -13,6 +13,7 @@
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
 #include <linux/crypto.h>
+#include <linux/tuxonice.h>
 
 #include "tuxonice_builtin.h"
 #include "tuxonice.h"
@@ -174,7 +175,7 @@ static int toi_compress_write_page(unsigned long index, int buf_type,
 	int ret, cpu = smp_processor_id();
 	struct cpu_context *ctx = &per_cpu(contexts, cpu);
 
-	if (!ctx->transform)
+	if (!ctx->transform || PagePrecompressed((struct page *) buffer_page))
 		return next_driver->write_page(index, TOI_PAGE, buffer_page,
 				buf_size);
 

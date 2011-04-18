@@ -17,6 +17,7 @@
 #include <linux/suspend.h>
 #include <linux/fs.h>
 #include <linux/kmod.h>
+#include <linux/tuxonice.h>
 #include <asm/setup.h>
 #include "tuxonice_pageflags.h"
 #include "power.h"

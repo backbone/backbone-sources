@@ -317,6 +317,17 @@ void toi_read_unlock_tasklist(void)
 }
 EXPORT_SYMBOL_GPL(toi_read_unlock_tasklist);
 
+#ifdef CONFIG_TOI_ZRAM_SUPPORT
+int (*toi_flag_zram_disks) (void);
+EXPORT_SYMBOL_GPL(toi_flag_zram_disks);
+
+int toi_do_flag_zram_disks(void)
+{
+	return toi_flag_zram_disks ? (*toi_flag_zram_disks)() : 0;
+}
+EXPORT_SYMBOL_GPL(toi_do_flag_zram_disks);
+#endif
+
 static int __init toi_wait_setup(char *str)
 {
 	int value;

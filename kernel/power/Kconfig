@@ -319,6 +319,10 @@ config TOI_EXPORTS
 		TOI_USERUI=m || TOI_CORE=m
 	default y
 
+config TOI_ZRAM_SUPPORT
+	def_bool y
+	depends on TOI && ZRAM!=n
+
 config PM_SLEEP
 	def_bool y
 	depends on SUSPEND || HIBERNATE_CALLBACKS
