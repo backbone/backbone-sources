@@ -37,6 +37,15 @@ static unsigned long swap_allocated;
 
 static struct sysinfo swapinfo;
 
+static int is_ram_backed(struct swap_info_struct *si)
+{
+	if (!strncmp(si->bdev->bd_disk->disk_name, "ram", 3) ||
+	    !strncmp(si->bdev->bd_disk->disk_name, "zram", 4))
+		return 1;
+
+	return 0;
+}
+
 /**
  * enable_swapfile: Swapon the user specified swapfile prior to hibernating.
  *
@@ -153,8 +162,7 @@ void si_swapinfo_no_compcache(void)
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si = get_swap_info_struct(i);
-		if (si && (si->flags & SWP_WRITEOK) &&
-		    (strncmp(si->bdev->bd_disk->disk_name, "ram", 3))) {
+		if (si && (si->flags & SWP_WRITEOK) && !is_ram_backed(si)) {
 			swapinfo.totalswap += si->inuse_pages;
 			swapinfo.freeswap += si->pages - si->inuse_pages;
 		}
@@ -261,8 +269,7 @@ static int toi_swap_register_storage(void)
 		unsigned char buf[256];
 		struct fs_info *fs_info;
 
-		if (!si || !(si->flags & SWP_WRITEOK) ||
-		    !strncmp(si->bdev->bd_disk->disk_name, "ram", 3))
+		if (!si || !(si->flags & SWP_WRITEOK) || is_ram_backed(si))
 			continue;
 
 		devinfo = toi_kzalloc(39, sizeof(struct toi_bdev_info),
