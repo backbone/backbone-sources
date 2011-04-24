@@ -43,7 +43,7 @@ static unsigned long num_nosave, main_storage_allocated, storage_limit,
 	    header_storage_needed;
 unsigned long extra_pd1_pages_allowance =
 	CONFIG_TOI_DEFAULT_EXTRA_PAGES_ALLOWANCE;
-long image_size_limit;
+long image_size_limit = CONFIG_TOI_DEFAULT_IMAGE_SIZE_LIMIT;
 static int no_ps2_needed;
 
 struct attention_list {
