@@ -22,7 +22,7 @@
 #include "tuxonice_pageflags.h"
 #include "power.h"
 
-#define TOI_CORE_VERSION "3.2-rc2"
+#define TOI_CORE_VERSION "3.2"
 #define	TOI_HEADER_VERSION 3
 #define MY_BOOT_KERNEL_DATA_VERSION 3
 
