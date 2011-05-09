@@ -71,7 +71,9 @@ static void __toi_power_down(int method)
 
 		error = pm_notifier_call_chain(PM_SUSPEND_PREPARE);
 		if (!error) {
+			pm_restore_gfp_mask();
 			error = suspend_devices_and_enter(PM_SUSPEND_MEM);
+			pm_restrict_gfp_mask();
 			if (!error)
 				did_suspend_to_both = 1;
 		}
