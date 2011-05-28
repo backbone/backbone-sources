@@ -275,6 +275,7 @@ static int toi_alloc_bitmap(struct memory_bitmap **bm)
 	if (result) {
 		printk(KERN_ERR "Failed to create a bitmap.\n");
 		kfree(*bm);
+		*bm = NULL;
 	}
 
 	return result;
