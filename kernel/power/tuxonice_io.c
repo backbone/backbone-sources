@@ -554,7 +554,7 @@ static unsigned long status_update(int writing, unsigned long done,
 		pages_left = io_barmax - done;
 		pgs_per_s = 1000 * done / msec;
 		if (pgs_per_s)
-			estimate = pages_left / pgs_per_s;
+			estimate = DIV_ROUND_UP(pages_left, pgs_per_s);
 	}
 
 	if (estimate && ticks > HZ / 2)
