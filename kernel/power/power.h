@@ -15,6 +15,7 @@ struct swsusp_info {
 
 #ifdef CONFIG_HIBERNATION
 /* kernel/power/snapshot.c */
+extern void __init hibernate_reserved_size_init(void);
 extern void __init hibernate_image_size_init(void);
 
 #ifdef CONFIG_ARCH_HIBERNATION_HEADER
@@ -60,6 +61,7 @@ extern void platform_recover(int platform_mode);
 
 #else /* !CONFIG_HIBERNATION */
 
+static inline void hibernate_reserved_size_init(void) {}
 static inline void hibernate_image_size_init(void) {}
 #endif /* !CONFIG_HIBERNATION */
 
@@ -79,6 +81,8 @@ extern struct pbe *restore_pblist;
 
 /* Preferred image size in bytes (default 500 MB) */
 extern unsigned long image_size;
+/* Size of memory reserved for drivers (default SPARE_PAGES x PAGE_SIZE) */
+extern unsigned long reserved_size;
 extern int in_suspend;
 extern dev_t swsusp_resume_device;
 extern sector_t swsusp_resume_block;

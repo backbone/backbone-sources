@@ -512,7 +512,7 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 		    *copy_page = final_page;
 	char *virt, *buffer_virt;
 	int was_present, cpu = smp_processor_id();
-	unsigned long idx;
+	unsigned long idx = 0;
 
 	if (io_pageset == 1 && (!pageset1_copy_map ||
 			!memory_bm_test_bit_index(pageset1_copy_map, write_pfn, cpu))) {

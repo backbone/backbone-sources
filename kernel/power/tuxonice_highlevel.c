@@ -138,6 +138,7 @@ static char *result_strings[] = {
 	"Failed to disable usermode helpers",
 	"Can't resume from alternate image",
 	"Header reservation too small",
+	"Device Power Management Preparation failed",
 };
 
 /**
