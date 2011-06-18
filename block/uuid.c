@@ -192,7 +192,7 @@ static struct page *read_bdev_page(struct block_device *dev, int page_num)
 	}
 
 	lock_page(page);
-	submit_bio(READ | REQ_SYNC, bio);
+	submit_bio(READ | REQ_SYNC | REQ_TOI, bio);
 
 	wait_on_page_locked(page);
 	if (PageError(page)) {
