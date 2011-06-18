@@ -178,8 +178,8 @@ static struct page *read_bdev_page(struct block_device *dev, int page_num)
 	bio->bi_sector = page_num << 3;
 	bio->bi_end_io = uuid_end_bio;
 
-	PRINTK("Submitting bio on device %lx, page %d.\n",
-			(unsigned long) dev->bd_dev, page_num);
+	PRINTK("Submitting bio on device %lx, page %d using bio %p and page %p.\n",
+			(unsigned long) dev->bd_dev, page_num, bio, page);
 
 	if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
 		printk(KERN_DEBUG "ERROR: adding page to bio at %d\n",
