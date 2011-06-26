@@ -156,7 +156,6 @@ void toi_finish_anything(int hibernate_or_resume)
 	toi_put_modules();
 	if (hibernate_or_resume) {
 		block_dump = block_dump_save;
-		pm_restore_gfp_mask();
 		set_cpus_allowed_ptr(current, cpu_all_mask);
 		toi_alloc_print_debug_stats();
 		atomic_inc(&snapshot_device_available);
@@ -187,8 +186,6 @@ int toi_start_anything(int hibernate_or_resume)
 
 		if (!atomic_add_unless(&snapshot_device_available, -1, 0))
 			goto snapshotdevice_unavailable;
-
-		pm_restrict_gfp_mask();
 	}
 
 	if (hibernate_or_resume == SYSFS_HIBERNATE)
@@ -223,10 +220,8 @@ early_init_err:
 	}
 	toi_put_modules();
 prehibernate_err:
-	if (hibernate_or_resume) {
-		pm_restore_gfp_mask();
+	if (hibernate_or_resume)
 		atomic_inc(&snapshot_device_available);
-	}
 snapshotdevice_unavailable:
 	if (hibernate_or_resume)
 		mutex_unlock(&pm_mutex);
@@ -827,6 +822,8 @@ static int do_prepare_image(void)
 
 	trap_non_toi_io = 1;
 
+	pm_restrict_gfp_mask();
+
 	return 0;
 }
 
@@ -1110,6 +1107,7 @@ prepare:
 			printk(KERN_INFO "Automatically adjusting the extra"
 				" pages allowance to %ld and restarting.\n",
 				extra_pd1_pages_allowance);
+			pm_restore_gfp_mask();
 			goto prepare;
 		}
 
@@ -1120,6 +1118,8 @@ prepare:
 	/* This code runs at resume time too! */
 	if (!result && toi_in_hibernate)
 		result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
+
+	pm_restore_gfp_mask();
 out:
 	do_cleanup(1, 0);
 	current->flags &= ~PF_MEMALLOC;
