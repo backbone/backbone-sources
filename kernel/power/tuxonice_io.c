@@ -586,15 +586,16 @@ static unsigned long status_update(int writing, unsigned long done,
 static int worker_rw_loop(void *data)
 {
 	unsigned long data_pfn, write_pfn, next_jiffies = jiffies + HZ / 4,
-		      jif_index = 1, start_time = jiffies;
-	int result = 0, my_io_index = 0, last_worker, thread_num = (int) data;
+		      jif_index = 1, start_time = jiffies, thread_num;
+	int result = 0, my_io_index = 0, last_worker;
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
 
 	current->flags |= PF_NOFREEZE;
 
 top:
-	atomic_inc(&toi_io_workers);
 	mutex_lock(&io_mutex);
+	thread_num = atomic_read(&toi_io_workers);
+	atomic_inc(&toi_io_workers);
 
 	while (atomic_read(&io_count) >= atomic_read(&toi_io_workers) &&
 		!(io_write && test_result_state(TOI_ABORTED)) &&
@@ -697,7 +698,7 @@ top:
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "%d workers left.", atomic_read(&toi_io_workers));
 	mutex_unlock(&io_mutex);
 
-	if (thread_num && toi_worker_command != TOI_IO_WORKER_EXIT) {
+	if ((int) data && toi_worker_command != TOI_IO_WORKER_EXIT) {
 		/* Were we the last thread and we're using a flusher thread? */
 		if (last_worker && using_flusher) {
 			toiActiveAllocator->finish_all_io();
