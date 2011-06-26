@@ -347,11 +347,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 			return 1;
 		}
 
-		if (dpm_prepare(state)) {
-			set_abort_result(TOI_DPM_PREPARE_FAILED);
-			toi_end_atomic(ATOMIC_STEP_DPM_COMPLETE, suspend_time, 3);
-			return 1;
-		}
+		/* dpm_prepare done earlier */
 	}
 
 	suspend_console();

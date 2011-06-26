@@ -822,6 +822,12 @@ static int do_prepare_image(void)
 
 	trap_non_toi_io = 1;
 
+	if (dpm_prepare(PMSG_FREEZE)) {
+		set_abort_result(TOI_DPM_PREPARE_FAILED);
+		dpm_complete(PMSG_FREEZE);
+		return 1;
+	}
+
 	pm_restrict_gfp_mask();
 
 	return 0;
