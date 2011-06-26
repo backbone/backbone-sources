@@ -453,6 +453,9 @@ static void do_cleanup(int get_debug_info, int restarting)
 	clear_toi_state(TOI_BOOT_KERNEL);
 	thaw_processes();
 
+	if (!restarting)
+		toi_stop_other_threads();
+
 	if (test_action_state(TOI_KEEP_IMAGE) &&
 	    !test_result_state(TOI_ABORTED)) {
 		toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
@@ -557,6 +560,11 @@ static int toi_init(int restarting)
 		return 1;
 	}
 	set_toi_state(TOI_NOTIFIERS_PREPARE);
+
+	if (!restarting) {
+		printk(KERN_ERR "Starting other threads.");
+		toi_start_other_threads();
+	}
 
 	result = usermodehelper_disable();
 	if (result) {
@@ -1017,11 +1025,13 @@ void toi_try_resume(void)
 	resume_attempted = 1;
 
 	current->flags |= PF_MEMALLOC;
+	toi_start_other_threads();
 
 	if (do_toi_step(STEP_RESUME_CAN_RESUME) &&
 			!do_toi_step(STEP_RESUME_LOAD_PS1))
 		do_toi_step(STEP_RESUME_DO_RESTORE);
 
+	toi_stop_other_threads();
 	do_cleanup(0, 0);
 
 	current->flags &= ~PF_MEMALLOC;

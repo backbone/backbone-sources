@@ -62,14 +62,13 @@ static atomic_t io_count;
 atomic_t toi_io_workers;
 EXPORT_SYMBOL_GPL(toi_io_workers);
 
+static int using_flusher;
+
 DECLARE_WAIT_QUEUE_HEAD(toi_io_queue_flusher);
 EXPORT_SYMBOL_GPL(toi_io_queue_flusher);
 
 int toi_bio_queue_flusher_should_finish;
 EXPORT_SYMBOL_GPL(toi_bio_queue_flusher_should_finish);
-
-/* Indicates that this thread should be used for checking throughput */
-#define MONITOR ((void *) 1)
 
 int toi_max_workers;
 
@@ -77,6 +76,15 @@ static char *image_version_error = "The image header version is newer than " \
 	"this kernel supports.";
 
 struct toi_module_ops *first_filter;
+
+static atomic_t toi_num_other_threads;
+static DECLARE_WAIT_QUEUE_HEAD(toi_worker_wait_queue);
+enum toi_worker_commands {
+	TOI_IO_WORKER_STOP,
+	TOI_IO_WORKER_RUN,
+	TOI_IO_WORKER_EXIT
+};
+static enum toi_worker_commands toi_worker_command;
 
 /**
  * toi_attempt_to_parse_resume_device - determine if we can hibernate
@@ -572,20 +580,26 @@ static unsigned long status_update(int writing, unsigned long done,
  * The main I/O loop for reading or writing pages. The io_map bitmap is used to
  * track the pages to read/write.
  * If we are reading, the pages are loaded to their final (mapped) pfn.
+ * Data is non zero iff this is a thread started via start_other_threads.
+ * In that case, we stay in here until told to quit.
  **/
 static int worker_rw_loop(void *data)
 {
 	unsigned long data_pfn, write_pfn, next_jiffies = jiffies + HZ / 4,
 		      jif_index = 1, start_time = jiffies;
-	int result = 0, my_io_index = 0, last_worker;
+	int result = 0, my_io_index = 0, last_worker, thread_num = (int) data;
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
 
 	current->flags |= PF_NOFREEZE;
 
+top:
+	atomic_inc(&toi_io_workers);
 	mutex_lock(&io_mutex);
 
-	do {
-		if (data && jiffies > next_jiffies) {
+	while (atomic_read(&io_count) >= atomic_read(&toi_io_workers) &&
+		!(io_write && test_result_state(TOI_ABORTED)) &&
+		toi_worker_command == TOI_IO_WORKER_RUN) {
+		if (!thread_num && jiffies > next_jiffies) {
 			next_jiffies += HZ / 4;
 			if (toiActiveAllocator->update_throughput_throttle)
 				toiActiveAllocator->update_throughput_throttle(
@@ -651,7 +665,7 @@ static int worker_rw_loop(void *data)
 			}
 		}
 
-		if (data) {
+		if (!thread_num) {
 			if(my_io_index + io_base > io_nextupdate)
 				io_nextupdate = status_update(io_write,
 						my_io_index + io_base,
@@ -677,25 +691,44 @@ static int worker_rw_loop(void *data)
 		 */
 
 		mutex_lock(&io_mutex);
-	} while (atomic_read(&io_count) >= atomic_read(&toi_io_workers) &&
-		!(io_write && test_result_state(TOI_ABORTED)));
+	}
 
 	last_worker = atomic_dec_and_test(&toi_io_workers);
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "%d workers left.", atomic_read(&toi_io_workers));
 	mutex_unlock(&io_mutex);
 
+	if (thread_num && toi_worker_command != TOI_IO_WORKER_EXIT) {
+		/* Were we the last thread and we're using a flusher thread? */
+		if (last_worker && using_flusher) {
+			toiActiveAllocator->finish_all_io();
+		}
+		/* First, if we're doing I/O, wait for it to finish */
+		wait_event(toi_worker_wait_queue, toi_worker_command != TOI_IO_WORKER_RUN);
+		/* Then wait to be told what to do next */
+		wait_event(toi_worker_wait_queue, toi_worker_command != TOI_IO_WORKER_STOP);
+		if (toi_worker_command == TOI_IO_WORKER_RUN)
+			goto top;
+	}
+
+	if (thread_num)
+		atomic_dec(&toi_num_other_threads);
+
+	toi_message(TOI_IO, TOI_LOW, 0, "Thread %d exiting.", thread_num);
 	toi__free_page(28, buffer);
 
 	return result;
 }
 
-static int start_other_threads(void)
+int toi_start_other_threads(void)
 {
 	int cpu, num_started = 0;
 	struct task_struct *p;
 	int to_start = (toi_max_workers ? toi_max_workers : num_online_cpus()) - 1;
 
-	atomic_set(&toi_io_workers, to_start);
+	if (test_action_state(TOI_NO_MULTITHREADED_IO))
+		return 0;
+
+	toi_worker_command = TOI_IO_WORKER_STOP;
 
 	for_each_online_cpu(cpu) {
 		if (num_started == to_start)
@@ -704,22 +737,29 @@ static int start_other_threads(void)
 		if (cpu == smp_processor_id())
 			continue;
 
-		p = kthread_create(worker_rw_loop, num_started ? NULL : MONITOR,
+		p = kthread_create(worker_rw_loop, (void *) num_started + 1,
 				"ktoi_io/%d", cpu);
 		if (IS_ERR(p)) {
 			printk(KERN_ERR "ktoi_io for %i failed\n", cpu);
-			atomic_dec(&toi_io_workers);
 			continue;
 		}
 		kthread_bind(p, cpu);
 		p->flags |= PF_MEMALLOC;
 		wake_up_process(p);
 		num_started++;
+		atomic_inc(&toi_num_other_threads);
 	}
 
+	toi_message(TOI_IO, TOI_LOW, 0, "Started %d threads.", num_started);
 	return num_started;
 }
 
+void toi_stop_other_threads(void)
+{
+	toi_message(TOI_IO, TOI_LOW, 0, "Stopping other threads.");
+	toi_worker_command = TOI_IO_WORKER_EXIT;
+	wake_up(&toi_worker_wait_queue);
+}
 /**
  * do_rw_loop - main highlevel function for reading or writing pages
  *
@@ -728,8 +768,7 @@ static int start_other_threads(void)
 static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 		int base, int barmax, int pageset)
 {
-	int index = 0, cpu, num_other_threads = 0, result = 0, flusher = 0;
-	int workers_started = 0;
+	int index = 0, cpu, result = 0, workers_started;
 	unsigned long pfn;
 
 	first_filter = toi_get_next_filter(NULL);
@@ -779,34 +818,35 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 
 	clear_toi_state(TOI_IO_STOPPED);
 
-	if (!test_action_state(TOI_NO_MULTITHREADED_IO))
-		num_other_threads = start_other_threads();
+	using_flusher = (atomic_read(&toi_num_other_threads) &&
+			 toiActiveAllocator->io_flusher &&
+			 !test_action_state(TOI_NO_FLUSHER_THREAD));
 
-	if (!num_other_threads || !toiActiveAllocator->io_flusher ||
-		test_action_state(TOI_NO_FLUSHER_THREAD)) {
-		atomic_inc(&toi_io_workers);
-	} else
-		flusher = 1;
+	workers_started = atomic_read(&toi_num_other_threads);
 
-	workers_started = atomic_read(&toi_io_workers);
-
-	memory_bm_set_iterators(io_map, workers_started);
+	memory_bm_set_iterators(io_map, atomic_read(&toi_num_other_threads) + 1);
 	memory_bm_position_reset(io_map);
 
-	memory_bm_set_iterators(pageset1_copy_map, workers_started);
+	memory_bm_set_iterators(pageset1_copy_map, atomic_read(&toi_num_other_threads) + 1);
 	memory_bm_position_reset(pageset1_copy_map);
+
+	toi_worker_command = TOI_IO_WORKER_RUN;
+	wake_up(&toi_worker_wait_queue);
 
 	mutex_unlock(&io_mutex);
 
-	if (flusher)
+	if (using_flusher)
 		result = toiActiveAllocator->io_flusher(write);
 	else
-		worker_rw_loop(num_other_threads ? NULL : MONITOR);
+		worker_rw_loop(NULL);
 
 	while (atomic_read(&toi_io_workers))
 		schedule();
 
 	printk(KERN_CONT "\n");
+
+	toi_worker_command = TOI_IO_WORKER_STOP;
+	wake_up(&toi_worker_wait_queue);
 
 	if (unlikely(test_toi_state(TOI_STOP_RESUME))) {
 		if (!atomic_read(&toi_io_workers)) {
