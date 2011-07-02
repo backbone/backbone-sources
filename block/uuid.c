@@ -165,7 +165,7 @@ static void uuid_end_bio(struct bio *bio, int err)
 static struct page *read_bdev_page(struct block_device *dev, int page_num)
 {
 	struct bio *bio = NULL;
-	struct page *page = alloc_page(GFP_NOFS);
+	struct page *page = alloc_page(GFP_NOFS | __GFP_HIGHMEM);
 
 	if (!page) {
 		printk(KERN_ERR "Failed to allocate a page for reading data "
@@ -243,12 +243,14 @@ int bdev_matches_key(struct block_device *bdev, const char *key)
 			continue;
 
 		if (pg_num != last_pg_num) {
-			if (data_page)
+			if (data_page) {
+				kunmap(data_page);
 				__free_page(data_page);
+			}
 			data_page = read_bdev_page(bdev, pg_num);
 			if (!data_page)
 				continue;
-			data = page_address(data_page);
+			data = kmap(data_page);
 		}
 
 		last_pg_num = pg_num;
@@ -260,8 +262,10 @@ int bdev_matches_key(struct block_device *bdev, const char *key)
 		break;
 	}
 
-	if (data_page)
+	if (data_page) {
+		kunmap(data_page);
 		__free_page(data_page);
+	}
 
 	return result;
 }
@@ -390,12 +394,14 @@ struct fs_info *fs_info_from_block_dev(struct block_device *bdev)
 			continue;
 
 		if (pg_num != last_pg_num) {
-			if (data_page)
+			if (data_page) {
+				kunmap(data_page);
 				__free_page(data_page);
+			}
 			data_page = read_bdev_page(bdev, pg_num);
 			if (!data_page)
 				continue;
-			data = page_address(data_page);
+			data = kmap(data_page);
 		}
 
 		last_pg_num = pg_num;
@@ -423,12 +429,14 @@ struct fs_info *fs_info_from_block_dev(struct block_device *bdev)
 			if (uuid_pg_num == pg_num && uuid_data)
 				memcpy(uuid_data, data, PAGE_SIZE);
 			else {
-				if (uuid_data_page)
+				if (uuid_data_page) {
+					kunmap(uuid_data_page);
 					__free_page(uuid_data_page);
+				}
 				uuid_data_page = read_bdev_page(bdev, uuid_pg_num);
 				if (!uuid_data_page)
 					continue;
-				uuid_data = page_address(uuid_data_page);
+				uuid_data = kmap(uuid_data_page);
 			}
 		}
 
@@ -452,7 +460,7 @@ no_uuid:
 				fs_info = ERR_PTR(-ENOMEM);
 				break;
 			}
-			last_mount_data = page_address(last_mount);
+			last_mount_data = kmap(last_mount);
 			sz = dat->last_mount_size;
 			ptr = kmalloc(sz, GFP_KERNEL);
 
@@ -468,16 +476,21 @@ no_uuid:
 				memcpy(ptr, &last_mount_data[off], sz);
 			}
 
+			kunmap(last_mount);
 			__free_page(last_mount);
 		}
 		break;
 	}
 
-	if (data_page)
+	if (data_page) {
+		kunmap(data_page);
 		__free_page(data_page);
+	}
 
-	if (uuid_data_page)
+	if (uuid_data_page) {
+		kunmap(uuid_data_page);
 		__free_page(uuid_data_page);
+	}
 
 	return fs_info;
 }
