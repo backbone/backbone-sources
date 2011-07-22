@@ -669,7 +669,7 @@ static void generate_free_page_map(void)
 		spin_lock_irqsave(&zone->lock, flags);
 
 		for (i = 0; i < zone->spanned_pages; i++) {
-			pfn = ZONE_START(zone) + i;
+			pfn = zone->zone_start_pfn + i;
 
 			if (!pfn_valid(pfn))
 				continue;
@@ -715,7 +715,7 @@ static void generate_free_page_map(void)
 static int size_of_free_region(struct zone *zone, unsigned long start_pfn)
 {
 	unsigned long this_pfn = start_pfn,
-		      end_pfn = ZONE_START(zone) + zone->spanned_pages - 1;
+		      end_pfn = zone->zone_start_pfn + zone->spanned_pages - 1;
 
 	while (this_pfn <= end_pfn && PageNosaveFree(pfn_to_page(this_pfn)))
 		this_pfn++;
@@ -756,7 +756,7 @@ static void flag_image_pages(int atomic_copy)
 		int highmem = is_highmem(zone);
 
 		for (loop = 0; loop < zone->spanned_pages; loop++) {
-			unsigned long pfn = ZONE_START(zone) + loop;
+			unsigned long pfn = zone->zone_start_pfn + loop;
 			struct page *page;
 			int chunk_size;
 

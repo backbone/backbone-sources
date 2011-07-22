@@ -278,12 +278,6 @@ struct nosave_region {
 	unsigned long end_pfn;
 };
 
-#ifndef PHYS_PFN_OFFSET
-#define PHYS_PFN_OFFSET 0
-#endif
-
-#define ZONE_START(thiszone) ((thiszone)->zone_start_pfn - PHYS_PFN_OFFSET)
-
 #define BM_END_OF_MAP	(~0UL)
 
 #define BM_BITS_PER_BLOCK	(PAGE_SIZE * BITS_PER_BYTE)
