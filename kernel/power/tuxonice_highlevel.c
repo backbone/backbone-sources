@@ -582,11 +582,12 @@ static int toi_init(int restarting)
 		return 1;
 	}
 
-	if (test_action_state(TOI_LATE_CPU_HOTPLUG) ||
-			!disable_nonboot_cpus())
+	if (!test_action_state(TOI_LATE_CPU_HOTPLUG) &&
+			disable_nonboot_cpus()) {
+		set_abort_result(TOI_CPU_HOTPLUG_FAILED);
 		return 1;
+	}
 
-	set_abort_result(TOI_CPU_HOTPLUG_FAILED);
 	return 0;
 }
 
@@ -812,7 +813,7 @@ static int do_prepare_image(void)
 	     check_still_keeping_image()))
 		return 1;
 
-	if (!toi_init(restarting) || toi_prepare_image() ||
+	if (toi_init(restarting) || toi_prepare_image() ||
 			test_result_state(TOI_ABORTED))
 		return 1;
 
