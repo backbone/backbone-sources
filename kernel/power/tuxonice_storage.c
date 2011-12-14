@@ -17,6 +17,7 @@
  *
  */
 
+#include <linux/module.h>
 #include <linux/suspend.h>
 #include <linux/freezer.h>
 

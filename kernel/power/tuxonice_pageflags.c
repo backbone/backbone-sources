@@ -10,6 +10,7 @@
  */
 
 #include <linux/list.h>
+#include <linux/module.h>
 #include "tuxonice_pageflags.h"
 #include "power.h"
 

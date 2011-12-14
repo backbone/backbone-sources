@@ -30,8 +30,8 @@ obj-$(CONFIG_TOI_CLUSTER)	+= tuxonice_cluster.o
 
 obj-$(CONFIG_TOI_USERUI)	+= tuxonice_userui.o
 
-obj-$(CONFIG_PM)		+= main.o
-obj-$(CONFIG_PM_SLEEP)		+= console.o
+obj-$(CONFIG_PM)		+= main.o qos.o
+obj-$(CONFIG_VT_CONSOLE_SLEEP)	+= console.o
 obj-$(CONFIG_FREEZER)		+= process.o
 obj-$(CONFIG_SUSPEND)		+= suspend.o
 obj-$(CONFIG_PM_TEST_SUSPEND)	+= suspend_test.o

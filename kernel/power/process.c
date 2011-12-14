@@ -142,7 +142,7 @@ static int try_to_freeze_tasks(bool sig_only)
 }
 
 /**
- *	freeze_processes - tell processes to enter the refrigerator
+ * freeze_processes - Signal user space processes to enter the refrigerator.
  */
 int freeze_processes(void)
 {
@@ -153,9 +153,22 @@ int freeze_processes(void)
 	freezer_state = FREEZER_FILESYSTEMS_FROZEN;
 	printk(KERN_INFO "Freezing user space processes ... ");
 	error = try_to_freeze_tasks(true);
-	if (error)
-		goto Exit;
-	printk("done.\n");
+	if (!error) {
+		printk("done.");
+		oom_killer_disable();
+	}
+	printk("\n");
+	BUG_ON(in_atomic());
+
+	return error;
+}
+
+/**
+ * freeze_kernel_threads - Make freezable kernel threads go to the refrigerator.
+ */
+int freeze_kernel_threads(void)
+{
+	int error;
 
 	if (freezer_sync)
 		sys_sync();
@@ -164,15 +177,13 @@ int freeze_processes(void)
 	freezer_state = FREEZER_USERSPACE_FROZEN;
 	printk(KERN_INFO "Freezing remaining freezable tasks ... ");
 	error = try_to_freeze_tasks(false);
-	if (error)
-		goto Exit;
-	printk("done.");
-	freezer_state = FREEZER_FULLY_ON;
+	if (!error) {
+    printk("done.");
+    freezer_state = FREEZER_FULLY_ON;
+  }
 
-	oom_killer_disable();
- Exit:
-	BUG_ON(in_atomic());
 	printk("\n");
+	BUG_ON(in_atomic());
 
 	return error;
 }
