@@ -1110,8 +1110,11 @@ int toi_try_hibernate(void)
 prepare:
 	result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE);
 
-	if (result || test_action_state(TOI_FREEZER_TEST))
+	if (result)
 		goto out;
+
+	if (test_action_state(TOI_FREEZER_TEST))
+		goto out_restore_gfp_mask;
 
 	result = do_toi_step(STEP_HIBERNATE_SAVE_IMAGE);
 
@@ -1136,6 +1139,7 @@ prepare:
 	if (!result && toi_in_hibernate)
 		result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
 
+out_restore_gfp_mask:
 	pm_restore_gfp_mask();
 out:
 	do_cleanup(1, 0);
