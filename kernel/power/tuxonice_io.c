@@ -328,9 +328,9 @@ static int rw_cleanup_modules(int rw)
 	return result;
 }
 
-static struct page *copy_page_from_orig_page(struct page *orig_page)
+static struct page *copy_page_from_orig_page(struct page *orig_page, int is_high)
 {
-	int is_high = PageHighMem(orig_page), index, min, max;
+	int index, min, max;
 	struct page *high_page = NULL,
 		    **my_last_high_page = &__get_cpu_var(last_high_page),
 		    **my_last_sought = &__get_cpu_var(last_sought);
@@ -524,8 +524,8 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 
 	if (io_pageset == 1 && (!pageset1_copy_map ||
 			!memory_bm_test_bit_index(pageset1_copy_map, write_pfn, cpu))) {
-		copy_page = copy_page_from_orig_page(final_page);
-		BUG_ON(!copy_page);
+		int is_high = PageHighMem(final_page);
+		copy_page = copy_page_from_orig_page(is_high ? (void *) write_pfn : final_page, is_high);
 	}
 
 	if (!memory_bm_test_bit_index(io_map, write_pfn, cpu)) {

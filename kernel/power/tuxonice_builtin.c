@@ -67,7 +67,7 @@ static void copyback_high(void)
 	while (this_pbe) {
 		int loop = (PAGE_SIZE / sizeof(unsigned long)) - 1;
 
-		origpage = kmap_atomic((struct page *) this_pbe->orig_address,
+		origpage = kmap_atomic(pfn_to_page((unsigned long) this_pbe->orig_address),
 			KM_BIO_DST_IRQ);
 		copypage = kmap_atomic((struct page *) this_pbe->address,
 			KM_BIO_SRC_IRQ);

@@ -249,7 +249,7 @@ int toi_get_pageset1_load_addresses(void)
 			} while (!PageHighMem(orig_page) ||
 					PagePageset1Copy(orig_page));
 
-			this_high_pbe->orig_address = orig_page;
+			this_high_pbe->orig_address = (void *) orig_high_pfn;
 			this_high_pbe->address = page;
 			this_high_pbe->next = NULL;
 			toi_message(TOI_PAGEDIR, TOI_VERBOSE, 0, "High pbe %d/%d: %p(%d)=>%p",
