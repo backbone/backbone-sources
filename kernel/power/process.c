@@ -162,6 +162,7 @@ int freeze_processes(void)
 
 	return error;
 }
+EXPORT_SYMBOL_GPL(freeze_processes);
 
 /**
  * freeze_kernel_threads - Make freezable kernel threads go to the refrigerator.
@@ -178,16 +179,15 @@ int freeze_kernel_threads(void)
 	printk(KERN_INFO "Freezing remaining freezable tasks ... ");
 	error = try_to_freeze_tasks(false);
 	if (!error) {
-    printk("done.");
-    freezer_state = FREEZER_FULLY_ON;
-  }
+		printk("done.");
+		freezer_state = FREEZER_FULLY_ON;
+	}
 
 	printk("\n");
 	BUG_ON(in_atomic());
 
 	return error;
 }
-EXPORT_SYMBOL_GPL(freeze_processes);
 
 static void thaw_tasks(bool nosig_only)
 {
