@@ -8,7 +8,7 @@
 #include <linux/stddef.h>
 #include <linux/mm.h>
 #include <linux/mmzone.h>
-#include <linux/module.h>
+#include <linux/export.h>
 
 struct pglist_data *first_online_pgdat(void)
 {

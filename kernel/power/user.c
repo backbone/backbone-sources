@@ -12,7 +12,7 @@
 #include <linux/suspend.h>
 #include <linux/syscalls.h>
 #include <linux/reboot.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/kmod.h>
 #include <linux/string.h>
 #include <linux/device.h>

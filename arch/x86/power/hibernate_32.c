@@ -9,7 +9,7 @@
 #include <linux/gfp.h>
 #include <linux/suspend.h>
 #include <linux/bootmem.h>
-#include <linux/module.h>
+#include <linux/export.h>
 
 #include <asm/system.h>
 #include <asm/page.h>

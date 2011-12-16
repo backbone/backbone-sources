@@ -2,7 +2,7 @@
 #include <linux/ctype.h>
 #include <linux/fs_uuid.h>
 #include <linux/slab.h>
-#include <linux/module.h>
+#include <linux/export.h>
 
 static int debug_enabled;
 

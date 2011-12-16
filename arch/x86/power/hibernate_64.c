@@ -11,7 +11,7 @@
 #include <linux/gfp.h>
 #include <linux/smp.h>
 #include <linux/suspend.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <asm/proto.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
