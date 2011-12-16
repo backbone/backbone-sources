@@ -812,8 +812,8 @@ int zram_toi_flag_disks(void)
 	int i, t = 0;
 	struct zram *zram;
 
-	for (i = 0; i < num_devices; i++) {
-		zram = &devices[i];
+	for (i = 0; i < zram_num_devices; i++) {
+		zram = &zram_devices[i];
 
 		t += zram_toi_flag_disk(zram);
 	}
