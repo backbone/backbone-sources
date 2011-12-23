@@ -1691,6 +1691,10 @@ static int __read_pageset1(void)
 		}
 	}
 
+	result = pm_notifier_call_chain(PM_RESTORE_PREPARE);
+	if (result)
+		goto out_notifier_call_chain;;
+
 	if (usermodehelper_disable())
 		goto out_enable_nonboot_cpus;
 
@@ -1761,6 +1765,8 @@ out_thaw:
 	usermodehelper_enable();
 out_enable_nonboot_cpus:
 	enable_nonboot_cpus();
+out_notifier_call_chain:
+  pm_notifier_call_chain(PM_POST_RESTORE);
 out_reset_console:
 	toi_cleanup_console();
 out_remove_image:

@@ -340,23 +340,37 @@ Failed:
  **/
 int toi_go_atomic(pm_message_t state, int suspend_time)
 {
-	if (suspend_time) {
-		if (platform_begin(1)) {
-			set_abort_result(TOI_PLATFORM_PREP_FAILED);
-			toi_end_atomic(ATOMIC_STEP_PLATFORM_END, suspend_time, 3);
-			return 1;
-		}
+  if (suspend_time) {
+    if (platform_begin(1)) {
+      set_abort_result(TOI_PLATFORM_PREP_FAILED);
+      toi_end_atomic(ATOMIC_STEP_PLATFORM_END, suspend_time, 3);
+      return 1;
+    }
 
-		/* dpm_prepare done earlier */
-	}
+    if (dpm_prepare(PMSG_FREEZE)) {
+      set_abort_result(TOI_DPM_PREPARE_FAILED);
+      dpm_complete(PMSG_RECOVER);
+      toi_end_atomic(ATOMIC_STEP_PLATFORM_END, suspend_time, 3);
+      return 1;
+    }
+  }
 
 	suspend_console();
+	pm_restrict_gfp_mask();
 
-	if (dpm_suspend(state)) {
-		set_abort_result(TOI_DPM_SUSPEND_FAILED);
-		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 3);
-		return 1;
-	}
+  if (suspend_time) {
+    if (dpm_suspend(state)) {
+      set_abort_result(TOI_DPM_SUSPEND_FAILED);
+      toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 3);
+      return 1;
+    }
+  } else {
+    if (dpm_suspend_start(state)) {
+      set_abort_result(TOI_DPM_SUSPEND_FAILED);
+      toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 3);
+      return 1;
+    }
+  }
 
 	/* At this point, dpm_suspend_start() has been called, but *not*
 	 * dpm_suspend_noirq(). We *must* dpm_suspend_noirq() now.
@@ -401,7 +415,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		return 1;
 	}
 
-	if (pm_wakeup_pending()) {
+	if (suspend_time && pm_wakeup_pending()) {
 		set_abort_result(TOI_WAKEUP_EVENT);
 		toi_end_atomic(ATOMIC_STEP_SYSCORE_RESUME, suspend_time, 1);
 		return 1;
@@ -434,15 +448,17 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 		if (test_action_state(TOI_LATE_CPU_HOTPLUG))
 			enable_nonboot_cpus();
 	case ATOMIC_STEP_PLATFORM_FINISH:
-		if (suspend_time)
-			platform_finish(1);
-		else
+		if (!suspend_time && error & 2)
 			platform_restore_cleanup(1);
+    else 
+      platform_finish(1);
 		dpm_resume_noirq(msg);
 	case ATOMIC_STEP_DEVICE_RESUME:
 		if (suspend_time && (error & 2))
 			platform_recover(1);
 		dpm_resume(msg);
+    if (error || !in_suspend)
+      pm_restore_gfp_mask();
 		resume_console();
 	case ATOMIC_STEP_DPM_COMPLETE:
 		dpm_complete(msg);
