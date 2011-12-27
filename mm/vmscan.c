@@ -2223,6 +2223,9 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 	struct zone *zone;
 	unsigned long writeback_threshold;
 
+  if (unlikely(freezer_is_on()))
+    return 0;
+
 	get_mems_allowed();
 	delayacct_freepages_start();
 
