@@ -220,7 +220,6 @@ extern int toi_launch_userspace_program(char *command, int channel_no,
 		enum umh_wait wait, int debug);
 
 extern char tuxonice_signature[9];
-extern int freezer_sync;
 
 extern int toi_start_other_threads(void);
 extern void toi_stop_other_threads(void);

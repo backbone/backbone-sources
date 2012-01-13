@@ -15,30 +15,14 @@
 #include <linux/syscalls.h>
 #include <linux/freezer.h>
 #include <linux/delay.h>
-#include <linux/buffer_head.h>
 #include <linux/workqueue.h>
-
-int freezer_state;
-EXPORT_SYMBOL_GPL(freezer_state);
-
-int freezer_sync = 1;
-EXPORT_SYMBOL_GPL(freezer_sync);
 
 /* 
  * Timeout for stopping processes
  */
 #define TIMEOUT	(20 * HZ)
 
-static inline int freezable(struct task_struct * p)
-{
-	if ((p == current) ||
-	    (p->flags & PF_NOFREEZE) ||
-	    (p->exit_state != 0))
-		return 0;
-	return 1;
-}
-
-static int try_to_freeze_tasks(bool sig_only)
+static int try_to_freeze_tasks(bool user_only)
 {
 	struct task_struct *g, *p;
 	unsigned long end_time;
@@ -53,17 +37,14 @@ static int try_to_freeze_tasks(bool sig_only)
 
 	end_time = jiffies + TIMEOUT;
 
-	if (!sig_only)
+	if (!user_only)
 		freeze_workqueues_begin();
 
 	while (true) {
 		todo = 0;
 		read_lock(&tasklist_lock);
 		do_each_thread(g, p) {
-			if (frozen(p) || !freezable(p))
-				continue;
-
-			if (!freeze_task(p, sig_only))
+			if (p == current || !freeze_task(p))
 				continue;
 
 			/*
@@ -84,7 +65,7 @@ static int try_to_freeze_tasks(bool sig_only)
 		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);
 
-		if (!sig_only) {
+		if (!user_only) {
 			wq_busy = freeze_workqueues_busy();
 			todo += wq_busy;
 		}
@@ -110,11 +91,6 @@ static int try_to_freeze_tasks(bool sig_only)
 	elapsed_csecs = elapsed_csecs64;
 
 	if (todo) {
-		/* This does not unfreeze processes that are already frozen
-		 * (we have slightly ugly calling convention in that respect,
-		 * and caller must call thaw_processes() if something fails),
-		 * but it cleans up leftover PF_FREEZE requests.
-		 */
 		printk("\n");
 		printk(KERN_ERR "Freezing of tasks %s after %d.%02d seconds "
 		       "(%d tasks refusing to freeze, wq_busy=%d):\n",
@@ -122,15 +98,11 @@ static int try_to_freeze_tasks(bool sig_only)
 		       elapsed_csecs / 100, elapsed_csecs % 100,
 		       todo - wq_busy, wq_busy);
 
-		thaw_workqueues();
-
 		read_lock(&tasklist_lock);
 		do_each_thread(g, p) {
-			task_lock(p);
-			if (!wakeup && freezing(p) && !freezer_should_skip(p))
+			if (!wakeup && !freezer_should_skip(p) &&
+			    p != current && freezing(p) && !frozen(p))
 				sched_show_task(p);
-			cancel_freezing(p);
-			task_unlock(p);
 		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);
 	} else {
@@ -143,15 +115,18 @@ static int try_to_freeze_tasks(bool sig_only)
 
 /**
  * freeze_processes - Signal user space processes to enter the refrigerator.
+ *
+ * On success, returns 0.  On failure, -errno and system is fully thawed.
  */
 int freeze_processes(void)
 {
 	int error;
 
-	printk(KERN_INFO "Stopping fuse filesystems.\n");
-	freeze_filesystems(FS_FREEZER_FUSE);
-	freezer_state = FREEZER_FILESYSTEMS_FROZEN;
-	printk(KERN_INFO "Freezing user space processes ... ");
+	if (!pm_freezing)
+		atomic_inc(&system_freezing_cnt);
+
+	printk("Freezing user space processes ... ");
+	pm_freezing = true;
 	error = try_to_freeze_tasks(true);
 	if (!error) {
 		printk("done.");
@@ -160,92 +135,67 @@ int freeze_processes(void)
 	printk("\n");
 	BUG_ON(in_atomic());
 
+	if (error)
+		thaw_processes();
 	return error;
 }
 EXPORT_SYMBOL_GPL(freeze_processes);
 
 /**
  * freeze_kernel_threads - Make freezable kernel threads go to the refrigerator.
+ *
+ * On success, returns 0.  On failure, -errno and system is fully thawed.
  */
 int freeze_kernel_threads(void)
 {
 	int error;
 
-	if (freezer_sync)
-		sys_sync();
-	printk(KERN_INFO "Stopping normal filesystems.\n");
-	freeze_filesystems(FS_FREEZER_NORMAL);
-	freezer_state = FREEZER_USERSPACE_FROZEN;
-	printk(KERN_INFO "Freezing remaining freezable tasks ... ");
+	printk("Freezing remaining freezable tasks ... ");
+	pm_nosig_freezing = true;
 	error = try_to_freeze_tasks(false);
-	if (!error) {
+	if (!error)
 		printk("done.");
-		freezer_state = FREEZER_FULLY_ON;
-	}
 
 	printk("\n");
 	BUG_ON(in_atomic());
 
+	if (error)
+		thaw_processes();
 	return error;
 }
+EXPORT_SYMBOL_GPL(freeze_kernel_threads);
 
-static void thaw_tasks(bool nosig_only)
+void thaw_kernel_threads(void)
 {
-	struct task_struct *g, *p;
+	printk("Thawing kernel threads.\n");
+	pm_nosig_freezing = false;
 
-	read_lock(&tasklist_lock);
-	do_each_thread(g, p) {
-		if (!freezable(p))
-			continue;
-
-		if (nosig_only && should_send_signal(p))
-			continue;
-
-		if (cgroup_freezing_or_frozen(p))
-			continue;
-
-		thaw_process(p);
-	} while_each_thread(g, p);
-	read_unlock(&tasklist_lock);
+	thaw_workqueues();
 }
+EXPORT_SYMBOL_GPL(thaw_kernel_threads);
 
 void thaw_processes(void)
 {
-	int old_state = freezer_state;
+	struct task_struct *g, *p;
 
-	if (old_state == FREEZER_OFF)
-		return;
-
-	freezer_state = FREEZER_OFF;
+	if (pm_freezing)
+		atomic_dec(&system_freezing_cnt);
+	pm_freezing = false;
 
 	oom_killer_enable();
 
-	printk(KERN_INFO "Restarting all filesystems ...\n");
-	thaw_filesystems(FS_FREEZER_ALL);
+	printk("Restarting tasks ... ");
 
-	printk(KERN_INFO "Restarting tasks ... ");
-	if (old_state == FREEZER_FULLY_ON) {
-		thaw_workqueues();
-		thaw_tasks(true);
-	}
+	thaw_kernel_threads();
 
-	thaw_tasks(false);
+	read_lock(&tasklist_lock);
+	do_each_thread(g, p) {
+		__thaw_task(p);
+	} while_each_thread(g, p);
+	read_unlock(&tasklist_lock);
+
 	schedule();
 	printk("done.\n");
 }
 EXPORT_SYMBOL_GPL(thaw_processes);
 
-void thaw_kernel_threads(void)
-{
-	freezer_state = FREEZER_USERSPACE_FROZEN;
-	printk(KERN_INFO "Restarting normal filesystems.\n");
-	thaw_filesystems(FS_FREEZER_NORMAL);
-	thaw_workqueues();
-	thaw_tasks(true);
-}
-
-/*
- * It's ugly putting this EXPORT down here, but it's necessary so that it
- * doesn't matter whether the fs-freezing patch is applied or not.
- */
-EXPORT_SYMBOL_GPL(thaw_kernel_threads);

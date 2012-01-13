@@ -329,6 +329,11 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 				    is a lot of faster
 			off	  - do not initialize any AMD IOMMU found in
 				    the system
+			force_isolation - Force device isolation for all
+					  devices. The IOMMU driver is not
+					  allowed anymore to lift isolation
+					  requirements as needed. This option
+					  does not override iommu=pt
 
 	amijoy.map=	[HW,JOY] Amiga joystick support
 			Map of devices attached to JOY0DAT and JOY1DAT
@@ -1059,7 +1064,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 		nomerge
 		forcesac
 		soft
-		pt	[x86, IA-64]
+		pt		[x86, IA-64]
+		group_mf	[x86, IA-64]
+
 
 	io7=		[HW] IO7 for Marvel based alpha systems
 			See comment before marvel_specify_io7 in
@@ -1177,9 +1184,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
 	kvm.ignore_msrs=[KVM] Ignore guest accesses to unhandled MSRs.
 			Default is 0 (don't ignore, but inject #GP)
-
-	kvm.oos_shadow=	[KVM] Disable out-of-sync shadow paging.
-			Default is 1 (enabled)
 
 	kvm.mmu_audit=	[KVM] This is a R/W parameter which allows audit
 			KVM MMU at runtime.
@@ -2636,6 +2640,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 	usbcore.old_scheme_first=
 			[USB] Start with the old device initialization
 			scheme (default 0 = off).
+
+	usbcore.usbfs_memory_mb=
+			[USB] Memory limit (in MB) for buffers allocated by
+			usbfs (default = 16, 0 = max = 2047).
 
 	usbcore.use_both_schemes=
 			[USB] Try the other device initialization scheme

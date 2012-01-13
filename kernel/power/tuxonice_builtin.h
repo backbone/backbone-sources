@@ -30,6 +30,7 @@ extern int toi_translate_err_default;
 extern int toi_force_no_multithreaded;
 extern void toi_read_lock_tasklist(void);
 extern void toi_read_unlock_tasklist(void);
+extern int toi_in_suspend(void);
 
 #ifdef CONFIG_TOI_ZRAM_SUPPORT
 extern int toi_do_flag_zram_disks(void);

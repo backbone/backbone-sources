@@ -147,7 +147,7 @@ int toi_get_pageset1_load_addresses(void)
 		    *low_pbe_page, *last_low_pbe_page = NULL;
 	struct pbe **last_high_pbe_ptr = &restore_highmem_pblist,
 		   *this_high_pbe = NULL;
-	int orig_low_pfn, orig_high_pfn;
+	unsigned long orig_low_pfn, orig_high_pfn;
 	int high_pbes_done = 0, low_pbes_done = 0;
 	int low_direct = 0, high_direct = 0, result = 0, i;
 	int high_page = 1, high_offset = 0, low_page = 1, low_offset = 0;

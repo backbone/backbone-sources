@@ -457,7 +457,7 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 		if (suspend_time && (error & 2))
 			platform_recover(1);
 		dpm_resume(msg);
-    if (error || !in_suspend)
+    if (error || !toi_in_suspend())
       pm_restore_gfp_mask();
 		resume_console();
 	case ATOMIC_STEP_DPM_COMPLETE:

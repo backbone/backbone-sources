@@ -376,7 +376,7 @@ static int asix_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 
 		skb_pull(skb, (size + 1) & 0xfffe);
 
-		if (skb->len == 0)
+		if (skb->len < sizeof(header))
 			break;
 
 		head = (u8 *) skb->data;
@@ -1152,7 +1152,7 @@ static int ax88772_bind(struct usbnet *dev, struct usb_interface *intf)
 	return 0;
 }
 
-static struct ethtool_ops ax88178_ethtool_ops = {
+static const struct ethtool_ops ax88178_ethtool_ops = {
 	.get_drvinfo		= asix_get_drvinfo,
 	.get_link		= asix_get_link,
 	.get_msglevel		= usbnet_get_msglevel,
@@ -1678,17 +1678,7 @@ static struct usb_driver asix_driver = {
 	.supports_autosuspend = 1,
 };
 
-static int __init asix_init(void)
-{
- 	return usb_register(&asix_driver);
-}
-module_init(asix_init);
-
-static void __exit asix_exit(void)
-{
- 	usb_deregister(&asix_driver);
-}
-module_exit(asix_exit);
+module_usb_driver(asix_driver);
 
 MODULE_AUTHOR("David Hollis");
 MODULE_VERSION(DRIVER_VERSION);

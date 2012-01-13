@@ -282,6 +282,12 @@ EXPORT_SYMBOL_GPL(toi_compress_bytes_in);
 unsigned long toi_compress_bytes_out;
 EXPORT_SYMBOL_GPL(toi_compress_bytes_out);
 
+int toi_in_suspend(void)
+{
+  return in_suspend;
+}
+EXPORT_SYMBOL_GPL(toi_in_suspend);
+
 unsigned long toi_state = ((1 << TOI_BOOT_TIME) |
 		(1 << TOI_IGNORE_LOGLEVEL) |
 		(1 << TOI_IO_STOPPED));
