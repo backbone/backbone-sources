@@ -607,12 +607,10 @@ int hibernate(void)
 {
 	int error;
 
-	lock_system_sleep();
-
 	if (test_action_state(TOI_REPLACE_SWSUSP))
 		return try_tuxonice_hibernate();
 
-	mutex_lock(&pm_mutex);
+	lock_system_sleep();
 	/* The snapshot device should not be opened while we're running */
 	if (!atomic_add_unless(&snapshot_device_available, -1, 0)) {
 		error = -EBUSY;
