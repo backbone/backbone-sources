@@ -432,7 +432,7 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		return -EINVAL;
 
 	/* All operations require privileges, even GET */
-	if (security_netlink_recv(skb, CAP_NET_ADMIN))
+	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
 	/* Only allow one task to receive NOFREEZE privileges */

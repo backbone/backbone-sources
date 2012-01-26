@@ -125,7 +125,7 @@ static void pageset2_full(void)
 			if (!zone_page_state(zone, NR_LRU_BASE + i))
 				continue;
 
-			list_for_each_entry(page, &zone->lru[i].list, lru) {
+			list_for_each_entry(page, &zone->lruvec.lists[i], lru) {
 				struct address_space *mapping;
 
 				mapping = page_mapping(page);
