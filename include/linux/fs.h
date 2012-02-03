@@ -401,6 +401,7 @@ struct inodes_stat_t {
 #include <linux/rculist_bl.h>
 #include <linux/atomic.h>
 #include <linux/shrinker.h>
+#include <linux/migrate_mode.h>
 
 #include <asm/byteorder.h>
 
@@ -531,7 +532,6 @@ enum positive_aop_returns {
 struct page;
 struct address_space;
 struct writeback_control;
-enum migrate_mode;
 
 struct iov_iter {
 	const struct iovec *iov;
