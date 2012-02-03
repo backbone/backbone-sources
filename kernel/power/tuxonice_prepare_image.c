@@ -903,8 +903,6 @@ static void update_image(int ps2_recalc)
 
 	} while (header_storage_needed > old_header_req);
 
-	if (freeze_processes())
-		set_abort_result(TOI_FREEZING_FAILED);
 	if (freeze_kernel_threads())
 		set_abort_result(TOI_FREEZING_FAILED);
 
@@ -922,7 +920,6 @@ static int attempt_to_freeze(void)
 	int result;
 
 	/* Stop processes before checking again */
-	thaw_processes();
 	toi_prepare_status(CLEAR_BAR, "Freezing processes & syncing "
 			"filesystems.");
 	result = freeze_processes();
@@ -1022,8 +1019,6 @@ static void eat_memory(void)
 
 		toi_cond_pause(0, NULL);
 
-		if (freeze_processes())
-			set_abort_result(TOI_FREEZING_FAILED);
 		if (freeze_kernel_threads())
 			set_abort_result(TOI_FREEZING_FAILED);
 	}

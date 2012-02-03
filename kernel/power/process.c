@@ -165,15 +165,6 @@ int freeze_kernel_threads(void)
 }
 EXPORT_SYMBOL_GPL(freeze_kernel_threads);
 
-void thaw_kernel_threads(void)
-{
-	printk("Thawing kernel threads.\n");
-	pm_nosig_freezing = false;
-
-	thaw_workqueues();
-}
-EXPORT_SYMBOL_GPL(thaw_kernel_threads);
-
 void thaw_processes(void)
 {
 	struct task_struct *g, *p;
@@ -218,3 +209,4 @@ void thaw_kernel_threads(void)
 	schedule();
 	printk("done.\n");
 }
+EXPORT_SYMBOL_GPL(thaw_kernel_threads);
