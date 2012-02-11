@@ -7505,7 +7505,7 @@ static void reap_sync_thread(struct mddev *mddev)
  */
 void md_check_recovery(struct mddev *mddev)
 {
-	if (mddev->suspended || unlikely(pm_freezing))
+	if (mddev->suspended || unlikely(atomic_read(&system_freezing_cnt)))
 		return;
 
 	if (mddev->bitmap)
