@@ -379,7 +379,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 	 * at resume time, and evil weirdness ensues.
 	 */
 
-	if (dpm_suspend_noirq(state)) {
+	if (dpm_suspend_end(state)) {
 		set_abort_result(TOI_DEVICE_REFUSED);
 		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 1);
 		return 1;
@@ -452,7 +452,7 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 			platform_restore_cleanup(1);
     else 
       platform_finish(1);
-		dpm_resume_noirq(msg);
+		dpm_resume_start(msg);
 	case ATOMIC_STEP_DEVICE_RESUME:
 		if (suspend_time && (error & 2))
 			platform_recover(1);
