@@ -317,9 +317,9 @@ void check_checksums(void)
 		}
 
 		/* Done when IRQs disabled so must be atomic */
-		pa = kmap_atomic(page, KM_USER1);
+		pa = kmap_atomic(page);
 		memcpy(ctx->buf, pa, PAGE_SIZE);
-		kunmap_atomic(pa, KM_USER1);
+		kunmap_atomic(pa);
 		ret = crypto_hash_digest(&ctx->desc, ctx->sg, PAGE_SIZE,
 							current_checksum);
 

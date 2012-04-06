@@ -147,11 +147,11 @@ void toi_copy_pageset1(void)
 		copypage = pfn_to_page(dest_index);
 
 		origvirt = PageHighMem(origpage) ?
-			kmap_atomic(origpage, KM_USER0) :
+			kmap_atomic(origpage) :
 			page_address(origpage);
 
 		copyvirt = PageHighMem(copypage) ?
-			kmap_atomic(copypage, KM_USER1) :
+			kmap_atomic(copypage) :
 			page_address(copypage);
 
 		was_present1 = kernel_page_present(origpage);
@@ -174,10 +174,10 @@ void toi_copy_pageset1(void)
 			kernel_map_pages(copypage, 1, 0);
 
 		if (PageHighMem(origpage))
-			kunmap_atomic(origvirt, KM_USER0);
+			kunmap_atomic(origvirt);
 
 		if (PageHighMem(copypage))
-			kunmap_atomic(copyvirt, KM_USER1);
+			kunmap_atomic(copyvirt);
 
 		source_index = memory_bm_next_pfn(pageset1_map);
 		dest_index = memory_bm_next_pfn(pageset1_copy_map);
