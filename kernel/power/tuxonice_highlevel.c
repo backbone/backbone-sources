@@ -135,7 +135,7 @@ static char *result_strings[] = {
 		"hibernation",
 	"Pre-snapshot preparation failed",
 	"Pre-restore preparation failed",
-	"(Obsolete) Failed to disable usermode helpers",
+	"Failed to disable usermode helpers",
 	"Can't resume from alternate image",
 	"Header reservation too small",
 	"Device Power Management Preparation failed",
@@ -467,6 +467,7 @@ static void do_cleanup(int get_debug_info, int restarting)
 			toiActiveAllocator->remove_image();
 
 	free_bitmaps();
+	usermodehelper_enable();
 
 	if (test_toi_state(TOI_NOTIFIERS_PREPARE)) {
 		pm_notifier_call_chain(PM_POST_HIBERNATION);
@@ -563,6 +564,14 @@ static int toi_init(int restarting)
 	if (!restarting) {
 		printk(KERN_ERR "Starting other threads.");
 		toi_start_other_threads();
+	}
+
+	result = usermodehelper_disable();
+	if (result) {
+		printk(KERN_ERR "TuxOnIce: Failed to disable usermode "
+				"helpers\n");
+		set_result_state(TOI_USERMODE_HELPERS_ERR);
+		return 1;
 	}
 
 	boot_kernel_data_buffer = toi_get_zeroed_page(37, TOI_ATOMIC_GFP);
@@ -1138,7 +1147,7 @@ out:
  * channel_no: If !0, -c <channel_no> is added to args (userui).
  */
 int toi_launch_userspace_program(char *command, int channel_no,
-		int debug)
+		int wait, int debug)
 {
 	int retval;
 	static char *envp[] = {
@@ -1189,7 +1198,7 @@ int toi_launch_userspace_program(char *command, int channel_no,
 		strcpy(argv[arg], "--debug");
 	}
 
-	retval = call_usermodehelper(argv[0], argv, envp, 0);
+	retval = call_usermodehelper(argv[0], argv, envp, wait);
 
 	/*
 	 * If the program reports an error, retval = 256. Don't complain

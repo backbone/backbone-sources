@@ -1696,6 +1696,9 @@ static int __read_pageset1(void)
 	if (result)
 		goto out_notifier_call_chain;;
 
+	if (usermodehelper_disable())
+		goto out_enable_nonboot_cpus;
+
 	current->flags |= PF_NOFREEZE;
 	freeze_result = FREEZE_IN_PROGRESS;
 
@@ -1760,9 +1763,11 @@ out_thaw:
 	wait_event(freeze_wait, freeze_result != FREEZE_IN_PROGRESS);
 	trap_non_toi_io = 0;
 	thaw_processes();
-out_notifier_call_chain:
+	usermodehelper_enable();
+out_enable_nonboot_cpus:
 	enable_nonboot_cpus();
-	pm_notifier_call_chain(PM_POST_RESTORE);
+out_notifier_call_chain:
+  pm_notifier_call_chain(PM_POST_RESTORE);
 out_reset_console:
 	toi_cleanup_console();
 out_remove_image:

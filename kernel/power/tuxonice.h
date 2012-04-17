@@ -217,7 +217,7 @@ extern void toi_early_boot_message(int can_erase_image, int default_answer,
 extern int do_check_can_resume(void);
 extern int do_toi_step(int step);
 extern int toi_launch_userspace_program(char *command, int channel_no,
-		int debug);
+		int wait, int debug);
 
 extern char tuxonice_signature[9];
 
