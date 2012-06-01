@@ -40,6 +40,8 @@ struct cpu_context {
 	u8 *output_buffer;
 };
 
+#define OUT_BUF_SIZE (2 * PAGE_SIZE)
+
 static DEFINE_PER_CPU(struct cpu_context, contexts);
 
 /*
@@ -79,7 +81,7 @@ static int toi_compress_crypto_prepare(void)
 		}
 
 		this->output_buffer =
-			(char *) vmalloc_32(2 * PAGE_SIZE);
+			(char *) vmalloc_32(OUT_BUF_SIZE);
 
 		if (!this->output_buffer) {
 			printk(KERN_ERR
@@ -172,38 +174,47 @@ static int toi_compress_rw_init(int rw, int stream_number)
 static int toi_compress_write_page(unsigned long index, int buf_type,
 		void *buffer_page, unsigned int buf_size)
 {
-	int ret, cpu = smp_processor_id();
+	int ret = 0, cpu = smp_processor_id();
 	struct cpu_context *ctx = &per_cpu(contexts, cpu);
+	u8* output_buffer = buffer_page;
+	int output_len = buf_size;
+	int out_buf_type = buf_type;
 
-	if (!ctx->transform || PagePrecompressed((struct page *) buffer_page))
-		return next_driver->write_page(index, TOI_PAGE, buffer_page,
-				buf_size);
+	if (ctx->transform && !PagePrecompressed((struct page *) buffer_page, cpu)) {
 
-	ctx->buffer_start = TOI_MAP(buf_type, buffer_page);
+		ctx->buffer_start = TOI_MAP(buf_type, buffer_page);
+		ctx->len = OUT_BUF_SIZE;
 
-	ctx->len = PAGE_SIZE;
-
-	ret = crypto_comp_compress(ctx->transform,
+		ret = crypto_comp_compress(ctx->transform,
 			ctx->buffer_start, buf_size,
 			ctx->output_buffer, &ctx->len);
 
-	TOI_UNMAP(buf_type, buffer_page);
+		TOI_UNMAP(buf_type, buffer_page);
+
+		toi_message(TOI_COMPRESS, TOI_VERBOSE, 0,
+				"CPU %d, index %lu: %d bytes",
+				cpu, index, ctx->len);
+
+		if (!ret && ctx->len < buf_size) { /* some compression */
+			output_buffer = ctx->output_buffer;
+			output_len = ctx->len;
+			out_buf_type = TOI_VIRT;
+		}
+
+	}
 
 	mutex_lock(&stats_lock);
+
 	toi_compress_bytes_in += buf_size;
-	toi_compress_bytes_out += ctx->len;
+	toi_compress_bytes_out += output_len;
+
 	mutex_unlock(&stats_lock);
 
-	toi_message(TOI_COMPRESS, TOI_VERBOSE, 0,
-			"CPU %d, index %lu: %d bytes",
-			cpu, index, ctx->len);
+	if (!ret)
+		ret = next_driver->write_page(index, out_buf_type,
+				output_buffer, output_len);
 
-	if (!ret && ctx->len < buf_size) /* some compression */
-		return next_driver->write_page(index, TOI_VIRT,
-				ctx->output_buffer, ctx->len);
-	else
-		return next_driver->write_page(index, TOI_PAGE, buffer_page,
-				buf_size);
+	return ret;
 }
 
 /*

@@ -589,12 +589,24 @@ static int worker_rw_loop(void *data)
 		      jif_index = 1, start_time = jiffies, thread_num;
 	int result = 0, my_io_index = 0, last_worker;
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
+	cpumask_var_t orig_mask;
+
+        if (!alloc_cpumask_var(&orig_mask, GFP_KERNEL)) {
+		printk(KERN_EMERG "Failed to allocate cpumask for TuxOnIce I/O thread %ld.\n", (unsigned long) data);
+                return -ENOMEM;
+        }
+
+	cpumask_copy(orig_mask, tsk_cpus_allowed(current));
 
 	current->flags |= PF_NOFREEZE;
 
 top:
 	mutex_lock(&io_mutex);
 	thread_num = atomic_read(&toi_io_workers);
+
+	cpumask_copy(tsk_cpus_allowed(current), orig_mask);
+	schedule();
+
 	atomic_inc(&toi_io_workers);
 
 	while (atomic_read(&io_count) >= atomic_read(&toi_io_workers) &&
@@ -716,6 +728,7 @@ top:
 
 	toi_message(TOI_IO, TOI_LOW, 0, "Thread %d exiting.", thread_num);
 	toi__free_page(28, buffer);
+	free_cpumask_var(orig_mask);
 
 	return result;
 }
@@ -739,8 +752,8 @@ int toi_start_other_threads(void)
 		if (cpu == smp_processor_id())
 			continue;
 
-		p = kthread_create(worker_rw_loop, (void *) num_started + 1,
-				"ktoi_io/%d", cpu);
+		p = kthread_create_on_node(worker_rw_loop, (void *) num_started + 1,
+				cpu_to_node(cpu), "ktoi_io/%d", cpu);
 		if (IS_ERR(p)) {
 			printk(KERN_ERR "ktoi_io for %i failed\n", cpu);
 			continue;
@@ -762,6 +775,7 @@ void toi_stop_other_threads(void)
 	toi_worker_command = TOI_IO_WORKER_EXIT;
 	wake_up(&toi_worker_wait_queue);
 }
+
 /**
  * do_rw_loop - main highlevel function for reading or writing pages
  *
