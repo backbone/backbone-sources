@@ -13,7 +13,6 @@
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
 #include <linux/crypto.h>
-#include <linux/tuxonice.h>
 
 #include "tuxonice_builtin.h"
 #include "tuxonice.h"
@@ -180,7 +179,7 @@ static int toi_compress_write_page(unsigned long index, int buf_type,
 	int output_len = buf_size;
 	int out_buf_type = buf_type;
 
-	if (ctx->transform && !PagePrecompressed((struct page *) buffer_page, cpu)) {
+	if (ctx->transform) {
 
 		ctx->buffer_start = TOI_MAP(buf_type, buffer_page);
 		ctx->len = OUT_BUF_SIZE;

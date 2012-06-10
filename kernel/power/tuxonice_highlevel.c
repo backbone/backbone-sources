@@ -76,7 +76,6 @@
 #include <linux/uaccess.h> /* for get/set_fs & KERNEL_DS on i386 */
 #include <linux/bio.h>
 #include <linux/kgdb.h>
-#include <linux/tuxonice.h>
 
 #include "tuxonice.h"
 #include "tuxonice_modules.h"
@@ -98,7 +97,7 @@ EXPORT_SYMBOL_GPL(pagedir2);
 
 static mm_segment_t oldfs;
 static DEFINE_MUTEX(tuxonice_in_use);
-static int block_dump_save, nr_precompressed;
+static int block_dump_save;
 
 /* Binary signature if an image is present */
 char tuxonice_signature[9] = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
@@ -322,7 +321,6 @@ static void free_bitmaps(void)
 	toi_free_bitmap(&nosave_map);
 	toi_free_bitmap(&free_map);
 	toi_free_bitmap(&page_resave_map);
-	toi_free_bitmap(&precompressed_map);
 }
 
 /**
@@ -403,8 +401,6 @@ static int get_toi_debug_info(const char *buffer, int count)
 					result_strings[i]);
 			first_result = 0;
 		}
-	if (nr_precompressed)
-		SNPRINTF("- ZRAM pages     : %d.\n", nr_precompressed);
 	if (first_result)
 		SNPRINTF("- Result         : %s.\n", nr_hibernates ?
 			"Succeeded" :
@@ -816,18 +812,6 @@ static int do_prepare_image(void)
 	if (toi_init(restarting) || toi_prepare_image() ||
 			test_result_state(TOI_ABORTED))
 		return 1;
-
-	/* 
-	 * ZRAM disks can be marked now as there's no race with userspace
-	 * potentially resizing a disk.
-	 */
-	nr_precompressed = 0;
-	if (toi_flag_zram_disks) {
-		if (toi_alloc_bitmap(&precompressed_map))
-			return 1;
-
-		nr_precompressed = toi_do_flag_zram_disks();
-	}
 
 	trap_non_toi_io = 1;
 
