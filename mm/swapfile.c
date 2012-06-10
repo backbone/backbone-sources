@@ -477,7 +477,7 @@ swp_entry_t get_swap_page_of_type(int type)
 EXPORT_SYMBOL_GPL(get_swap_page_of_type);
 
 static unsigned int find_next_to_unuse(struct swap_info_struct *si,
-					unsigned int prev);
+					unsigned int prev, bool frontswap);
 
 void get_swap_range_of_type(int type, swp_entry_t *start, swp_entry_t *end,
 		unsigned int limit)
@@ -494,7 +494,7 @@ void get_swap_range_of_type(int type, swp_entry_t *start, swp_entry_t *end,
 		/* This is called for allocating swap entry, not cache */
 		start_at = scan_swap_map(si, 1);
 		if (start_at) {
-			unsigned int stop_at = find_next_to_unuse(si, start_at);
+			unsigned int stop_at = find_next_to_unuse(si, start_at, 0);
 			if (stop_at > start_at)
 				stop_at--;
 			else
