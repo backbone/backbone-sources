@@ -997,7 +997,7 @@ static void eat_memory(void)
 		thaw_kernel_threads();
 
 		/*
-		 * Ask for too many because shrink_all_memory doesn't
+		 * Ask for too many because shrink_memory_mask doesn't
 		 * currently return enough most of the time.
 		 */
 		
@@ -1012,7 +1012,7 @@ static void eat_memory(void)
 
 		amount_wanted = amount_needed(1);
 
-		printk(KERN_DEBUG "Asked shrink_all_memory for %ld low pages &"
+		printk(KERN_DEBUG "Asked shrink_memory_mask for %ld low pages &"
 				" %ld pages from anywhere, got %ld.\n",
 				high_req, low_req,
 				request - amount_wanted);
