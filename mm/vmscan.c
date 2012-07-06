@@ -1673,12 +1673,13 @@ out:
 		unsigned long scan;
 
 		scan = get_lru_size(lruvec, lru);
-		if ((sc->priority || noswap || !vmscan_swappiness(sc)) && !sc->hibernation_mode) {
+		if (sc->priority || noswap || !vmscan_swappiness(sc)) {
 			scan >>= sc->priority;
 			if (!scan && force_scan)
 				scan = SWAP_CLUSTER_MAX;
 			scan = div64_u64(scan * fraction[file], denominator);
-		}
+		} else if (sc->hibernation_mode)
+			scan = SWAP_CLUSTER_MAX;
 		nr[lru] = scan;
 	}
 }
@@ -2031,7 +2032,7 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 	bool aborted_reclaim;
 
 #ifdef CONFIG_FREEZER
-	if (unlikely(pm_freezing))
+	if (unlikely(pm_freezing && !sc->hibernation_mode))
 		return 0;
 #endif
 
