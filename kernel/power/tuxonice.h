@@ -16,7 +16,6 @@
 #include <linux/bootmem.h>
 #include <linux/suspend.h>
 #include <linux/fs.h>
-#include <linux/kmod.h>
 #include <linux/module.h>
 #include <asm/setup.h>
 #include "tuxonice_pageflags.h"

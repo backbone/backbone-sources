@@ -29,7 +29,6 @@
 #include <linux/tty.h>
 #include <linux/vt_kern.h>
 #include <linux/reboot.h>
-#include <linux/kmod.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
 #include <linux/vt.h>

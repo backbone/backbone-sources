@@ -178,7 +178,7 @@ void toi_early_boot_message(int message_detail, int default_answer,
 
 post_ask:
 	if ((warning_reason) && (!continue_req))
-		machine_restart(NULL);
+		kernel_restart(NULL);
 
 	restore_toi_state(orig_state);
 	if (continue_req)

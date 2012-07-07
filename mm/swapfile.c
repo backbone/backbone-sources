@@ -451,7 +451,6 @@ noswap:
 	spin_unlock(&swap_lock);
 	return (swp_entry_t) {0};
 }
-EXPORT_SYMBOL_GPL(get_swap_page);
 
 /* The only caller of this function is now susupend routine */
 swp_entry_t get_swap_page_of_type(int type)

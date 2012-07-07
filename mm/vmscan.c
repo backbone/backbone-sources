@@ -1710,8 +1710,8 @@ static inline bool should_continue_reclaim(struct lruvec *lruvec,
 	unsigned long pages_for_compaction;
 	unsigned long inactive_lru_pages;
 
-  if (sc->hibernation_mode && nr_reclaimed && nr_scanned && sc->nr_to_reclaim >= sc->nr_reclaimed)
-    return true;
+	if (sc->hibernation_mode && nr_reclaimed && nr_scanned && sc->nr_to_reclaim >= sc->nr_reclaimed)
+		return true;
 
 	/* If not in reclaim/compaction mode, stop */
 	if (!in_reclaim_compaction(sc))

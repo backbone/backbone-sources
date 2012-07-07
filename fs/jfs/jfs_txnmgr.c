@@ -2752,7 +2752,7 @@ int jfs_lazycommit(void *arg)
 	unsigned long flags;
 	struct jfs_sb_info *sbi;
 
-  set_freezable();
+	set_freezable();
 
 	do {
 		LAZY_LOCK(flags);
@@ -2938,7 +2938,7 @@ int jfs_sync(void *arg)
 	struct jfs_inode_info *jfs_ip;
 	tid_t tid;
 
-  set_freezable();
+	set_freezable();
 
 	do {
 		/*

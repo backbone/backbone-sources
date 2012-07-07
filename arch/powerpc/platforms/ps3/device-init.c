@@ -841,7 +841,7 @@ static int ps3_probe_thread(void *data)
 	if (res)
 		goto fail_free_irq;
 
-  set_freezable();
+	set_freezable();
 
 	/* Loop here processing the requested notification events. */
 	do {
