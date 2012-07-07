@@ -181,12 +181,13 @@ void thaw_processes(void)
 	if (pm_freezing)
 		atomic_dec(&system_freezing_cnt);
 	pm_freezing = false;
+	pm_nosig_freezing = false;
 
 	oom_killer_enable();
 
 	printk("Restarting tasks ... ");
 
-	thaw_kernel_threads();
+	thaw_workqueues();
 
 	read_lock(&tasklist_lock);
 	do_each_thread(g, p) {
