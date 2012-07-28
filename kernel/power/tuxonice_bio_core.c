@@ -16,7 +16,6 @@
 #include <linux/suspend.h>
 #include <linux/ctype.h>
 #include <linux/fs_uuid.h>
-#include <scsi/scsi_scan.h>
 
 #include "tuxonice.h"
 #include "tuxonice_sysfs.h"
@@ -176,7 +175,6 @@ retry:
 		if (!retried) {
 			retried = 1;
 			wait_for_device_probe();
-			scsi_complete_async_scans();
 			goto retry;
 		}
 		if (display_errs)
@@ -1567,7 +1565,6 @@ do { \
 	command; \
 	if (!resume_dev_t && !waited_for_device_probe) { \
 		wait_for_device_probe(); \
-		scsi_complete_async_scans(); \
 		command; \
 		waited_for_device_probe = 1; \
 	} \

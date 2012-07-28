@@ -60,15 +60,6 @@ static struct sk_buff *toi_get_skb(struct user_helper_data *uhd)
 	return skb;
 }
 
-static void put_skb(struct user_helper_data *uhd, struct sk_buff *skb)
-{
-	if (uhd->pool_level < uhd->pool_limit) {
-		skb->next = uhd->emerg_skbs;
-		uhd->emerg_skbs = skb;
-	} else
-		kfree_skb(skb);
-}
-
 void toi_send_netlink_message(struct user_helper_data *uhd,
 		int type, void *params, size_t len)
 {
@@ -90,8 +81,7 @@ void toi_send_netlink_message(struct user_helper_data *uhd,
 		return;
 	}
 
-	/* NLMSG_PUT contains a hidden goto nlmsg_failure */
-	nlh = NLMSG_PUT(skb, 0, uhd->sock_seq, type, len);
+	nlh = nlmsg_put(skb, 0, uhd->sock_seq, type, len, 0);
 	uhd->sock_seq++;
 
 	dest = NLMSG_DATA(nlh);
@@ -113,16 +103,6 @@ void toi_send_netlink_message(struct user_helper_data *uhd,
 	toi_read_unlock_tasklist();
 
 	yield();
-
-	return;
-
-nlmsg_failure:
-	if (skb)
-		put_skb(uhd, skb);
-
-	if (uhd->debug)
-		printk(KERN_ERR "toi_send_netlink_message: Failed to send "
-				"message type %d.\n", type);
 }
 EXPORT_SYMBOL_GPL(toi_send_netlink_message);
 
@@ -282,12 +262,17 @@ static void toi_user_rcv_skb(struct sk_buff *skb)
 
 static int netlink_prepare(struct user_helper_data *uhd)
 {
+	struct netlink_kernel_cfg cfg = {
+		.groups = 0,
+		.input = toi_user_rcv_skb,
+	};
+
 	uhd->next = uhd_list;
 	uhd_list = uhd;
 
 	uhd->sock_seq = 0x42c0ffee;
-	uhd->nl = netlink_kernel_create(&init_net, uhd->netlink_id, 0,
-			toi_user_rcv_skb, NULL, THIS_MODULE);
+	uhd->nl = netlink_kernel_create(&init_net, uhd->netlink_id,
+				THIS_MODULE, &cfg);
 	if (!uhd->nl) {
 		printk(KERN_INFO "Failed to allocate netlink socket for %s.\n",
 				uhd->name);
