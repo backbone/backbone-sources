@@ -125,6 +125,22 @@ menuconfig TOI_CORE
 	comment "General Options"
 		depends on TOI_CORE
 
+	config TOI_PRUNE
+		tristate "Image pruning support"
+		depends on TOI_CORE && CRYPTO && BROKEN
+		default y
+		---help---
+		  This option adds support for using cryptoapi hashing
+		  algorithms to identify pages with the same content. We
+		  then write a much smaller pointer to the first copy of
+		  the data instead of a complete (perhaps compressed)
+                  additional copy.
+
+		  You probably want this, so say Y here.
+
+	comment "No image pruning support available without Cryptoapi support."
+		depends on TOI_CORE && !CRYPTO
+
 	config TOI_CRYPTO
 		tristate "Compression support"
 		depends on TOI_CORE && CRYPTO

@@ -23,7 +23,7 @@
 
 #define TOI_CORE_VERSION "3.3"
 #define	TOI_HEADER_VERSION 3
-#define MY_BOOT_KERNEL_DATA_VERSION 3
+#define MY_BOOT_KERNEL_DATA_VERSION 4
 
 struct toi_boot_kernel_data {
 	int version;
@@ -36,6 +36,7 @@ struct toi_boot_kernel_data {
 	unsigned long pages_used[33];
 	unsigned long compress_bytes_in;
 	unsigned long compress_bytes_out;
+	unsigned long pruned_pages;
 };
 
 extern struct toi_boot_kernel_data toi_bkd;
