@@ -14,6 +14,7 @@
 #include <linux/freezer.h>
 #include <linux/console.h>
 #include <linux/syscore_ops.h>
+#include <linux/ftrace.h>
 #include <asm/suspend.h>
 #include "tuxonice.h"
 #include "tuxonice_storage.h"
@@ -356,6 +357,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
   }
 
 	suspend_console();
+	ftrace_stop();
 	pm_restrict_gfp_mask();
 
   if (suspend_time) {
@@ -450,15 +452,16 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 	case ATOMIC_STEP_PLATFORM_FINISH:
 		if (!suspend_time && error & 2)
 			platform_restore_cleanup(1);
-    else 
-      platform_finish(1);
+		else 
+			platform_finish(1);
 		dpm_resume_start(msg);
 	case ATOMIC_STEP_DEVICE_RESUME:
 		if (suspend_time && (error & 2))
 			platform_recover(1);
 		dpm_resume(msg);
-    if (error || !toi_in_suspend())
-      pm_restore_gfp_mask();
+		if (error || !toi_in_suspend())
+			pm_restore_gfp_mask();
+		ftrace_start();
 		resume_console();
 	case ATOMIC_STEP_DPM_COMPLETE:
 		dpm_complete(msg);
