@@ -1338,10 +1338,10 @@ struct sk_buff *__ip_make_skb(struct sock *sk,
 	iph->ihl = 5;
 	iph->tos = inet->tos;
 	iph->frag_off = df;
-	ip_select_ident(iph, &rt->dst, sk);
 	iph->ttl = ttl;
 	iph->protocol = sk->sk_protocol;
 	ip_copy_addrs(iph, fl4);
+	ip_select_ident(iph, &rt->dst, sk);
 
 	if (opt) {
 		iph->ihl += opt->optlen>>2;
@@ -1366,9 +1366,8 @@ out:
 	return skb;
 }
 
-int ip_send_skb(struct sk_buff *skb)
+int ip_send_skb(struct net *net, struct sk_buff *skb)
 {
-	struct net *net = sock_net(skb->sk);
 	int err;
 
 	err = ip_local_out(skb);
@@ -1391,7 +1390,7 @@ int ip_push_pending_frames(struct sock *sk, struct flowi4 *fl4)
 		return 0;
 
 	/* Netfilter gets whole the not fragmented skb. */
-	return ip_send_skb(skb);
+	return ip_send_skb(sock_net(sk), skb);
 }
 
 /*
@@ -1536,6 +1535,7 @@ void ip_send_unicast_reply(struct net *net, struct sk_buff *skb, __be32 daddr,
 			  arg->csumoffset) = csum_fold(csum_add(nskb->csum,
 								arg->csum));
 		nskb->ip_summed = CHECKSUM_NONE;
+		skb_orphan(nskb);
 		skb_set_queue_mapping(nskb, skb_get_queue_mapping(skb));
 		ip_push_pending_frames(sk, &fl4);
 	}
