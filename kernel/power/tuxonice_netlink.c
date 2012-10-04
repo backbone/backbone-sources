@@ -271,8 +271,7 @@ static int netlink_prepare(struct user_helper_data *uhd)
 	uhd_list = uhd;
 
 	uhd->sock_seq = 0x42c0ffee;
-	uhd->nl = netlink_kernel_create(&init_net, uhd->netlink_id,
-				THIS_MODULE, &cfg);
+	uhd->nl = netlink_kernel_create(&init_net, uhd->netlink_id, &cfg);
 	if (!uhd->nl) {
 		printk(KERN_INFO "Failed to allocate netlink socket for %s.\n",
 				uhd->name);
