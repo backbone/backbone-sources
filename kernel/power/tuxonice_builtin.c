@@ -61,24 +61,22 @@ static void copyback_high(void)
 	if (!pbe_page)
 		return;
 
-	this_pbe = (struct pbe *) kmap_atomic(pbe_page, KM_BOUNCE_READ);
+	this_pbe = (struct pbe *) kmap_atomic(pbe_page);
 	first_pbe = this_pbe;
 
 	while (this_pbe) {
 		int loop = (PAGE_SIZE / sizeof(unsigned long)) - 1;
 
-		origpage = kmap_atomic(pfn_to_page((unsigned long) this_pbe->orig_address),
-			KM_BIO_DST_IRQ);
-		copypage = kmap_atomic((struct page *) this_pbe->address,
-			KM_BIO_SRC_IRQ);
+		origpage = kmap_atomic(pfn_to_page((unsigned long) this_pbe->orig_address));
+		copypage = kmap_atomic((struct page *) this_pbe->address);
 
 		while (loop >= 0) {
 			*(origpage + loop) = *(copypage + loop);
 			loop--;
 		}
 
-		kunmap_atomic(origpage, KM_BIO_DST_IRQ);
-		kunmap_atomic(copypage, KM_BIO_SRC_IRQ);
+		kunmap_atomic(origpage);
+		kunmap_atomic(copypage);
 
 		if (!this_pbe->next)
 			break;
@@ -88,16 +86,15 @@ static void copyback_high(void)
 			pbe_index++;
 		} else {
 			pbe_page = (struct page *) this_pbe->next;
-			kunmap_atomic(first_pbe, KM_BOUNCE_READ);
+			kunmap_atomic(first_pbe);
 			if (!pbe_page)
 				return;
-			this_pbe = (struct pbe *) kmap_atomic(pbe_page,
-					KM_BOUNCE_READ);
+			this_pbe = (struct pbe *) kmap_atomic(pbe_page);
 			first_pbe = this_pbe;
 			pbe_index = 1;
 		}
 	}
-	kunmap_atomic(first_pbe, KM_BOUNCE_READ);
+	kunmap_atomic(first_pbe);
 }
 
 #else /* CONFIG_HIGHMEM */
