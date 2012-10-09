@@ -161,7 +161,7 @@ static void toi_mark_task_as_pageset(struct task_struct *t, int pageset2)
 		unsigned long posn;
 
 		if (!vma->vm_start ||
-		    vma->vm_flags & (VM_IO | VM_RESERVED | VM_PFNMAP))
+		    vma->vm_flags & (VM_IO | VM_DONTDUMP | VM_PFNMAP))
 			continue;
 
 		for (posn = vma->vm_start; posn < vma->vm_end;

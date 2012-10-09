@@ -705,6 +705,7 @@ static void __init early_cmdline_parse(void)
 #endif
 #define OV5_TYPE1_AFFINITY	0x80	/* Type 1 NUMA affinity */
 #define OV5_PFO_HW_RNG		0x80	/* PFO Random Number Generator */
+#define OV5_PFO_HW_842		0x40	/* PFO Compression Accelerator */
 #define OV5_PFO_HW_ENCR		0x20	/* PFO Encryption Accelerator */
 
 /* Option Vector 6: IBM PAPR hints */
@@ -774,8 +775,7 @@ static unsigned char ibm_architecture_vec[] = {
 	0,
 	0,
 	0,
-	OV5_PFO_HW_RNG | OV5_PFO_HW_ENCR,
-
+	OV5_PFO_HW_RNG | OV5_PFO_HW_ENCR | OV5_PFO_HW_842,
 	/* option vector 6: IBM PAPR hints */
 	4 - 2,				/* length */
 	0,
@@ -1748,7 +1748,7 @@ static void __init prom_initialize_tce_table(void)
 		 * else will impact performance, so we always allocate 8MB.
 		 * Anton
 		 */
-		if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p))
+		if (pvr_version_is(PVR_POWER4) || pvr_version_is(PVR_POWER4p))
 			minsize = 8UL << 20;
 		else
 			minsize = 4UL << 20;

@@ -1125,10 +1125,12 @@ menuconfig EXPERT
           environments which can tolerate a "non-standard" kernel.
           Only use this if you really know what you are doing.
 
+config HAVE_UID16
+	bool
+
 config UID16
 	bool "Enable 16-bit UID system calls" if EXPERT
-	depends on ARM || BLACKFIN || CRIS || FRV || H8300 || X86_32 || M68K || (S390 && !64BIT) || SUPERH || SPARC32 || (SPARC64 && COMPAT) || UML || (X86_64 && IA32_EMULATION) \
-		|| AARCH32_EMULATION
+	depends on HAVE_UID16
 	default y
 	help
 	  This enables the legacy 16-bit UID syscall wrappers.
@@ -1149,6 +1151,11 @@ config SYSCTL_SYSCALL
 	  making your kernel marginally smaller.
 
 	  If unsure say N here.
+
+config SYSCTL_EXCEPTION_TRACE
+	bool
+	help
+	  Enable support for /proc/sys/debug/exception-trace.
 
 config KALLSYMS
 	 bool "Load all symbols for debugging/ksymoops" if EXPERT
@@ -1199,6 +1206,7 @@ config BUG
           Just say Y.
 
 config ELF_CORE
+	depends on COREDUMP
 	default y
 	bool "Enable ELF core dumps" if EXPERT
 	help
@@ -1579,6 +1587,12 @@ config PREEMPT_NOTIFIERS
 
 config PADATA
 	depends on SMP
+	bool
+
+# Can be selected by architectures with broken toolchains
+# that get confused by correct const<->read_only section
+# mappings
+config BROKEN_RODATA
 	bool
 
 source "kernel/Kconfig.locks"
