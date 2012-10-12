@@ -44,6 +44,7 @@
 #define IRQ_MODE	0x00000012
 #define SVC_MODE	0x00000013
 #define ABT_MODE	0x00000017
+#define HYP_MODE	0x0000001a
 #define UND_MODE	0x0000001b
 #define SYSTEM_MODE	0x0000001f
 #define MODE32_BIT	0x00000010
@@ -253,6 +254,11 @@ static inline unsigned long user_stack_pointer(struct pt_regs *regs)
 {
 	return regs->ARM_sp;
 }
+
+#define current_pt_regs(void) ({				\
+	register unsigned long sp asm ("sp");			\
+	(struct pt_regs *)((sp | (THREAD_SIZE - 1)) - 7) - 1;	\
+})
 
 #endif /* __KERNEL__ */
 
