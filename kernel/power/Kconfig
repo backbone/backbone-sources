@@ -125,6 +125,25 @@ menuconfig TOI_CORE
 	comment "General Options"
 		depends on TOI_CORE
 
+	config TOI_INCREMENTAL
+		tristate "Incremental Image Support"
+		depends on TOI_CORE && CRYPTO && BROKEN
+		select CRYPTO_SHA1
+		default y
+		---help---
+		  This option adds initial support for using hashing algorithms
+		  (a quick, internal implementation of Fletcher16 and SHA1 via
+		  cryptoapi) to discover the number of pages which are
+		  unchanged since the image was last written. It is hoped that
+		  this will be an initial step toward implementing storing just
+		  the differences between consecutive images, which will
+		  increase the amount of storage needed for the image, but also
+		  increase the speed at which writing an image occurs and
+		  reduce the wear and tear on drives.
+
+	comment "No increemntal image support available without Cryptoapi support."
+		depends on TOI_CORE && !CRYPTO
+
 	config TOI_PRUNE
 		tristate "Image pruning support"
 		depends on TOI_CORE && CRYPTO && BROKEN
