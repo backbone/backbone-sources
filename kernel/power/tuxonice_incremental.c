@@ -43,34 +43,6 @@ struct cpu_context {
 
 static DEFINE_PER_CPU(struct cpu_context, contexts);
 
-#if 0
-/*
- * toi_fletcher16
- *
- * Calculate the fletcher16 checksum of a page
- */
-static uint16_t toi_incremental_fletcher16(char *data)
-{
-	int sum1 = 0xffff, sum2 = 0xffff;
-	int len = PAGE_SIZE;
-	while (len)
-	{
-		int tlen = len > 360 ? 360 : len;
-		len -= tlen;
-		do
-		{
-			sum1 += *data++;
-			sum2 += sum1;
-		} while ((--tlen) != 0);
-		sum1 = (sum1 & 0xffff) + (sum1 >> 16);
-		sum2 = (sum2 & 0xffff) + (sum2 >> 16);
-	}
-	sum1 = (sum1 & 0xffff) + (sum1 >> 16);
-	sum2 = (sum2 & 0xffff) + (sum2 >> 16);
-	return sum2 << 16 | sum1;
-}
-#endif
-
 /*
  * toi_crypto_prepare
  *
@@ -81,8 +53,8 @@ static int toi_incremental_crypto_prepare(void)
 	int cpu;
 
 	if (!*toi_incremental_slow_cmp_name) {
-		printk(KERN_INFO "TuxOnIce: Compression enabled but no "
-				"compressor name set.\n");
+		printk(KERN_INFO "TuxOnIce: Incremental image support enabled but no "
+				"hash algorithm set.\n");
 		return 1;
 	}
 
@@ -174,7 +146,7 @@ static int toi_incremental_rw_init(int rw, int stream_number)
 			return -ENODEV;
 		} else {
 			printk(KERN_INFO "Continuing without "
-				"compressing the image.\n");
+				" calculating an incremental image.\n");
 			toi_incremental_ops.enabled = 0;
 		}
 	}
@@ -185,11 +157,15 @@ static int toi_incremental_rw_init(int rw, int stream_number)
 /*
  * toi_incremental_write_page()
  *
- * Compress a page of data, buffering output and passing on filled
- * pages to the next module in the pipeline.
+ * Decide whether to write a page to the image. Calculate the SHA1 (or something
+ * else if the user changes the hashing algo) of the page and compare it to the
+ * previous value (if any). If there was no previous value or the values are
+ * different, write the page. Otherwise, skip the write.
+ *
+ * @TODO: Clear hashes for pages that are no longer in the image!
  *
  * Buffer_page:	Pointer to a buffer of size PAGE_SIZE, containing
- * data to be compressed.
+ * data to be written.
  *
  * Returns:	0 on success. Otherwise the error is that returned by later
  * 		modules, -ECHILD if we have a broken pipeline or -EIO if
@@ -200,43 +176,45 @@ static int toi_incremental_write_page(unsigned long index, int buf_type,
 {
 	int ret = 0, cpu = smp_processor_id();
 	struct cpu_context *ctx = &per_cpu(contexts, cpu);
-	u8* output_buffer = buffer_page;
-	int output_len = buf_size;
-	int out_buf_type = buf_type;
+	int to_write = true;
 
 	if (ctx->transform) {
+/*
+		PSEUDO CODE TO START WITH.
 
 		ctx->buffer_start = TOI_MAP(buf_type, buffer_page);
 		ctx->len = OUT_BUF_SIZE;
-/*
-		ret = crypto_comp_compress(ctx->transform,
-			ctx->buffer_start, buf_size,
-			ctx->output_buffer, &ctx->len);
-*/
+
+		result = get_new_hash(ctx);
+		old_hash = get_old_hash(index);
+
 		TOI_UNMAP(buf_type, buffer_page);
+
+		if (!result && new_hash == old_hash) {
+			to_write = false;	
+		} else
+			store_hash(ctx, index, new_hash);
 
 		toi_message(TOI_COMPRESS, TOI_VERBOSE, 0,
 				"CPU %d, index %lu: %d bytes",
 				cpu, index, ctx->len);
-
-		if (!ret && ctx->len < buf_size) { /* some compression */
-			output_buffer = ctx->output_buffer;
-			output_len = ctx->len;
-			out_buf_type = TOI_VIRT;
-		}
-
+*/
 	}
 
 	mutex_lock(&stats_lock);
 
 	toi_incremental_bytes_in += buf_size;
-	toi_incremental_bytes_out += output_len;
+	if (ret || to_write)
+		toi_incremental_bytes_out += buf_size;
 
 	mutex_unlock(&stats_lock);
 
-	if (!ret)
-		ret = next_driver->write_page(index, out_buf_type,
-				output_buffer, output_len);
+	if (ret || to_write) {
+		int ret2 = next_driver->write_page(index, buf_type,
+				buffer_page, buf_size);
+		if (!ret)
+			ret = ret2;
+	}
 
 	return ret;
 }
@@ -245,62 +223,12 @@ static int toi_incremental_write_page(unsigned long index, int buf_type,
  * toi_incremental_read_page()
  * @buffer_page: struct page *. Pointer to a buffer of size PAGE_SIZE.
  *
- * Retrieve data from later modules and decompress it until the input buffer
- * is filled.
- * Zero if successful. Error condition from me or from downstream on failure.
+ * Nothing extra to do here.
  */
 static int toi_incremental_read_page(unsigned long *index, int buf_type,
 		void *buffer_page, unsigned int *buf_size)
 {
-	int ret, cpu = smp_processor_id();
-	unsigned int len;
-	unsigned int outlen = PAGE_SIZE;
-	char *buffer_start;
-	struct cpu_context *ctx = &per_cpu(contexts, cpu);
-
-	if (!ctx->transform)
-		return next_driver->read_page(index, TOI_PAGE, buffer_page,
-				buf_size);
-
-	/*
-	 * All our reads must be synchronous - we can't decompress
-	 * data that hasn't been read yet.
-	 */
-
-	ret = next_driver->read_page(index, TOI_VIRT, ctx->page_buffer, &len);
-
-	buffer_start = kmap(buffer_page);
-
-	/* Error or uncompressed data */
-	if (ret || len == PAGE_SIZE) {
-		memcpy(buffer_start, ctx->page_buffer, len);
-		goto out;
-	}
-/*
-	ret = crypto_comp_decompress(
-			ctx->transform,
-			ctx->page_buffer,
-			len, buffer_start, &outlen);
-*/
-	toi_message(TOI_COMPRESS, TOI_VERBOSE, 0,
-			"CPU %d, index %lu: %d=>%d (%d).",
-			cpu, *index, len, outlen, ret);
-
-	if (ret)
-		abort_hibernate(TOI_FAILED_IO,
-			"Compress_read returned %d.\n", ret);
-	else if (outlen != PAGE_SIZE) {
-		abort_hibernate(TOI_FAILED_IO,
-			"Decompression yielded %d bytes instead of %ld.\n",
-			outlen, PAGE_SIZE);
-		printk(KERN_ERR "Decompression yielded %d bytes instead of "
-				"%ld.\n", outlen, PAGE_SIZE);
-		ret = -EIO;
-		*buf_size = outlen;
-	}
-out:
-	TOI_UNMAP(buf_type, buffer_page);
-	return ret;
+	return next_driver->read_page(index, TOI_PAGE, buffer_page, buf_size);
 }
 
 /*
@@ -318,24 +246,24 @@ static int toi_incremental_print_debug_stats(char *buffer, int size)
 		      pages_out = toi_incremental_bytes_out >> PAGE_SHIFT;
 	int len;
 
-	/* Output the compression ratio achieved. */
+	/* Output the size of the incremental image. */
 	if (*toi_incremental_slow_cmp_name)
-		len = scnprintf(buffer, size, "- Compressor is '%s'.\n",
+		len = scnprintf(buffer, size, "- Hash algorithm is '%s'.\n",
 				toi_incremental_slow_cmp_name);
 	else
-		len = scnprintf(buffer, size, "- Compressor is not set.\n");
+		len = scnprintf(buffer, size, "- Hash algorithm is not set.\n");
 
 	if (pages_in)
-		len += scnprintf(buffer+len, size - len, "  Compressed "
-			"%lu bytes into %lu (%ld percent compression).\n",
-		  toi_incremental_bytes_in,
+		len += scnprintf(buffer+len, size - len, "  Incremental image "
+			"%lu of %lu bytes (%ld percent).\n",
 		  toi_incremental_bytes_out,
-		  (pages_in - pages_out) * 100 / pages_in);
+		  toi_incremental_bytes_in,
+		  pages_out * 100 / pages_in);
 	return len;
 }
 
 /*
- * toi_incremental_compression_memory_needed
+ * toi_incremental_memory_needed
  *
  * Tell the caller how much memory we need to operate during hibernate/resume.
  * Returns: Unsigned long. Maximum number of bytes of memory required for
@@ -377,8 +305,7 @@ static int toi_incremental_save_config_info(char *buffer)
  * @buffer: Pointer to the start of the data.
  * @size: Number of bytes that were saved.
  *
- * Description:	Reload information needed for decompressing the image at
- * resume time.
+ * Description:	Reload information to be retained for debugging info.
  */
 static void toi_incremental_load_config_info(char *buffer, int size)
 {
@@ -395,14 +322,14 @@ static void toi_incremental_load_config_info(char *buffer, int size)
 
 static void toi_incremental_pre_atomic_restore(struct toi_boot_kernel_data *bkd)
 {
-	bkd->compress_bytes_in = toi_incremental_bytes_in;
-	bkd->compress_bytes_out = toi_incremental_bytes_out;
+	bkd->incremental_bytes_in = toi_incremental_bytes_in;
+	bkd->incremental_bytes_out = toi_incremental_bytes_out;
 }
 
 static void toi_incremental_post_atomic_restore(struct toi_boot_kernel_data *bkd)
 {
-	toi_incremental_bytes_in = bkd->compress_bytes_in;
-	toi_incremental_bytes_out = bkd->compress_bytes_out;
+	toi_incremental_bytes_in = bkd->incremental_bytes_in;
+	toi_incremental_bytes_out = bkd->incremental_bytes_out;
 }
 
 /*
@@ -419,8 +346,8 @@ static struct toi_sysfs_data sysfs_params[] = {
  */
 static struct toi_module_ops toi_incremental_ops = {
 	.type			= FILTER_MODULE,
-	.name			= "compression",
-	.directory		= "compression",
+	.name			= "incremental",
+	.directory		= "incremental",
 	.module			= THIS_MODULE,
 	.initialise		= toi_incremental_init,
 	.memory_needed 		= toi_incremental_memory_needed,

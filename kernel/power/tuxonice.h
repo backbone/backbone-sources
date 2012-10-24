@@ -34,6 +34,8 @@ struct toi_boot_kernel_data {
 	int toi_io_time[2][2];
 	char toi_nosave_commandline[COMMAND_LINE_SIZE];
 	unsigned long pages_used[33];
+	unsigned long incremental_bytes_in;
+	unsigned long incremental_bytes_out;
 	unsigned long compress_bytes_in;
 	unsigned long compress_bytes_out;
 	unsigned long pruned_pages;
