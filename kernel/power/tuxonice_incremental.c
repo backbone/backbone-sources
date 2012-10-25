@@ -14,6 +14,7 @@
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
 #include <linux/crypto.h>
+#include <linux/scatterlist.h>
 
 #include "tuxonice_builtin.h"
 #include "tuxonice.h"
@@ -28,15 +29,15 @@ static struct toi_module_ops *next_driver;
 static unsigned long toi_incremental_bytes_in, toi_incremental_bytes_out;
 
 static char toi_incremental_slow_cmp_name[32] = "sha1";
+static int toi_incremental_digestsize;
 
 static DEFINE_MUTEX(stats_lock);
 
 struct cpu_context {
-	u8 *page_buffer;
-	struct crypto_hash *transform;
-	unsigned int len;
 	u8 *buffer_start;
-	u8 *output_buffer;
+	struct hash_desc desc;
+	struct scatterlist sg[1];
+	unsigned char *digest;
 };
 
 #define OUT_BUF_SIZE (2 * PAGE_SIZE)
@@ -50,7 +51,7 @@ static DEFINE_PER_CPU(struct cpu_context, contexts);
  */
 static int toi_incremental_crypto_prepare(void)
 {
-	int cpu;
+	int cpu, digestsize = toi_incremental_digestsize;
 
 	if (!*toi_incremental_slow_cmp_name) {
 		printk(KERN_INFO "TuxOnIce: Incremental image support enabled but no "
@@ -60,34 +61,25 @@ static int toi_incremental_crypto_prepare(void)
 
 	for_each_online_cpu(cpu) {
 		struct cpu_context *this = &per_cpu(contexts, cpu);
-		this->transform = crypto_alloc_hash(toi_incremental_slow_cmp_name, 0, 0);
-		if (IS_ERR(this->transform)) {
+		this->desc.tfm = crypto_alloc_hash(toi_incremental_slow_cmp_name, 0, 0);
+		if (IS_ERR(this->desc.tfm)) {
 			printk(KERN_INFO "TuxOnIce: Failed to initialise the "
 					"%s hashing transform.\n",
 					toi_incremental_slow_cmp_name);
-			this->transform = NULL;
+			this->desc.tfm = NULL;
 			return 1;
 		}
 
-		this->page_buffer =
-			(char *) toi_get_zeroed_page(16, TOI_ATOMIC_GFP);
-
-		if (!this->page_buffer) {
-			printk(KERN_ERR
-			  "Failed to allocate a page buffer for TuxOnIce "
-			  "hashing driver.\n");
-			return -ENOMEM;
+		if (!digestsize) {
+			digestsize = crypto_hash_digestsize(this->desc.tfm);
+			toi_incremental_digestsize = digestsize;
 		}
 
-		this->output_buffer =
-			(char *) vmalloc_32(OUT_BUF_SIZE);
-
-		if (!this->output_buffer) {
-			printk(KERN_ERR
-			  "Failed to allocate a output buffer for TuxOnIce "
-			  "hashing driver.\n");
+		this->digest = toi_kzalloc(16, digestsize, GFP_KERNEL);
+		if (!this->digest)
 			return -ENOMEM;
-		}
+
+		this->desc.flags = CRYPTO_TFM_REQ_MAY_SLEEP;
 	}
 
 	return 0;
@@ -99,20 +91,15 @@ static int toi_incremental_rw_cleanup(int writing)
 
 	for_each_online_cpu(cpu) {
 		struct cpu_context *this = &per_cpu(contexts, cpu);
-		if (this->transform) {
-			crypto_free_hash(this->transform);
-			this->transform = NULL;
+		if (this->desc.tfm) {
+			crypto_free_hash(this->desc.tfm);
+			this->desc.tfm = NULL;
 		}
 
-		if (this->page_buffer)
-			toi_free_page(16, (unsigned long) this->page_buffer);
-
-		this->page_buffer = NULL;
-
-		if (this->output_buffer)
-			vfree(this->output_buffer);
-
-		this->output_buffer = NULL;
+		if (this->digest) {
+			toi_kfree(16, this->digest, toi_incremental_digestsize);
+			this->digest = NULL;
+		}
 	}
 
 	return 0;
@@ -178,27 +165,24 @@ static int toi_incremental_write_page(unsigned long index, int buf_type,
 	struct cpu_context *ctx = &per_cpu(contexts, cpu);
 	int to_write = true;
 
-	if (ctx->transform) {
-/*
-		PSEUDO CODE TO START WITH.
+	if (ctx->desc.tfm) {
+		// char *old_hash;
 
 		ctx->buffer_start = TOI_MAP(buf_type, buffer_page);
-		ctx->len = OUT_BUF_SIZE;
 
-		result = get_new_hash(ctx);
-		old_hash = get_old_hash(index);
+		sg_init_one(&ctx->sg[0], ctx->buffer_start, buf_size);
+
+		ret = crypto_hash_digest(&ctx->desc, &ctx->sg[0], ctx->sg[0].length, ctx->digest);
+		// old_hash = get_old_hash(index);
 
 		TOI_UNMAP(buf_type, buffer_page);
 
-		if (!result && new_hash == old_hash) {
+#if 0
+		if (!ret && new_hash == old_hash) {
 			to_write = false;	
 		} else
 			store_hash(ctx, index, new_hash);
-
-		toi_message(TOI_COMPRESS, TOI_VERBOSE, 0,
-				"CPU %d, index %lu: %d bytes",
-				cpu, index, ctx->len);
-*/
+#endif
 	}
 
 	mutex_lock(&stats_lock);
@@ -332,13 +316,19 @@ static void toi_incremental_post_atomic_restore(struct toi_boot_kernel_data *bkd
 	toi_incremental_bytes_out = bkd->incremental_bytes_out;
 }
 
+static void toi_incremental_algo_change(void)
+{
+	/* Reset so it's gotten from crypto_hash_digestsize afresh */
+	toi_incremental_digestsize = 0;
+}
+
 /*
  * data for our sysfs entries.
  */
 static struct toi_sysfs_data sysfs_params[] = {
 	SYSFS_INT("enabled", SYSFS_RW, &toi_incremental_ops.enabled, 0, 1, 0,
 			NULL),
-	SYSFS_STRING("algorithm", SYSFS_RW, toi_incremental_slow_cmp_name, 31, 0, NULL),
+	SYSFS_STRING("algorithm", SYSFS_RW, toi_incremental_slow_cmp_name, 31, 0, toi_incremental_algo_change),
 };
 
 /*
