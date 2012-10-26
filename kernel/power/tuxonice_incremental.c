@@ -125,7 +125,7 @@ static int toi_incremental_init(int hibernate_or_resume)
 
 static int toi_incremental_rw_init(int rw, int stream_number)
 {
-	if (toi_incremental_crypto_prepare()) {
+	if (rw == WRITE && toi_incremental_crypto_prepare()) {
 		printk(KERN_ERR "Failed to initialise hashing "
 				"algorithm.\n");
 		if (rw == READ) {
