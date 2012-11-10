@@ -33,6 +33,7 @@
 */
 
 #include <linux/kthread.h>
+#include <linux/freezer.h>
 #include <linux/blkdev.h>
 #include <linux/sysctl.h>
 #include <linux/seq_file.h>
