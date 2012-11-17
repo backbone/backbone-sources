@@ -1546,9 +1546,8 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	BUG_ON(!current->mm);
 
 	pathname = getname(specialfile);
-	err = PTR_ERR(pathname);
 	if (IS_ERR(pathname))
-		goto out;
+		return PTR_ERR(pathname);
 
 	victim = file_open_name(pathname, O_RDWR|O_LARGEFILE, 0);
 	err = PTR_ERR(victim);
@@ -1660,6 +1659,7 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 out_dput:
 	filp_close(victim, NULL);
 out:
+	putname(pathname);
 	return err;
 }
 EXPORT_SYMBOL_GPL(sys_swapoff);
