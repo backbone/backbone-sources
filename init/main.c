@@ -464,10 +464,6 @@ static void __init mm_init(void)
 	percpu_init_late();
 	pgtable_cache_init();
 	vmalloc_init();
-#ifdef CONFIG_X86
-	if (efi_enabled)
-		efi_enter_virtual_mode();
-#endif
 }
 
 asmlinkage void __init start_kernel(void)
@@ -608,6 +604,10 @@ asmlinkage void __init start_kernel(void)
 	calibrate_delay();
 	pidmap_init();
 	anon_vma_init();
+#ifdef CONFIG_X86
+	if (efi_enabled)
+		efi_enter_virtual_mode();
+#endif
 	thread_info_cache_init();
 	cred_init();
 	fork_init(totalram_pages);
@@ -798,7 +798,9 @@ static void __init do_pre_smp_initcalls(void)
 static int run_init_process(const char *init_filename)
 {
 	argv_init[0] = init_filename;
-	return kernel_execve(init_filename, argv_init, envp_init);
+	return do_execve(init_filename,
+		(const char __user *const __user *)argv_init,
+		(const char __user *const __user *)envp_init);
 }
 
 static void __init kernel_init_freeable(void);
@@ -813,7 +815,6 @@ static int __ref kernel_init(void *unused)
 	system_state = SYSTEM_RUNNING;
 	numa_default_policy();
 
-	current->signal->flags |= SIGNAL_UNKILLABLE;
 	flush_delayed_fput();
 
 	if (ramdisk_execute_command) {
