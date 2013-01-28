@@ -1623,7 +1623,7 @@ static unsigned long shrink_list(enum lru_list lru, unsigned long nr_to_scan,
 				 struct lruvec *lruvec, struct scan_control *sc)
 {
 	if (is_active_lru(lru)) {
-		if (sc->hibernation_mode || inactive_list_is_low(lruvec, lru))
+		if (inactive_list_is_low(lruvec, lru))
 			shrink_active_list(nr_to_scan, lruvec, sc, lru);
 		return 0;
 	}
@@ -1762,13 +1762,14 @@ out:
 		unsigned long scan;
 
 		scan = get_lru_size(lruvec, lru);
-		if (sc->priority || noswap || !vmscan_swappiness(sc)) {
+		if (sc->hibernation_mode)
+			scan = SWAP_CLUSTER_MAX;
+		else if (sc->priority || noswap || !vmscan_swappiness(sc)) {
 			scan >>= sc->priority;
 			if (!scan && force_scan)
 				scan = SWAP_CLUSTER_MAX;
 			scan = div64_u64(scan * fraction[file], denominator);
-		} else if (sc->hibernation_mode)
-			scan = SWAP_CLUSTER_MAX;
+		}
 		nr[lru] = scan;
 	}
 }
@@ -1799,7 +1800,7 @@ static inline bool should_continue_reclaim(struct lruvec *lruvec,
 	unsigned long pages_for_compaction;
 	unsigned long inactive_lru_pages;
 
-	if (sc->hibernation_mode && nr_reclaimed && nr_scanned && sc->nr_to_reclaim >= sc->nr_reclaimed)
+	if (nr_reclaimed && nr_scanned && sc->nr_to_reclaim >= sc->nr_reclaimed)
 		return true;
 
 	/* If not in reclaim/compaction mode, stop */
