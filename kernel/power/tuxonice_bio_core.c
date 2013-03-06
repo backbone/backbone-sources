@@ -98,7 +98,7 @@ unsigned long raw_pages_allocd, header_pages_reserved;
  **/
 static void set_free_mem_throttle(void)
 {
-	int new_throttle = nr_unallocated_buffer_pages() + 256;
+	int new_throttle = nr_free_buffer_pages() + 256;
 
 	if (new_throttle > free_mem_throttle)
 		free_mem_throttle = new_throttle;
@@ -221,7 +221,7 @@ static void do_bio_wait(int reason)
 
 		wait_event(num_in_progress_wait,
 			!atomic_read(&toi_io_in_progress) ||
-			nr_unallocated_buffer_pages() > free_mem_throttle);
+			nr_free_buffer_pages() > free_mem_throttle);
 	}
 }
 
@@ -235,7 +235,7 @@ static void do_bio_wait(int reason)
  **/
 static int throttle_if_needed(int flags)
 {
-	int free_pages = nr_unallocated_buffer_pages();
+	int free_pages = nr_free_buffer_pages();
 
 	/* Getting low on memory and I/O is in progress? */
 	while (unlikely(free_pages < free_mem_throttle) &&
@@ -244,7 +244,7 @@ static int throttle_if_needed(int flags)
 		if (!(flags & THROTTLE_WAIT))
 			return -ENOMEM;
 		do_bio_wait(4);
-		free_pages = nr_unallocated_buffer_pages();
+		free_pages = nr_free_buffer_pages();
 	}
 
 	while (!(flags & MEMORY_ONLY) && throughput_throttle &&
@@ -1606,7 +1606,7 @@ static int try_to_open_resume_device(char *commandline, int quiet)
 				O_RDONLY|O_LARGEFILE, 0);
 
 		if (!IS_ERR(file) && file) {
-			vfs_getattr(file->f_vfsmnt, file->f_dentry, &stat);
+			vfs_getattr(&file->f_path, &stat);
 			filp_close(file, NULL);
 		} else
 			error = vfs_stat(commandline, &stat);
