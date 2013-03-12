@@ -2837,26 +2837,6 @@ static unsigned long nr_free_zone_pages(int offset)
 	return sum;
 }
 
-static unsigned long nr_unallocated_zone_pages(int offset)
-{
-	struct zoneref *z;
-	struct zone *zone;
-
-	/* Just pick one node, since fallback list is circular */
-	unsigned long sum = 0;
-
-	struct zonelist *zonelist = node_zonelist(numa_node_id(), GFP_KERNEL);
-
-	for_each_zone_zonelist(zone, z, zonelist, offset) {
-		unsigned long high = high_wmark_pages(zone);
-		unsigned long left = zone_page_state(zone, NR_FREE_PAGES);
-		if (left > high)
-			sum += left - high;
-	}
-
-	return sum;
-}
-
 /**
  * nr_free_buffer_pages - count number of pages beyond high watermark
  *
