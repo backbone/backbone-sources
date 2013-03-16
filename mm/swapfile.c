@@ -518,8 +518,8 @@ void get_swap_range_of_type(int type, swp_entry_t *start, swp_entry_t *end,
 
 	*start = swp_entry(0, 0);
 	*end = swp_entry(0, 0);
-	spin_lock(&swap_lock);
 	si = swap_info[type];
+	spin_lock(&si->lock);
 	if (si && (si->flags & SWP_WRITEOK)) {
 		/* This is called for allocating swap entry, not cache */
 		start_at = scan_swap_map(si, 1);
@@ -551,7 +551,7 @@ void get_swap_range_of_type(int type, swp_entry_t *start, swp_entry_t *end,
 			*end = swp_entry(type, stop_at);
 		}
 	}
-	spin_unlock(&swap_lock);
+	spin_unlock(&si->lock);
 }
 EXPORT_SYMBOL_GPL(get_swap_range_of_type);
 
