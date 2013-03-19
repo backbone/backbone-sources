@@ -7,7 +7,6 @@
  *  Rewritten to use page cache, (C) 1998 Stephen Tweedie
  */
 #include <linux/mm.h>
-#include <linux/export.h>
 #include <linux/gfp.h>
 #include <linux/kernel_stat.h>
 #include <linux/swap.h>
