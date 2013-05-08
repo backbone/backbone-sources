@@ -139,13 +139,12 @@ static int simdisk_open(struct block_device *bdev, fmode_t mode)
 	return 0;
 }
 
-static int simdisk_release(struct gendisk *disk, fmode_t mode)
+static void simdisk_release(struct gendisk *disk, fmode_t mode)
 {
 	struct simdisk *dev = disk->private_data;
 	spin_lock(&dev->lock);
 	--dev->users;
 	spin_unlock(&dev->lock);
-	return 0;
 }
 
 static const struct block_device_operations simdisk_ops = {
@@ -231,7 +230,7 @@ static ssize_t proc_read_simdisk(struct file *file, char __user *buf,
 }
 
 static ssize_t proc_write_simdisk(struct file *file, const char __user *buf,
-			size_t size, loff_t *ppos)
+			size_t count, loff_t *ppos)
 {
 	char *tmp = kmalloc(count + 1, GFP_KERNEL);
 	struct simdisk *dev = PDE_DATA(file_inode(file));
