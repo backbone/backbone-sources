@@ -118,6 +118,7 @@ struct bio {
  * BIO_POOL_IDX()
  */
 #define BIO_RESET_BITS	13
+#define BIO_OWNS_VEC	13	/* bio_free() should free bvec */
 
 #define bio_flagged(bio, flag)	((bio)->bi_flags & (1 << (flag)))
 
@@ -177,6 +178,7 @@ enum rq_flag_bits {
 	__REQ_MIXED_MERGE,	/* merge of different types, fail separately */
 	__REQ_KERNEL, 		/* direct IO to kernel pages */
 	__REQ_TOI,		/* TuxOnIce I/O */
+	__REQ_PM,		/* runtime pm request */
 	__REQ_NR_BITS,		/* stops here */
 };
 
@@ -198,6 +200,8 @@ enum rq_flag_bits {
 	 REQ_DISCARD | REQ_WRITE_SAME | REQ_NOIDLE | REQ_FLUSH | REQ_FUA | \
 	 REQ_SECURE)
 #define REQ_CLONE_MASK		REQ_COMMON_MASK
+
+#define BIO_NO_ADVANCE_ITER_MASK	(REQ_DISCARD|REQ_WRITE_SAME)
 
 /* This mask is used for both bio and request merge checking */
 #define REQ_NOMERGE_FLAGS \
@@ -226,5 +230,6 @@ enum rq_flag_bits {
 #define REQ_SECURE		(1 << __REQ_SECURE)
 #define REQ_TOI			(1 << __REQ_TOI)
 #define REQ_KERNEL		(1 << __REQ_KERNEL)
+#define REQ_PM			(1 << __REQ_PM)
 
 #endif /* __LINUX_BLK_TYPES_H */
