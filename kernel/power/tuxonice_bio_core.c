@@ -379,6 +379,7 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 	bio->bi_sector = first_block;
 	bio->bi_private = (void *) ((unsigned long) free_group);
 	bio->bi_end_io = toi_end_bio;
+	bio->bi_flags |= (1 << BIO_TOI);
 
 	if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
 		printk(KERN_DEBUG "ERROR: adding page to bio at %lld\n",
@@ -405,7 +406,7 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 		set_bit(BIO_UPTODATE, &bio->bi_flags);
 		toi_end_bio(bio, 0);
 	} else
-		submit_bio(writing | REQ_TOI | REQ_SYNC, bio);
+		submit_bio(writing | REQ_SYNC, bio);
 
 	return 0;
 }

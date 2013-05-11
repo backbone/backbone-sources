@@ -178,6 +178,7 @@ static struct page *read_bdev_page(struct block_device *dev, int page_num)
 	bio->bi_bdev = dev;
 	bio->bi_sector = page_num << 3;
 	bio->bi_end_io = uuid_end_bio;
+	bio->bi_flags |= (1 << BIO_TOI);
 
 	PRINTK("Submitting bio on device %lx, page %d using bio %p and page %p.\n",
 			(unsigned long) dev->bd_dev, page_num, bio, page);
@@ -193,7 +194,7 @@ static struct page *read_bdev_page(struct block_device *dev, int page_num)
 	}
 
 	lock_page(page);
-	submit_bio(READ | REQ_SYNC | REQ_TOI, bio);
+	submit_bio(READ | REQ_SYNC, bio);
 
 	wait_on_page_locked(page);
 	if (PageError(page)) {
