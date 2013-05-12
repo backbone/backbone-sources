@@ -536,6 +536,7 @@ xfsaild(
 		    ailp->xa_target == ailp->xa_target_prev) {
 			spin_unlock(&ailp->xa_lock);
 			schedule();
+			try_to_freeze();
 			tout = 0;
 			continue;
 		}
