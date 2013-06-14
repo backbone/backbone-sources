@@ -7367,9 +7367,8 @@ void md_do_sync(struct md_thread *thread)
 		mddev->curr_resync = 2;
 
 	try_again:
-	try_to_freeze();
 
-		if (kthread_should_stop())
+		if (kthread_freezable_should_stop())
 			set_bit(MD_RECOVERY_INTR, &mddev->recovery);
 
 		if (test_bit(MD_RECOVERY_INTR, &mddev->recovery))
@@ -7524,9 +7523,7 @@ void md_do_sync(struct md_thread *thread)
 						 || kthread_should_stop());
 		}
 
-		try_to_freeze();
-
-		if (kthread_should_stop())
+		if (kthread_freezable_should_stop())
 			goto interrupted;
 
 		sectors = mddev->pers->sync_request(mddev, j, &skipped,
@@ -7570,9 +7567,7 @@ void md_do_sync(struct md_thread *thread)
 			last_mark = next;
 		}
 
-		try_to_freeze();
-
-		if (kthread_should_stop())
+		if (kthread_freezable_should_stop())
 			goto interrupted;
 
 

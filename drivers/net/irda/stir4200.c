@@ -741,7 +741,7 @@ static int stir_transmit_thread(void *arg)
 
 	set_freezable();
 
-        while (!kthread_should_stop()) {
+        while (!kthread_freezable_should_stop()) {
 #ifdef CONFIG_PM
 		/* if suspending, then power off and wait */
 		if (unlikely(freezing(current))) {

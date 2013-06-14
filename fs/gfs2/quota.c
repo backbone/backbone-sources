@@ -1402,7 +1402,7 @@ int gfs2_quotad(void *data)
 
 	set_freezable();
 
-	while (!kthread_should_stop()) {
+	while (!kthread_freezable_should_stop()) {
 
 		/* Update the master statfs file */
 		if (sdp->sd_statfs_force_sync) {

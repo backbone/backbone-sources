@@ -2363,7 +2363,7 @@ int jfsIOWait(void *arg)
 			schedule();
 			__set_current_state(TASK_RUNNING);
 		}
-	} while (!kthread_should_stop());
+	} while (!kthread_freezable_should_stop());
 
 	jfs_info("jfsIOWait being killed!");
 	return 0;
