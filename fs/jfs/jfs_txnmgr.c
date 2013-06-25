@@ -2813,7 +2813,7 @@ int jfs_lazycommit(void *arg)
 			__set_current_state(TASK_RUNNING);
 			remove_wait_queue(&jfs_commit_thread_wait, &wq);
 		}
-	} while (!kthread_freezable_should_stop());
+	} while (!kthread_freezable_should_stop(NULL));
 
 	if (!list_empty(&TxAnchor.unlock_queue))
 		jfs_err("jfs_lazycommit being killed w/pending transactions!");
@@ -3002,7 +3002,7 @@ int jfs_sync(void *arg)
 			schedule();
 			__set_current_state(TASK_RUNNING);
 		}
-	} while (!kthread_freezable_should_stop());
+	} while (!kthread_freezable_should_stop(NULL));
 
 	jfs_info("jfs_sync being killed");
 	return 0;

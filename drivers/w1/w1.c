@@ -977,7 +977,7 @@ int w1_process(void *data)
 	const unsigned long jtime = msecs_to_jiffies(w1_timeout * 1000);
 	set_freezable();
 
-	while (!kthread_freezable_should_stop()) {
+	while (!kthread_freezable_should_stop(NULL)) {
 		if (dev->search_count) {
 			mutex_lock(&dev->mutex);
 			w1_search_process(dev, W1_SEARCH);

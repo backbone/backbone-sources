@@ -514,7 +514,7 @@ xfsaild(
 	set_freezable();
 	current->flags |= PF_MEMALLOC;
 
-	while (!kthread_freezable_should_stop()) {
+	while (!kthread_freezable_should_stop(NULL)) {
 		if (tout && tout <= 20)
 			__set_current_state(TASK_KILLABLE);
 		else

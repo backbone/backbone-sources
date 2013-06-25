@@ -345,7 +345,7 @@ again:
 			try_to_freeze();
 		} else {
 			spin_unlock_irq(&worker->lock);
-			if (!kthread_freezable_should_stop()) {
+			if (!kthread_freezable_should_stop(NULL)) {
 				cpu_relax();
 				/*
 				 * we've dropped the lock, did someone else
@@ -370,7 +370,7 @@ again:
 				    !list_empty(&worker->prio_pending))
 					continue;
 
-				if (kthread_freezable_should_stop())
+				if (kthread_freezable_should_stop(NULL))
 					break;
 
 				/* still no more work?, sleep for real */
@@ -390,7 +390,7 @@ again:
 				worker->working = 0;
 				spin_unlock_irq(&worker->lock);
 
-				if (!kthread_freezable_should_stop()) {
+				if (!kthread_freezable_should_stop(NULL)) {
 					schedule_timeout(HZ * 120);
 					if (!worker->working &&
 					    try_worker_shutdown(worker)) {
@@ -400,7 +400,7 @@ again:
 			}
 			__set_current_state(TASK_RUNNING);
 		}
-	} while (!kthread_freezable_should_stop());
+	} while (!kthread_freezable_should_stop(NULL));
 	return 0;
 }
 
