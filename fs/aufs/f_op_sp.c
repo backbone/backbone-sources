@@ -247,11 +247,18 @@ static void au_init_fop_sp(struct file *file)
 static int au_cpup_sp(struct dentry *dentry)
 {
 	int err;
-	aufs_bindex_t bcpup;
 	struct au_pin pin;
 	struct au_wr_dir_args wr_dir_args = {
 		.force_btgt	= -1,
 		.flags		= 0
+	};
+	struct au_cp_generic cpg = {
+		.dentry	= dentry,
+		.bdst	= -1,
+		.bsrc	= -1,
+		.len	= -1,
+		.pin	= &pin,
+		.flags	= AuCpup_DTIME
 	};
 
 	AuDbg("%.*s\n", AuDLNPair(dentry));
@@ -261,15 +268,15 @@ static int au_cpup_sp(struct dentry *dentry)
 	err = au_wr_dir(dentry, /*src_dentry*/NULL, &wr_dir_args);
 	if (unlikely(err < 0))
 		goto out;
-	bcpup = err;
+	cpg.bdst = err;
 	err = 0;
-	if (bcpup == au_dbstart(dentry))
+	if (cpg.bdst == au_dbstart(dentry))
 		goto out; /* success */
 
-	err = au_pin(&pin, dentry, bcpup, au_opt_udba(dentry->d_sb),
+	err = au_pin(&pin, dentry, cpg.bdst, au_opt_udba(dentry->d_sb),
 		     AuPin_MNT_WRITE);
 	if (!err) {
-		err = au_sio_cpup_simple(dentry, bcpup, -1, AuCpup_DTIME, &pin);
+		err = au_sio_cpup_simple(&cpg);
 		au_unpin(&pin);
 	}
 

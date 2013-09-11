@@ -222,28 +222,35 @@ static int au_ready_to_write_wh(struct file *file, loff_t len,
 {
 	int err;
 	struct inode *inode, *h_inode;
-	struct dentry *dentry, *h_dentry, *hi_wh;
+	struct dentry *h_dentry, *hi_wh;
+	struct au_cp_generic cpg = {
+		.dentry	= file->f_dentry,
+		.bdst	= bcpup,
+		.bsrc	= -1,
+		.len	= len,
+		.pin	= pin
+	};
 
-	dentry = file->f_dentry;
-	au_update_dbstart(dentry);
-	inode = dentry->d_inode;
+	au_update_dbstart(cpg.dentry);
+	inode = cpg.dentry->d_inode;
 	h_inode = NULL;
-	if (au_dbstart(dentry) <= bcpup && au_dbend(dentry) >= bcpup) {
-		h_dentry = au_h_dptr(dentry, bcpup);
+	if (au_dbstart(cpg.dentry) <= bcpup
+	    && au_dbend(cpg.dentry) >= bcpup) {
+		h_dentry = au_h_dptr(cpg.dentry, bcpup);
 		if (h_dentry)
 			h_inode = h_dentry->d_inode;
 	}
 	hi_wh = au_hi_wh(inode, bcpup);
 	if (!hi_wh && !h_inode)
-		err = au_sio_cpup_wh(dentry, bcpup, len, file, pin);
+		err = au_sio_cpup_wh(&cpg, file);
 	else
 		/* already copied-up after unlink */
 		err = au_reopen_wh(file, bcpup, hi_wh);
 
 	if (!err
 	    && inode->i_nlink > 1
-	    && au_opt_test(au_mntflags(dentry->d_sb), PLINK))
-		au_plink_append(inode, bcpup, au_h_dptr(dentry, bcpup));
+	    && au_opt_test(au_mntflags(cpg.dentry->d_sb), PLINK))
+		au_plink_append(inode, bcpup, au_h_dptr(cpg.dentry, bcpup));
 
 	return err;
 }
@@ -254,72 +261,79 @@ static int au_ready_to_write_wh(struct file *file, loff_t len,
 int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 {
 	int err;
-	aufs_bindex_t bstart, bcpup, dbstart;
-	struct dentry *dentry, *parent, *h_dentry;
+	aufs_bindex_t dbstart;
+	struct dentry *parent, *h_dentry;
 	struct inode *inode;
 	struct super_block *sb;
 	struct file *h_file;
+	struct au_cp_generic cpg = {
+		.dentry	= file->f_dentry,
+		.bdst	= -1,
+		.bsrc	= -1,
+		.len	= len,
+		.pin	= pin,
+		.flags	= AuCpup_DTIME
+	};
 
-	dentry = file->f_dentry;
-	sb = dentry->d_sb;
-	inode = dentry->d_inode;
+	sb = cpg.dentry->d_sb;
+	inode = cpg.dentry->d_inode;
 	AuDebugOn(au_special_file(inode->i_mode));
-	bstart = au_fbstart(file);
-	err = au_test_ro(sb, bstart, inode);
+	cpg.bsrc = au_fbstart(file);
+	err = au_test_ro(sb, cpg.bsrc, inode);
 	if (!err && (au_hf_top(file)->f_mode & FMODE_WRITE)) {
-		err = au_pin(pin, dentry, bstart, AuOpt_UDBA_NONE, /*flags*/0);
+		err = au_pin(pin, cpg.dentry, cpg.bsrc, AuOpt_UDBA_NONE,
+			     /*flags*/0);
 		goto out;
 	}
 
 	/* need to cpup or reopen */
-	parent = dget_parent(dentry);
+	parent = dget_parent(cpg.dentry);
 	di_write_lock_parent(parent);
-	err = AuWbrCopyup(au_sbi(sb), dentry);
-	bcpup = err;
+	err = AuWbrCopyup(au_sbi(sb), cpg.dentry);
+	cpg.bdst = err;
 	if (unlikely(err < 0))
 		goto out_dgrade;
 	err = 0;
 
-	if (!d_unhashed(dentry) && !au_h_dptr(parent, bcpup)) {
-		err = au_cpup_dirs(dentry, bcpup);
+	if (!d_unhashed(cpg.dentry) && !au_h_dptr(parent, cpg.bdst)) {
+		err = au_cpup_dirs(cpg.dentry, cpg.bdst);
 		if (unlikely(err))
 			goto out_dgrade;
 	}
 
-	err = au_pin(pin, dentry, bcpup, AuOpt_UDBA_NONE,
+	err = au_pin(pin, cpg.dentry, cpg.bdst, AuOpt_UDBA_NONE,
 		     AuPin_DI_LOCKED | AuPin_MNT_WRITE);
 	if (unlikely(err))
 		goto out_dgrade;
 
 	h_dentry = au_hf_top(file)->f_dentry;
-	dbstart = au_dbstart(dentry);
-	if (dbstart <= bcpup) {
-		h_dentry = au_h_dptr(dentry, bcpup);
+	dbstart = au_dbstart(cpg.dentry);
+	if (dbstart <= cpg.bdst) {
+		h_dentry = au_h_dptr(cpg.dentry, cpg.bdst);
 		AuDebugOn(!h_dentry);
-		bstart = bcpup;
+		cpg.bsrc = cpg.bdst;
 	}
 
-	if (dbstart <= bcpup		/* just reopen */
-	    || !d_unhashed(dentry)	/* copyup and reopen */
+	if (dbstart <= cpg.bdst		/* just reopen */
+	    || !d_unhashed(cpg.dentry)	/* copyup and reopen */
 		) {
-		h_file = au_h_open_pre(dentry, bstart);
+		h_file = au_h_open_pre(cpg.dentry, cpg.bsrc);
 		if (IS_ERR(h_file))
 			err = PTR_ERR(h_file);
 		else {
 			di_downgrade_lock(parent, AuLock_IR);
-			if (dbstart > bcpup)
-				err = au_sio_cpup_simple(dentry, bcpup, len,
-							 AuCpup_DTIME, pin);
+			if (dbstart > cpg.bdst)
+				err = au_sio_cpup_simple(&cpg);
 			if (!err)
 				err = au_reopen_nondir(file);
-			au_h_open_post(dentry, bstart, h_file);
+			au_h_open_post(cpg.dentry, cpg.bsrc, h_file);
 		}
 	} else {			/* copyup as wh and reopen */
 		/*
 		 * since writable hfsplus branch is not supported,
 		 * h_open_pre/post() are unnecessary.
 		 */
-		err = au_ready_to_write_wh(file, len, bcpup, pin);
+		err = au_ready_to_write_wh(file, len, cpg.bdst, pin);
 		di_downgrade_lock(parent, AuLock_IR);
 	}
 
@@ -369,29 +383,35 @@ int au_do_flush(struct file *file, fl_owner_t id,
 static int au_file_refresh_by_inode(struct file *file, int *need_reopen)
 {
 	int err;
-	aufs_bindex_t bstart;
 	struct au_pin pin;
 	struct au_finfo *finfo;
-	struct dentry *dentry, *parent, *hi_wh;
+	struct dentry *parent, *hi_wh;
 	struct inode *inode;
 	struct super_block *sb;
+	struct au_cp_generic cpg = {
+		.dentry	= file->f_dentry,
+		.bdst	= -1,
+		.bsrc	= -1,
+		.len	= -1,
+		.pin	= &pin,
+		.flags	= AuCpup_DTIME
+	};
 
 	FiMustWriteLock(file);
 
 	err = 0;
 	finfo = au_fi(file);
-	dentry = file->f_dentry;
-	sb = dentry->d_sb;
-	inode = dentry->d_inode;
-	bstart = au_ibstart(inode);
-	if (bstart == finfo->fi_btop || IS_ROOT(dentry))
+	sb = cpg.dentry->d_sb;
+	inode = cpg.dentry->d_inode;
+	cpg.bdst = au_ibstart(inode);
+	if (cpg.bdst == finfo->fi_btop || IS_ROOT(cpg.dentry))
 		goto out;
 
-	parent = dget_parent(dentry);
-	if (au_test_ro(sb, bstart, inode)) {
+	parent = dget_parent(cpg.dentry);
+	if (au_test_ro(sb, cpg.bdst, inode)) {
 		di_read_lock_parent(parent, !AuLock_IR);
-		err = AuWbrCopyup(au_sbi(sb), dentry);
-		bstart = err;
+		err = AuWbrCopyup(au_sbi(sb), cpg.dentry);
+		cpg.bdst = err;
 		di_read_unlock(parent, !AuLock_IR);
 		if (unlikely(err < 0))
 			goto out_parent;
@@ -399,27 +419,26 @@ static int au_file_refresh_by_inode(struct file *file, int *need_reopen)
 	}
 
 	di_read_lock_parent(parent, AuLock_IR);
-	hi_wh = au_hi_wh(inode, bstart);
+	hi_wh = au_hi_wh(inode, cpg.bdst);
 	if (!S_ISDIR(inode->i_mode)
 	    && au_opt_test(au_mntflags(sb), PLINK)
 	    && au_plink_test(inode)
-	    && !d_unhashed(dentry)
-	    && bstart < au_dbstart(dentry)) {
-		err = au_test_and_cpup_dirs(dentry, bstart);
+	    && !d_unhashed(cpg.dentry)
+	    && cpg.bdst < au_dbstart(cpg.dentry)) {
+		err = au_test_and_cpup_dirs(cpg.dentry, cpg.bdst);
 		if (unlikely(err))
 			goto out_unlock;
 
 		/* always superio. */
-		err = au_pin(&pin, dentry, bstart, AuOpt_UDBA_NONE,
+		err = au_pin(&pin, cpg.dentry, cpg.bdst, AuOpt_UDBA_NONE,
 			     AuPin_DI_LOCKED | AuPin_MNT_WRITE);
 		if (!err) {
-			err = au_sio_cpup_simple(dentry, bstart, -1,
-						 AuCpup_DTIME, &pin);
+			err = au_sio_cpup_simple(&cpg);
 			au_unpin(&pin);
 		}
 	} else if (hi_wh) {
 		/* already copied-up after unlink */
-		err = au_reopen_wh(file, bstart, hi_wh);
+		err = au_reopen_wh(file, cpg.bdst, hi_wh);
 		*need_reopen = 0;
 	}
 
