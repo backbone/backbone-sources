@@ -1362,7 +1362,7 @@ static int shmem_mmap(struct file *file, struct vm_area_struct *vma)
 }
 
 static struct inode *shmem_get_inode(struct super_block *sb, const struct inode *dir,
-				     umode_t mode, dev_t dev, unsigned long flags)
+				     umode_t mode, dev_t dev, unsigned long flags, int atomic_copy)
 {
 	struct inode *inode;
 	struct shmem_inode_info *info;
@@ -1383,6 +1383,8 @@ static struct inode *shmem_get_inode(struct super_block *sb, const struct inode 
 		memset(info, 0, (char *)inode - (char *)info);
 		spin_lock_init(&info->lock);
 		info->flags = flags & VM_NORESERVE;
+		if (atomic_copy)
+			inode->i_flags |= S_ATOMIC_COPY;
 		INIT_LIST_HEAD(&info->swaplist);
 		simple_xattrs_init(&info->xattrs);
 		cache_no_acl(inode);
@@ -1935,7 +1937,7 @@ shmem_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev)
 	struct inode *inode;
 	int error = -ENOSPC;
 
-	inode = shmem_get_inode(dir->i_sb, dir, mode, dev, VM_NORESERVE);
+	inode = shmem_get_inode(dir->i_sb, dir, mode, dev, VM_NORESERVE, 0);
 	if (inode) {
 #ifdef CONFIG_TMPFS_POSIX_ACL
 		error = generic_acl_init(inode, dir);
@@ -1969,7 +1971,7 @@ shmem_tmpfile(struct inode *dir, struct dentry *dentry, umode_t mode)
 	struct inode *inode;
 	int error = -ENOSPC;
 
-	inode = shmem_get_inode(dir->i_sb, dir, mode, 0, VM_NORESERVE);
+	inode = shmem_get_inode(dir->i_sb, dir, mode, 0, VM_NORESERVE, 0);
 	if (inode) {
 		error = security_inode_init_security(inode, dir,
 						     NULL,
@@ -2105,7 +2107,7 @@ static int shmem_symlink(struct inode *dir, struct dentry *dentry, const char *s
 	if (len > PAGE_CACHE_SIZE)
 		return -ENAMETOOLONG;
 
-	inode = shmem_get_inode(dir->i_sb, dir, S_IFLNK|S_IRWXUGO, 0, VM_NORESERVE);
+	inode = shmem_get_inode(dir->i_sb, dir, S_IFLNK|S_IRWXUGO, 0, VM_NORESERVE, 0);
 	if (!inode)
 		return -ENOSPC;
 
@@ -2647,7 +2649,7 @@ int shmem_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_flags |= MS_POSIXACL;
 #endif
 
-	inode = shmem_get_inode(sb, NULL, S_IFDIR | sbinfo->mode, 0, VM_NORESERVE);
+	inode = shmem_get_inode(sb, NULL, S_IFDIR | sbinfo->mode, 0, VM_NORESERVE, 0);
 	if (!inode)
 		goto failed;
 	inode->i_uid = sbinfo->uid;
@@ -2901,7 +2903,7 @@ EXPORT_SYMBOL_GPL(shmem_truncate_range);
 
 #define shmem_vm_ops				generic_file_vm_ops
 #define shmem_file_operations			ramfs_file_operations
-#define shmem_get_inode(sb, dir, mode, dev, flags)	ramfs_get_inode(sb, dir, mode, dev)
+#define shmem_get_inode(sb, dir, mode, dev, flags, atomic_copy)	ramfs_get_inode(sb, dir, mode, dev)
 #define shmem_acct_size(flags, size)		0
 #define shmem_unacct_size(flags, size)		do {} while (0)
 
@@ -2918,8 +2920,10 @@ static struct dentry_operations anon_ops = {
  * @name: name for dentry (to be seen in /proc/<pid>/maps
  * @size: size to be set for the file
  * @flags: VM_NORESERVE suppresses pre-accounting of the entire object size
+ * @atomic_copy: Atomically copy the area when hibernating?
  */
-struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags)
+struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags,
+		int atomic_copy)
 {
 	struct file *res;
 	struct inode *inode;
@@ -2948,7 +2952,7 @@ struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags
 	path.mnt = mntget(shm_mnt);
 
 	res = ERR_PTR(-ENOSPC);
-	inode = shmem_get_inode(sb, NULL, S_IFREG | S_IRWXUGO, 0, flags);
+	inode = shmem_get_inode(sb, NULL, S_IFREG | S_IRWXUGO, 0, flags, atomic_copy);
 	if (!inode)
 		goto put_dentry;
 
@@ -2983,7 +2987,7 @@ int shmem_zero_setup(struct vm_area_struct *vma)
 	struct file *file;
 	loff_t size = vma->vm_end - vma->vm_start;
 
-	file = shmem_file_setup("dev/zero", size, vma->vm_flags);
+	file = shmem_file_setup("dev/zero", size, vma->vm_flags, 0);
 	if (IS_ERR(file))
 		return PTR_ERR(file);
 

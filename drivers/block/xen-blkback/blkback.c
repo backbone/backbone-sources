@@ -578,6 +578,7 @@ int xen_blkif_schedule(void *arg)
 	int ret;
 
 	xen_blkif_get(blkif);
+	set_freezable();
 
 	while (!kthread_should_stop()) {
 		if (try_to_freeze())
