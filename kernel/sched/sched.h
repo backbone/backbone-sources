@@ -524,6 +524,16 @@ struct rq {
 #endif
 
 	struct sched_avg avg;
+#ifdef CONFIG_BLD
+	struct list_head disp_load_balance;
+	/* pos indicates whether, rq is first or last
+	 * or in the middle based on load from rq_head.
+	 * 0 - First rq
+	 * 1 - stays middle
+	 * 2 - last rq
+	 */
+	char pos;
+#endif
 };
 
 static inline int cpu_of(struct rq *rq)
