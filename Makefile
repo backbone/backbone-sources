@@ -2,7 +2,7 @@ VERSION = 3
 PATCHLEVEL = 10
 SUBLEVEL = 0
 EXTRAVERSION = -backbone
-NAME = Unicycling Gorilla
+NAME = Erudite Equine
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
