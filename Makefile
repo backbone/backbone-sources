@@ -1,7 +1,7 @@
 VERSION = 3
 PATCHLEVEL = 11
 SUBLEVEL = 5
-EXTRAVERSION = -backbone
+EXTRAVERSION = -backbone-r2
 NAME = Linux for Workgroups
 
 # *DOCUMENTATION*
