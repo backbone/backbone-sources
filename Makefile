@@ -1,7 +1,7 @@
 VERSION = 3
 PATCHLEVEL = 10
 SUBLEVEL = 16
-EXTRAVERSION = -backbone
+EXTRAVERSION = -backbone-r2
 NAME = Erudite Equine
 
 # *DOCUMENTATION*
