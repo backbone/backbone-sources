@@ -1,8 +1,8 @@
 VERSION = 3
 PATCHLEVEL = 12
 SUBLEVEL = 0
-EXTRAVERSION =
-NAME = One Giant Leap for Frogkind
+EXTRAVERSION = -zen
+NAME = Attack of the Giant Nanobots
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
