@@ -1692,6 +1692,8 @@ static int cleaner_kthread(void *arg)
 	struct btrfs_root *root = arg;
 	int again;
 
+	set_freezable();
+
 	do {
 		again = 0;
 
@@ -1723,11 +1725,11 @@ static int cleaner_kthread(void *arg)
 sleep:
 		if (!try_to_freeze() && !again) {
 			set_current_state(TASK_INTERRUPTIBLE);
-			if (!kthread_should_stop())
+			if (!kthread_freezable_should_stop(NULL))
 				schedule();
 			__set_current_state(TASK_RUNNING);
 		}
-	} while (!kthread_should_stop());
+	} while (!kthread_freezable_should_stop(NULL));
 	return 0;
 }
 
@@ -1740,6 +1742,8 @@ static int transaction_kthread(void *arg)
 	unsigned long now;
 	unsigned long delay;
 	bool cannot_commit;
+
+	set_freezable();
 
 	do {
 		cannot_commit = false;
@@ -1782,13 +1786,13 @@ sleep:
 
 		if (!try_to_freeze()) {
 			set_current_state(TASK_INTERRUPTIBLE);
-			if (!kthread_should_stop() &&
+			if (!kthread_freezable_should_stop(NULL) &&
 			    (!btrfs_transaction_blocked(root->fs_info) ||
 			     cannot_commit))
 				schedule_timeout(delay);
 			__set_current_state(TASK_RUNNING);
 		}
-	} while (!kthread_should_stop());
+	} while (!kthread_freezable_should_stop(NULL));
 	return 0;
 }
 
