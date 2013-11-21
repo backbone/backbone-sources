@@ -1168,6 +1168,7 @@ static void yield_task_rt(struct rq *rq)
 #ifdef CONFIG_SMP
 static int find_lowest_rq(struct task_struct *task);
 
+#ifndef	CONFIG_BLD
 static int
 select_task_rq_rt(struct task_struct *p, int sd_flag, int flags)
 {
@@ -1225,6 +1226,7 @@ select_task_rq_rt(struct task_struct *p, int sd_flag, int flags)
 out:
 	return cpu;
 }
+#endif	/* CONFIG_BLD */
 
 static void check_preempt_equal_prio(struct rq *rq, struct task_struct *p)
 {
@@ -1976,8 +1978,9 @@ const struct sched_class rt_sched_class = {
 	.put_prev_task		= put_prev_task_rt,
 
 #ifdef CONFIG_SMP
+#ifndef	CONFIG_BLD
 	.select_task_rq		= select_task_rq_rt,
-
+#endif
 	.set_cpus_allowed       = set_cpus_allowed_rt,
 	.rq_online              = rq_online_rt,
 	.rq_offline             = rq_offline_rt,
