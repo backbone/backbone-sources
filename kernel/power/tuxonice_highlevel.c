@@ -447,7 +447,8 @@ static void do_cleanup(int get_debug_info, int restarting)
 	}
 
 	clear_toi_state(TOI_BOOT_KERNEL);
-	thaw_processes();
+	if (current->flags & PF_SUSPEND_TASK)
+		thaw_processes();
 
 	if (!restarting)
 		toi_stop_other_threads();
