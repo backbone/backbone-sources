@@ -745,6 +745,7 @@ void get_swap_range_of_type(int type, swp_entry_t *start, swp_entry_t *end,
 	si = swap_info[type];
 	spin_lock(&si->lock);
 	if (si && (si->flags & SWP_WRITEOK)) {
+		atomic_long_dec(&nr_swap_pages);
 		/* This is called for allocating swap entry, not cache */
 		start_at = scan_swap_map(si, 1);
 		if (start_at) {
@@ -763,17 +764,22 @@ void get_swap_range_of_type(int type, swp_entry_t *start, swp_entry_t *end,
 			/* first page already done above */
 			si->inuse_pages += stop_at - start_at;
 
-			atomic_long_sub(stop_at - start_at + 1, &nr_swap_pages);
-			if (start_at + 1 == si->lowest_bit)
+			atomic_long_sub(stop_at - start_at, &nr_swap_pages);
+			if (start_at == si->lowest_bit)
 				si->lowest_bit = stop_at + 1;
+			if (stop_at == si->highest_bit)
+				si->highest_bit = start_at - 1;
 			if (si->inuse_pages == si->pages) {
 				si->lowest_bit = si->max;
 				si->highest_bit = 0;
 			}
+			for (i = start_at; i <= stop_at; i++)
+				inc_cluster_info_page(si, si->cluster_info, i);
 			si->cluster_next = stop_at + 1;
 			*start = swp_entry(type, start_at);
 			*end = swp_entry(type, stop_at);
-		}
+		} else
+			atomic_long_inc(&nr_swap_pages);
 	}
 	spin_unlock(&si->lock);
 }
