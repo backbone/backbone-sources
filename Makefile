@@ -1,6 +1,6 @@
 VERSION = 3
 PATCHLEVEL = 12
-SUBLEVEL = 4
+SUBLEVEL = 5
 EXTRAVERSION = -zen
 NAME = Attack of the Giant Nanobots
 
