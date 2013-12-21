@@ -2920,15 +2920,9 @@ static struct dentry_operations anon_ops = {
 	.d_dname = simple_dname
 };
 
-/**
- * shmem_file_setup - get an unlinked file living in tmpfs
- * @name: name for dentry (to be seen in /proc/<pid>/maps
- * @size: size to be set for the file
- * @flags: VM_NORESERVE suppresses pre-accounting of the entire object size
- * @atomic_copy: Atomically copy the area when hibernating?
- */
-struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags,
-		int atomic_copy)
+static struct file *__shmem_file_setup(const char *name, loff_t size,
+				       unsigned long flags, unsigned int i_flags,
+				       int atomic_copy)
 {
 	struct file *res;
 	struct inode *inode;
@@ -2961,6 +2955,7 @@ struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags
 	if (!inode)
 		goto put_dentry;
 
+	inode->i_flags |= i_flags;
 	d_instantiate(path.dentry, inode);
 	inode->i_size = size;
 	clear_nlink(inode);	/* It is unlinked */
@@ -2981,6 +2976,32 @@ put_memory:
 	shmem_unacct_size(flags, size);
 	return res;
 }
+
+/**
+ * shmem_kernel_file_setup - get an unlinked file living in tmpfs which must be
+ * 	kernel internal.  There will be NO LSM permission checks against the
+ * 	underlying inode.  So users of this interface must do LSM checks at a
+ * 	higher layer.  The one user is the big_key implementation.  LSM checks
+ * 	are provided at the key level rather than the inode level.
+ * @name: name for dentry (to be seen in /proc/<pid>/maps
+ * @size: size to be set for the file
+ * @flags: VM_NORESERVE suppresses pre-accounting of the entire object size
+ */
+struct file *shmem_kernel_file_setup(const char *name, loff_t size, unsigned long flags, atomic_copy)
+{
+	return __shmem_file_setup(name, size, flags, S_PRIVATE, atomic_copy);
+}
+
+/**
+ * shmem_file_setup - get an unlinked file living in tmpfs
+ * @name: name for dentry (to be seen in /proc/<pid>/maps
+ * @size: size to be set for the file
+ * @flags: VM_NORESERVE suppresses pre-accounting of the entire object size
+ */
+struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags, atomic_copy)
+{
+	return __shmem_file_setup(name, size, flags, 0, atomic_copy);
+}
 EXPORT_SYMBOL_GPL(shmem_file_setup);
 
 /**
@@ -2992,7 +3013,7 @@ int shmem_zero_setup(struct vm_area_struct *vma)
 	struct file *file;
 	loff_t size = vma->vm_end - vma->vm_start;
 
-	file = shmem_file_setup("dev/zero", size, vma->vm_flags, 0);
+	file = shmem_file_setup("dev/zero", size, vma->vm_flags, 0, 0);
 	if (IS_ERR(file))
 		return PTR_ERR(file);
 
