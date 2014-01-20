@@ -1,8 +1,8 @@
 VERSION = 3
 PATCHLEVEL = 13
 SUBLEVEL = 0
-EXTRAVERSION =
-NAME = One Giant Leap for Frogkind
+EXTRAVERSION = -zen
+NAME = Vagueness Is Coming
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
