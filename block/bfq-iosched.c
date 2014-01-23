@@ -1669,6 +1669,20 @@ static int bfq_update_peak_rate(struct bfq_data *bfqd, struct bfq_queue *bfqq,
  * request as soon as possible after the last one has been completed (in
  * contrast, when a batch of requests is completed, a soft real-time
  * application spends some time processing data).
+ *
+ * Actually, the last filter may easily generate false positives if: only
+ * bfqd->bfq_slice_idle is used as a reference time interval, and one or
+ * both the following two cases occur:
+ * 1) HZ is so low that the duration of a jiffie is comparable to or higher
+ *    than bfqd->bfq_slice_idle. This happens, e.g., on slow devices with
+ *    HZ=100.
+ * 2) jiffies, instead of increasing at a constant rate, may stop increasing
+ *    for a while, then suddenly 'jump' by several units to recover the lost
+ *    increments. This seems to happen, e.g., inside virtual machines.
+ * To address this issue, we do not use as a reference time interval just
+ * bfqd->bfq_slice_idle, but bfqd->bfq_slice_idle plus a few jiffies. In
+ * particular we add the minimum number of jiffies for which the filter seems
+ * to be quite precise also in embedded systems and KVM/QEMU virtual machines.
  */
 static inline u64 bfq_bfqq_softrt_next_start(struct bfq_data *bfqd,
 					     struct bfq_queue *bfqq)
@@ -1676,7 +1690,7 @@ static inline u64 bfq_bfqq_softrt_next_start(struct bfq_data *bfqd,
 	return max(bfqq->last_idle_bklogged +
 		   HZ * bfqq->service_from_backlogged /
 		   bfqd->bfq_raising_max_softrt_rate,
-		   (u64)jiffies + bfqd->bfq_slice_idle);
+		   (u64)jiffies + bfqq->bfqd->bfq_slice_idle + 4);
 }
 
 /**
