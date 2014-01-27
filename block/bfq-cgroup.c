@@ -274,7 +274,8 @@ static void bfq_bfqq_move(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 	resume = !RB_EMPTY_ROOT(&bfqq->sort_list);
 
 	BUG_ON(resume && !entity->on_st);
-	BUG_ON(busy && !resume && entity->on_st && bfqq != bfqd->active_queue);
+	BUG_ON(busy && !resume && entity->on_st &&
+	       bfqq != bfqd->in_service_queue);
 
 	if (busy) {
 		BUG_ON(atomic_read(&bfqq->ref) < 2);
@@ -297,7 +298,7 @@ static void bfq_bfqq_move(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 	if (busy && resume)
 		bfq_activate_bfqq(bfqd, bfqq);
 
-	if (bfqd->active_queue == NULL && !bfqd->rq_in_driver)
+	if (bfqd->in_service_queue == NULL && !bfqd->rq_in_driver)
 		bfq_schedule_dispatch(bfqd);
 }
 
@@ -362,7 +363,8 @@ static void bfq_bic_change_cgroup(struct bfq_io_cq *bic,
 	struct bfq_data *bfqd;
 	unsigned long uninitialized_var(flags);
 
-	bfqd = bfq_get_bfqd_locked(&(bic->icq.q->elevator->elevator_data), &flags);
+	bfqd = bfq_get_bfqd_locked(&(bic->icq.q->elevator->elevator_data),
+				   &flags);
 	if (bfqd != NULL) {
 		__bfq_bic_change_cgroup(bfqd, bic, cgroup);
 		bfq_put_bfqd_unlock(bfqd, &flags);
@@ -451,7 +453,7 @@ static inline void bfq_reparent_active_entities(struct bfq_data *bfqd,
 	if (!RB_EMPTY_ROOT(&st->active))
 		entity = bfq_entity_of(rb_first(active));
 
-	for (; entity != NULL ; entity = bfq_entity_of(rb_first(active)))
+	for (; entity != NULL; entity = bfq_entity_of(rb_first(active)))
 		bfq_reparent_leaf_entity(bfqd, entity);
 
 	if (bfqg->sched_data.active_entity != NULL)
@@ -544,6 +546,7 @@ static void bfq_end_raising_async(struct bfq_data *bfqd)
 
 	hlist_for_each_entry_safe(bfqg, tmp, &bfqd->group_list, bfqd_node)
 		bfq_end_raising_async_queues(bfqd, bfqg);
+	bfq_end_raising_async_queues(bfqd, bfqd->root_group);
 }
 
 /**
@@ -559,7 +562,7 @@ static void bfq_disconnect_groups(struct bfq_data *bfqd)
 	struct hlist_node *tmp;
 	struct bfq_group *bfqg;
 
-	bfq_log(bfqd, "disconnect_groups beginning") ;
+	bfq_log(bfqd, "disconnect_groups beginning");
 	hlist_for_each_entry_safe(bfqg, tmp, &bfqd->group_list, bfqd_node) {
 		hlist_del(&bfqg->bfqd_node);
 
@@ -575,7 +578,7 @@ static void bfq_disconnect_groups(struct bfq_data *bfqd)
 		rcu_assign_pointer(bfqg->bfqd, NULL);
 
 		bfq_log(bfqd, "disconnect_groups: put async for group %p",
-			bfqg) ;
+			bfqg);
 		bfq_put_async_queues(bfqd, bfqg);
 	}
 }
@@ -604,7 +607,7 @@ static struct bfq_group *bfq_alloc_root_group(struct bfq_data *bfqd, int node)
 	struct bfqio_cgroup *bgrp;
 	int i;
 
-	bfqg = kmalloc_node(sizeof(*bfqg), GFP_KERNEL | __GFP_ZERO, node);
+	bfqg = kzalloc_node(sizeof(*bfqg), GFP_KERNEL, node);
 	if (bfqg == NULL)
 		return NULL;
 
@@ -671,16 +674,16 @@ static int bfqio_cgroup_##__VAR##_write(struct cgroup *cgroup,		\
 	bgrp->__VAR = (unsigned short)val;				\
 	hlist_for_each_entry(bfqg, &bgrp->group_data, group_node) {	\
 		/*							\
-                 * Setting the ioprio_changed flag of the entity        \
-                 * to 1 with new_##__VAR == ##__VAR would re-set        \
-                 * the value of the weight to its ioprio mapping.       \
-                 * Set the flag only if necessary.                      \
-                 */                                                     \
-                if ((unsigned short)val != bfqg->entity.new_##__VAR) {  \
-                        bfqg->entity.new_##__VAR = (unsigned short)val; \
-                        smp_wmb();                                      \
-                        bfqg->entity.ioprio_changed = 1;                \
-                }							\
+		 * Setting the ioprio_changed flag of the entity        \
+		 * to 1 with new_##__VAR == ##__VAR would re-set        \
+		 * the value of the weight to its ioprio mapping.       \
+		 * Set the flag only if necessary.                      \
+		 */                                                     \
+		if ((unsigned short)val != bfqg->entity.new_##__VAR) {  \
+			bfqg->entity.new_##__VAR = (unsigned short)val; \
+			smp_wmb();                                      \
+			bfqg->entity.ioprio_changed = 1;                \
+		}							\
 	}								\
 	spin_unlock_irq(&bgrp->lock);					\
 									\
@@ -784,8 +787,9 @@ static void bfqio_attach(struct cgroup *cgroup, struct cgroup_taskset *tset)
 			 */
 			rcu_read_lock();
 			hlist_for_each_entry_rcu(icq, &ioc->icq_list, ioc_node)
-				if (!strncmp(icq->q->elevator->type->elevator_name,
-					     "bfq", ELV_NAME_MAX))
+				if (!strncmp(
+					icq->q->elevator->type->elevator_name,
+					"bfq", ELV_NAME_MAX))
 					bfq_bic_change_cgroup(icq_to_bic(icq),
 							      cgroup);
 			rcu_read_unlock();
