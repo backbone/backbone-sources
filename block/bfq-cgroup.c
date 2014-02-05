@@ -456,8 +456,9 @@ static inline void bfq_reparent_active_entities(struct bfq_data *bfqd,
 	for (; entity != NULL; entity = bfq_entity_of(rb_first(active)))
 		bfq_reparent_leaf_entity(bfqd, entity);
 
-	if (bfqg->sched_data.active_entity != NULL)
-		bfq_reparent_leaf_entity(bfqd, bfqg->sched_data.active_entity);
+	if (bfqg->sched_data.in_service_entity != NULL)
+		bfq_reparent_leaf_entity(bfqd,
+			bfqg->sched_data.in_service_entity);
 
 	return;
 }
@@ -514,8 +515,8 @@ static void bfq_destroy_group(struct bfqio_cgroup *bgrp, struct bfq_group *bfqg)
 		BUG_ON(!RB_EMPTY_ROOT(&st->active));
 		BUG_ON(!RB_EMPTY_ROOT(&st->idle));
 	}
-	BUG_ON(bfqg->sched_data.next_active != NULL);
-	BUG_ON(bfqg->sched_data.active_entity != NULL);
+	BUG_ON(bfqg->sched_data.next_in_service != NULL);
+	BUG_ON(bfqg->sched_data.in_service_entity != NULL);
 
 	/*
 	 * We may race with device destruction, take extra care when
