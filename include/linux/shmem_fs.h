@@ -49,7 +49,7 @@ extern struct file *shmem_file_setup(const char *name,
 					loff_t size, unsigned long flags,
 					int atomic_copy);
 extern struct file *shmem_kernel_file_setup(const char *name, loff_t size,
-					    unsigned long flags);
+					    unsigned long flags, int atomic_copy);
 extern int shmem_zero_setup(struct vm_area_struct *);
 extern int shmem_lock(struct file *file, int lock, struct user_struct *user);
 extern void shmem_unlock_mapping(struct address_space *mapping);

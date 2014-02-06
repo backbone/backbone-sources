@@ -2987,7 +2987,7 @@ put_memory:
  * @size: size to be set for the file
  * @flags: VM_NORESERVE suppresses pre-accounting of the entire object size
  */
-struct file *shmem_kernel_file_setup(const char *name, loff_t size, unsigned long flags, atomic_copy)
+struct file *shmem_kernel_file_setup(const char *name, loff_t size, unsigned long flags, int atomic_copy)
 {
 	return __shmem_file_setup(name, size, flags, S_PRIVATE, atomic_copy);
 }
@@ -2998,7 +2998,7 @@ struct file *shmem_kernel_file_setup(const char *name, loff_t size, unsigned lon
  * @size: size to be set for the file
  * @flags: VM_NORESERVE suppresses pre-accounting of the entire object size
  */
-struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags, atomic_copy)
+struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags, int atomic_copy)
 {
 	return __shmem_file_setup(name, size, flags, 0, atomic_copy);
 }
@@ -3013,7 +3013,7 @@ int shmem_zero_setup(struct vm_area_struct *vma)
 	struct file *file;
 	loff_t size = vma->vm_end - vma->vm_start;
 
-	file = shmem_file_setup("dev/zero", size, vma->vm_flags, 0, 0);
+	file = shmem_file_setup("dev/zero", size, vma->vm_flags, 0);
 	if (IS_ERR(file))
 		return PTR_ERR(file);
 
