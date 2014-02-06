@@ -176,7 +176,7 @@ static struct page *read_bdev_page(struct block_device *dev, int page_num)
 
 	bio = bio_alloc(GFP_NOFS, 1);
 	bio->bi_bdev = dev;
-	bio->bi_sector = page_num << 3;
+	bio->bi_iter.bi_sector = page_num << 3;
 	bio->bi_end_io = uuid_end_bio;
 	bio->bi_flags |= (1 << BIO_TOI);
 
