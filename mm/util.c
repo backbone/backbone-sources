@@ -403,6 +403,7 @@ struct address_space *page_mapping(struct page *page)
 		mapping = NULL;
 	return mapping;
 }
+EXPORT_SYMBOL_GPL(page_mapping);
 
 /*
  * Committed memory limit enforced when OVERCOMMIT_NEVER policy is used

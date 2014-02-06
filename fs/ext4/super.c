@@ -2921,6 +2921,7 @@ static int ext4_lazyinit_thread(void *arg)
 	unsigned long next_wakeup, cur;
 
 	BUG_ON(NULL == eli);
+	set_freezable();
 
 cont_thread:
 	while (true) {
@@ -2960,7 +2961,7 @@ cont_thread:
 
 		schedule_timeout_interruptible(next_wakeup - cur);
 
-		if (kthread_should_stop()) {
+		if (kthread_freezable_should_stop(NULL)) {
 			ext4_clear_request_list();
 			goto exit_thread;
 		}
