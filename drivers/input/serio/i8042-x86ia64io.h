@@ -747,25 +747,27 @@ static int i8042_pnp_aux_probe(struct pnp_dev *dev, const struct pnp_device_id *
 	return 0;
 }
 
-static struct pnp_device_id pnp_kbd_devids[] = {
-	{ .id = "PNP0300", .driver_data = 0 },
-	{ .id = "PNP0301", .driver_data = 0 },
-	{ .id = "PNP0302", .driver_data = 0 },
-	{ .id = "PNP0303", .driver_data = 0 },
-	{ .id = "PNP0304", .driver_data = 0 },
-	{ .id = "PNP0305", .driver_data = 0 },
-	{ .id = "PNP0306", .driver_data = 0 },
-	{ .id = "PNP0309", .driver_data = 0 },
-	{ .id = "PNP030a", .driver_data = 0 },
-	{ .id = "PNP030b", .driver_data = 0 },
-	{ .id = "PNP0320", .driver_data = 0 },
-	{ .id = "PNP0343", .driver_data = 0 },
-	{ .id = "PNP0344", .driver_data = 0 },
-	{ .id = "PNP0345", .driver_data = 0 },
+#define KBD_DEVIDS \
+	{ .id = "PNP0300", .driver_data = 0 }, \
+	{ .id = "PNP0301", .driver_data = 0 }, \
+	{ .id = "PNP0302", .driver_data = 0 }, \
+	{ .id = "PNP0303", .driver_data = 0 }, \
+	{ .id = "PNP0304", .driver_data = 0 }, \
+	{ .id = "PNP0305", .driver_data = 0 }, \
+	{ .id = "PNP0306", .driver_data = 0 }, \
+	{ .id = "PNP0309", .driver_data = 0 }, \
+	{ .id = "PNP030a", .driver_data = 0 }, \
+	{ .id = "PNP030b", .driver_data = 0 }, \
+	{ .id = "PNP0320", .driver_data = 0 }, \
+	{ .id = "PNP0343", .driver_data = 0 }, \
+	{ .id = "PNP0344", .driver_data = 0 }, \
+	{ .id = "PNP0345", .driver_data = 0 }, \
 	{ .id = "CPQA0D7", .driver_data = 0 },
+
+static struct pnp_device_id pnp_kbd_devids[] = {
+	KBD_DEVIDS
 	{ .id = "", },
 };
-MODULE_DEVICE_TABLE(pnp, pnp_kbd_devids);
 
 static struct pnp_driver i8042_pnp_kbd_driver = {
 	.name           = "i8042 kbd",
@@ -773,27 +775,36 @@ static struct pnp_driver i8042_pnp_kbd_driver = {
 	.probe          = i8042_pnp_kbd_probe,
 };
 
-static struct pnp_device_id pnp_aux_devids[] = {
-	{ .id = "AUI0200", .driver_data = 0 },
-	{ .id = "FJC6000", .driver_data = 0 },
-	{ .id = "FJC6001", .driver_data = 0 },
-	{ .id = "PNP0f03", .driver_data = 0 },
-	{ .id = "PNP0f0b", .driver_data = 0 },
-	{ .id = "PNP0f0e", .driver_data = 0 },
-	{ .id = "PNP0f12", .driver_data = 0 },
-	{ .id = "PNP0f13", .driver_data = 0 },
-	{ .id = "PNP0f19", .driver_data = 0 },
-	{ .id = "PNP0f1c", .driver_data = 0 },
+#define AUX_DEVIDS \
+	{ .id = "AUI0200", .driver_data = 0 }, \
+	{ .id = "FJC6000", .driver_data = 0 }, \
+	{ .id = "FJC6001", .driver_data = 0 }, \
+	{ .id = "PNP0f03", .driver_data = 0 }, \
+	{ .id = "PNP0f0b", .driver_data = 0 }, \
+	{ .id = "PNP0f0e", .driver_data = 0 }, \
+	{ .id = "PNP0f12", .driver_data = 0 }, \
+	{ .id = "PNP0f13", .driver_data = 0 }, \
+	{ .id = "PNP0f19", .driver_data = 0 }, \
+	{ .id = "PNP0f1c", .driver_data = 0 }, \
 	{ .id = "SYN0801", .driver_data = 0 },
+
+static struct pnp_device_id pnp_aux_devids[] = {
+	AUX_DEVIDS
 	{ .id = "", },
 };
-MODULE_DEVICE_TABLE(pnp, pnp_aux_devids);
 
 static struct pnp_driver i8042_pnp_aux_driver = {
 	.name           = "i8042 aux",
 	.id_table       = pnp_aux_devids,
 	.probe          = i8042_pnp_aux_probe,
 };
+
+static struct pnp_device_id pnp_kdb_aux_devids[] = {
+	KBD_DEVIDS
+	AUX_DEVIDS
+	{ .id = "", },
+};
+MODULE_DEVICE_TABLE(pnp, pnp_kdb_aux_devids);
 
 static void i8042_pnp_exit(void)
 {

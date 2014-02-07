@@ -1324,6 +1324,9 @@ int file_read_actor(read_descriptor_t *desc, struct page *page,
 	if (size > count)
 		size = count;
 
+	if (PageReadaheadUnused(page))
+		ClearPageReadaheadUnused(page);
+
 	/*
 	 * Faults on the destination of a read are common, so do it before
 	 * taking the kmap.
@@ -1735,7 +1738,7 @@ int filemap_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 	int ret = VM_FAULT_LOCKED;
 
 	sb_start_pagefault(inode->i_sb);
-	file_update_time(vma->vm_file);
+	vma_file_update_time(vma);
 	lock_page(page);
 	if (page->mapping != inode->i_mapping) {
 		unlock_page(page);
