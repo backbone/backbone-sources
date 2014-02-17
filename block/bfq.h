@@ -1,5 +1,5 @@
 /*
- * BFQ-v7 for 3.13.0: data structures and common functions prototypes.
+ * BFQ-v7r2 for 3.13.0: data structures and common functions prototypes.
  *
  * Based on ideas and code from CFQ:
  * Copyright (C) 2003 Jens Axboe <axboe@kernel.dk>
@@ -57,15 +57,15 @@ struct bfq_service_tree {
 
 /**
  * struct bfq_sched_data - multi-class scheduler.
- * @active_entity: entity under service.
- * @next_active: head-of-the-line entity in the scheduler.
+ * @in_service_entity: entity under service.
+ * @next_in_service: head-of-the-line entity in the scheduler.
  * @service_tree: array of service trees, one per ioprio_class.
  *
  * bfq_sched_data is the basic scheduler queue.  It supports three
  * ioprio_classes, and can be used either as a toplevel queue or as
  * an intermediate queue on a hierarchical setup.
- * @next_active points to the active entity of the sched_data service
- * trees that will be scheduled next.
+ * @next_in_service points to the active entity of the sched_data
+ * service trees that will be scheduled next.
  *
  * The supported ioprio_classes are the same as in CFQ, in descending
  * priority order, IOPRIO_CLASS_RT, IOPRIO_CLASS_BE, IOPRIO_CLASS_IDLE.
@@ -75,8 +75,8 @@ struct bfq_service_tree {
  * All the fields are protected by the queue lock of the containing bfqd.
  */
 struct bfq_sched_data {
-	struct bfq_entity *active_entity;
-	struct bfq_entity *next_active;
+	struct bfq_entity *in_service_entity;
+	struct bfq_entity *next_in_service;
 	struct bfq_service_tree service_tree[BFQ_IOPRIO_CLASSES];
 };
 
@@ -186,8 +186,16 @@ struct bfq_group;
  * @seek_mean: mean seek distance
  * @last_request_pos: position of the last request enqueued
  * @pid: pid of the process owning the queue, used for logging purposes.
- * @last_rais_start_time: last (idle -> weight-raised) transition attempt
+ * @last_rais_start_finish: start time of the current weight-raising period if
+ *                          the @bfq-queue is being weight-raised, otherwise
+ *                          finish time of the last weight-raising period
  * @raising_cur_max_time: current max raising time for this queue
+ * @soft_rt_next_start: minimum time instant such that, only if a new request
+ *                      is enqueued after this time instant in an idle
+ *                      @bfq_queue with no outstanding requests, then the
+ *                      task associated with the queue it is deemed as soft
+ *                      real-time (see the comments to the function
+ *                      bfq_bfqq_softrt_next_start())
  * @last_idle_bklogged: time of the last transition of the @bfq_queue from
  *                      idle to backlogged
  * @service_from_backlogged: cumulative service received from the @bfq_queue
@@ -195,11 +203,11 @@ struct bfq_group;
  * @bic: pointer to the bfq_io_cq owning the bfq_queue, set to %NULL if the
  *	 queue is shared
  *
- * A bfq_queue is a leaf request queue; it can be associated to an io_context
- * or more (if it is an async one).  @cgroup holds a reference to the
- * cgroup, to be sure that it does not disappear while a bfqq still
- * references it (mostly to avoid races between request issuing and task
- * migration followed by cgroup distruction).
+ * A bfq_queue is a leaf request queue; it can be associated with an io_context
+ * or more, if it is async or shared between cooperating processes. @cgroup
+ * holds a reference to the cgroup, to be sure that it does not disappear while
+ * a bfqq still references it (mostly to avoid races between request issuing and
+ * task migration followed by cgroup destruction).
  * All the fields are protected by the queue lock of the containing bfqd.
  */
 struct bfq_queue {
@@ -240,11 +248,11 @@ struct bfq_queue {
 	struct bfq_io_cq *bic;
 
 	/* weight-raising fields */
-	unsigned int raising_cur_max_time;
+	unsigned long raising_cur_max_time;
 	unsigned long soft_rt_next_start;
-	u64 last_rais_start_finish;
+	unsigned long last_rais_start_finish;
 	unsigned int raising_coeff;
-	u64 last_idle_bklogged;
+	unsigned long last_idle_bklogged;
 	unsigned long service_from_backlogged;
 };
 
@@ -424,9 +432,9 @@ enum bfqq_state_flags {
 	BFQ_BFQQ_FLAG_sync,		/* synchronous queue */
 	BFQ_BFQQ_FLAG_budget_new,	/* no completion with this budget */
 	BFQ_BFQQ_FLAG_coop,		/* bfqq is shared */
-	BFQ_BFQQ_FLAG_split_coop,	/* shared bfqq will be splitted */
+	BFQ_BFQQ_FLAG_split_coop,	/* shared bfqq will be split */
 	BFQ_BFQQ_FLAG_just_split,	/* queue has just been split */
-	BFQ_BFQQ_FLAG_softrt_update,	/* needs softrt-next-start update */
+	BFQ_BFQQ_FLAG_softrt_update,	/* may need softrt-next-start update */
 };
 
 #define BFQ_BFQQ_FNS(name)						\

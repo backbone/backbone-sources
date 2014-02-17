@@ -1,5 +1,5 @@
 /*
- * BFQ, or Budget Fair Queueing, disk scheduler.
+ * Budget Fair Queueing (BFQ) disk scheduler.
  *
  * Based on ideas and code from CFQ:
  * Copyright (C) 2003 Jens Axboe <axboe@kernel.dk>
@@ -14,7 +14,7 @@
  * BFQ is a proportional share disk scheduling algorithm based on the
  * slice-by-slice service scheme of CFQ. But BFQ assigns budgets, measured in
  * number of sectors, to tasks instead of time slices. The disk is not granted
- * to the in-service task for a given time slice, but until it has exahusted
+ * to the in-service task for a given time slice, but until it has exhausted
  * its assigned budget. This change from the time to the service domain allows
  * BFQ to distribute the disk bandwidth among tasks as desired, without any
  * distortion due to ZBR, workload fluctuations or other factors. BFQ uses an
@@ -88,7 +88,7 @@ static const int bfq_max_budget_async_rq = 4;
 /*
  * Async to sync throughput distribution is controlled as follows:
  * when an async request is served, the entity is charged the number
- * of sectors of the request, multipled by the factor below
+ * of sectors of the request, multiplied by the factor below
  */
 static const int bfq_async_charge_factor = 10;
 
@@ -423,7 +423,7 @@ static void bfq_updated_next_req(struct bfq_data *bfqd,
 		return;
 
 	BUG_ON(entity->tree != &st->active);
-	BUG_ON(entity == entity->sched_data->active_entity);
+	BUG_ON(entity == entity->sched_data->in_service_entity);
 
 	new_budget = max_t(unsigned long, bfqq->max_budget,
 			   bfq_serv_to_charge(next_rq, bfqq));
@@ -548,9 +548,9 @@ static void bfq_add_rq_rb(struct request *rq)
 				bfqq->raising_cur_max_time =
 					bfqd->bfq_raising_rt_max_time;
 			bfq_log_bfqq(bfqd, bfqq,
-				     "wrais starting at %llu msec,"
+				     "wrais starting at %lu, "
 				     "rais_max_time %u",
-				     bfqq->last_rais_start_finish,
+				     jiffies,
 				     jiffies_to_msecs(bfqq->
 					raising_cur_max_time));
 		} else if (old_raising_coeff > 1) {
@@ -562,22 +562,24 @@ static void bfq_add_rq_rb(struct request *rq)
 				 !soft_rt) {
 				bfqq->raising_coeff = 1;
 				bfq_log_bfqq(bfqd, bfqq,
-					     "wrais ending at %llu msec,"
+					     "wrais ending at %lu, "
 					     "rais_max_time %u",
-					     bfqq->last_rais_start_finish,
+					     jiffies,
 					     jiffies_to_msecs(bfqq->
 						raising_cur_max_time));
-			} else if ((bfqq->last_rais_start_finish +
-				    bfqq->raising_cur_max_time <
-				    jiffies + bfqd->bfq_raising_rt_max_time) &&
+			} else if (time_before(
+					bfqq->last_rais_start_finish +
+					bfqq->raising_cur_max_time,
+					jiffies +
+					bfqd->bfq_raising_rt_max_time) &&
 				   soft_rt) {
 				/*
 				 *
 				 * The remaining weight-raising time is lower
 				 * than bfqd->bfq_raising_rt_max_time, which
 				 * means that the application is enjoying
-				 * weight raising either because deemed soft rt
-				 * in the near past, or because deemed
+				 * weight raising either because deemed soft-
+				 * rt in the near past, or because deemed
 				 * interactive a long ago. In both cases,
 				 * resetting now the current remaining weight-
 				 * raising time for the application to the
@@ -631,8 +633,8 @@ add_bfqq_busy:
 	} else {
 		if (bfqd->low_latency && old_raising_coeff == 1 &&
 			!rq_is_sync(rq) &&
-			bfqq->last_rais_start_finish +
 			time_is_before_jiffies(
+				bfqq->last_rais_start_finish +
 				bfqd->bfq_raising_min_inter_arr_async)) {
 			bfqq->raising_coeff = bfqd->bfq_raising_coeff;
 			bfqq->raising_cur_max_time = bfq_wrais_duration(bfqd);
@@ -640,9 +642,9 @@ add_bfqq_busy:
 			bfqd->raised_busy_queues++;
 			entity->ioprio_changed = 1;
 			bfq_log_bfqq(bfqd, bfqq,
-				     "non-idle wrais starting at %llu msec,"
+				     "non-idle wrais starting at %lu, "
 				     "rais_max_time %u",
-				     bfqq->last_rais_start_finish,
+				     jiffies,
 				     jiffies_to_msecs(bfqq->
 					raising_cur_max_time));
 		}
@@ -1158,9 +1160,9 @@ static int bfq_allow_merge(struct request_queue *q, struct request *rq,
 		if (new_bfqq != NULL) {
 			bfq_merge_bfqqs(bfqd, bic, bfqq, new_bfqq);
 			/*
-			 * If we get here, the bio will be queued in the shared queue,
-			 * i.e., new_bfqq, so use new_bfqq to decide whether bio and
-			 * rq can be merged.
+			 * If we get here, the bio will be queued in the shared
+			 * queue, i.e., new_bfqq, so use new_bfqq to decide
+			 * whether bio and rq can be merged.
 			 */
 			bfqq = new_bfqq;
 		}
@@ -1233,14 +1235,14 @@ static inline bool bfq_queue_nonrot_noidle(struct bfq_data *bfqd,
 	if (in_service_bfqq == NULL)
 		return false;
 	/*
-	 * If device is SSD it has no seek penalty, disable idling; but
-	 * do so only if:
+	 * If the device is non-rotational, and hence has no seek penalty,
+	 * disable idling; but do so only if:
 	 * - device does not support queuing, otherwise we still have
 	 *   a problem with sync vs async workloads;
 	 * - the queue is not weight-raised, to preserve guarantees.
 	 */
-	return (blk_queue_nonrot(bfqd->queue) && bfqd->hw_tag &&
-		in_service_bfqq->raising_coeff == 1);
+	return blk_queue_nonrot(bfqd->queue) && bfqd->hw_tag &&
+	       (in_service_bfqq->raising_coeff == 1);
 }
 
 static void bfq_arm_slice_timer(struct bfq_data *bfqd)
@@ -1420,7 +1422,7 @@ static void __bfq_bfqq_recalc_budget(struct bfq_data *bfqd,
 		case BFQ_BFQQ_TOO_IDLE:
 			/*
 			 * This is the only case where we may reduce
-			 * the budget: if there is no requets of the
+			 * the budget: if there is no request of the
 			 * process still waiting for completion, then
 			 * we assume (tentatively) that the timer has
 			 * expired because the batch of requests of
@@ -1436,13 +1438,13 @@ static void __bfq_bfqq_recalc_budget(struct bfq_data *bfqd,
 			 * requests, then the process may have not yet
 			 * issued its next request just because it is
 			 * still waiting for the completion of some of
-			 * the still oustanding ones.  So in this
+			 * the still outstanding ones.  So in this
 			 * subcase we do not reduce its budget, on the
 			 * contrary we increase it to possibly boost
 			 * the throughput, as discussed in the
 			 * comments to the BUDGET_TIMEOUT case.
 			 */
-			if (bfqq->dispatched > 0) /* still oustanding reqs */
+			if (bfqq->dispatched > 0) /* still outstanding reqs */
 				budget = min(budget * 2, bfqd->bfq_max_budget);
 			else {
 				if (budget > 5 * min_budget)
@@ -1639,41 +1641,44 @@ static int bfq_update_peak_rate(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 
 /*
  * To be deemed as soft real-time, an application must meet two requirements.
- * The first is that the application must not require an average bandwidth
- * higher than the approximate bandwidth required to playback or record a
- * compressed high-definition video.
+ * First, the application must not require an average bandwidth higher than
+ * the approximate bandwidth required to playback or record a compressed high-
+ * definition video.
  * The next function is invoked on the completion of the last request of a
  * batch, to compute the next-start time instant, soft_rt_next_start, such
  * that, if the next request of the application does not arrive before
  * soft_rt_next_start, then the above requirement on the bandwidth is met.
  *
  * The second requirement is that the request pattern of the application is
- * isochronous, i.e., that, after issuing a request or a batch of requests, the
- * application stops for a while, then issues a new batch, and so on. For this
- * reason the next function is invoked to compute soft_rt_next_start only for
- * applications that meet this requirement, whereas soft_rt_next_start is set
- * to infinity for applications that do not.
+ * isochronous, i.e., that, after issuing a request or a batch of requests,
+ * the application stops issuing new requests until all its pending requests
+ * have been completed. After that, the application may issue a new batch,
+ * and so on.
+ * For this reason the next function is invoked to compute soft_rt_next_start
+ * only for applications that meet this requirement, whereas soft_rt_next_start
+ * is set to infinity for applications that do not.
  *
  * Unfortunately, even a greedy application may happen to behave in an
- * isochronous way if several processes are competing for the CPUs. In fact,
- * in this scenario the application stops issuing requests while the CPUs are
- * busy serving other processes, then restarts, then stops again for a while,
- * and so on. In addition, if the disk achieves a low enough throughput with
- * the request pattern issued by the application, then the above bandwidth
- * requirement may happen to be met too. To prevent such a greedy application
- * to be deemed as soft real-time, a further rule is used in the computation
- * of soft_rt_next_start: soft_rt_next_start must be higher than the current
- * time plus the maximum time for which the arrival of a request is waited
- * for when a sync queue becomes idle, namely bfqd->bfq_slice_idle. This
- * filters out greedy applications, as the latter issue instead their next
+ * isochronous way if the CPU load is high. In fact, the application may stop
+ * issuing requests while the CPUs are busy serving other processes, then
+ * restart, then stop again for a while, and so on. In addition, if the disk
+ * achieves a low enough throughput with the request pattern issued by the
+ * application (e.g., because the request pattern is random and/or the device
+ * is slow), then the application may meet the above bandwidth requirement too.
+ * To prevent such a greedy application to be deemed as soft real-time, a
+ * further rule is used in the computation of soft_rt_next_start:
+ * soft_rt_next_start must be higher than the current time plus the maximum
+ * time for which the arrival of a request is waited for when a sync queue
+ * becomes idle, namely bfqd->bfq_slice_idle.
+ * This filters out greedy applications, as the latter issue instead their next
  * request as soon as possible after the last one has been completed (in
- * contrast, when a batch of requests is completed, a soft real-time
- * application spends some time processing data).
+ * contrast, when a batch of requests is completed, a soft real-time application
+ * spends some time processing data).
  *
- * Actually, the last filter may easily generate false positives if: only
- * bfqd->bfq_slice_idle is used as a reference time interval, and one or
- * both the following two cases occur:
- * 1) HZ is so low that the duration of a jiffie is comparable to or higher
+ * Unfortunately, the last filter may easily generate false positives if only
+ * bfqd->bfq_slice_idle is used as a reference time interval and one or both
+ * the following cases occur:
+ * 1) HZ is so low that the duration of a jiffy is comparable to or higher
  *    than bfqd->bfq_slice_idle. This happens, e.g., on slow devices with
  *    HZ=100.
  * 2) jiffies, instead of increasing at a constant rate, may stop increasing
@@ -1684,13 +1689,23 @@ static int bfq_update_peak_rate(struct bfq_data *bfqd, struct bfq_queue *bfqq,
  * particular we add the minimum number of jiffies for which the filter seems
  * to be quite precise also in embedded systems and KVM/QEMU virtual machines.
  */
-static inline u64 bfq_bfqq_softrt_next_start(struct bfq_data *bfqd,
-					     struct bfq_queue *bfqq)
+static inline unsigned long bfq_bfqq_softrt_next_start(struct bfq_data *bfqd,
+						       struct bfq_queue *bfqq)
 {
 	return max(bfqq->last_idle_bklogged +
 		   HZ * bfqq->service_from_backlogged /
 		   bfqd->bfq_raising_max_softrt_rate,
-		   (u64)jiffies + bfqq->bfqd->bfq_slice_idle + 4);
+		   jiffies + bfqq->bfqd->bfq_slice_idle + 4);
+}
+
+/*
+ * Return the largest-possible time instant such that, for as long as possible,
+ * the current time will be lower than this time instant according to the macro
+ * time_is_before_jiffies().
+ */
+static inline unsigned long bfq_infinity_from_now(unsigned long now)
+{
+	return now + ULONG_MAX / 2;
 }
 
 /**
@@ -1756,33 +1771,44 @@ static void bfq_bfqq_expire(struct bfq_data *bfqd,
 	if (bfqd->low_latency && bfqq->raising_coeff == 1)
 		bfqq->last_rais_start_finish = jiffies;
 
-	if (bfqd->low_latency && bfqd->bfq_raising_max_softrt_rate > 0) {
-		if (reason != BFQ_BFQQ_BUDGET_TIMEOUT &&
-		    reason != BFQ_BFQQ_BUDGET_EXHAUSTED) {
+	if (bfqd->low_latency && bfqd->bfq_raising_max_softrt_rate > 0 &&
+	    RB_EMPTY_ROOT(&bfqq->sort_list)) {
+		/*
+		 * If we get here, and there are no outstanding requests,
+		 * then the request pattern is isochronous (see the comments
+		 * to the function bfq_bfqq_softrt_next_start()). Hence we can
+		 * compute soft_rt_next_start. If, instead, the queue still
+		 * has outstanding requests, then we have to wait for the
+		 * completion of all the outstanding requests to discover
+		 * whether the request pattern is actually isochronous.
+		 */
+		if (bfqq->dispatched == 0)
+			bfqq->soft_rt_next_start =
+				bfq_bfqq_softrt_next_start(bfqd, bfqq);
+		else {
 			/*
-			 * If we get here, then the request pattern is
-			 * isochronous (see the comments to the function
-			 * bfq_bfqq_softrt_next_start()). However, if the
-			 * queue still has in-flight requests, then it is
-			 * better to postpone the computation of next_start
-			 * to the next request completion. In fact, if we
-			 * computed it now, then the application might pass
-			 * the greedy-application filter improperly, because
-			 * the arrival of its next request may  happen to be
-			 * higher than (jiffies + bfqq->bfqd->bfq_slice_idle)
-			 * not because the application is truly soft real-
-			 * time, but just because the application is currently
-			 * waiting for the completion of some request before
-			 * issuing, as quickly as possible, its next request.
+			 * The application is still waiting for the
+			 * completion of one or more requests:
+			 * prevent it from possibly being incorrectly
+			 * deemed as soft real-time by setting its
+			 * soft_rt_next_start to infinity. In fact,
+			 * without this assignment, the application
+			 * would be incorrectly deemed as soft
+			 * real-time if:
+			 * 1) it issued a new request before the
+			 *    completion of all its in-flight
+			 *    requests, and
+			 * 2) at that time, its soft_rt_next_start
+			 *    happened to be in the past.
 			 */
-			if (bfqq->dispatched > 0) {
-				bfqq->soft_rt_next_start = -1;
-				bfq_mark_bfqq_softrt_update(bfqq);
-			} else
-				bfqq->soft_rt_next_start =
-					bfq_bfqq_softrt_next_start(bfqd, bfqq);
-		} else
-			bfqq->soft_rt_next_start = -1; /* infinity */
+			bfqq->soft_rt_next_start =
+				bfq_infinity_from_now(jiffies);
+			/*
+			 * Schedule an update of soft_rt_next_start to when
+			 * the task may be discovered to be isochronous.
+			 */
+			bfq_mark_bfqq_softrt_update(bfqq);
+		}
 	}
 
 	bfq_log_bfqq(bfqd, bfqq,
@@ -1812,7 +1838,7 @@ static int bfq_bfqq_budget_timeout(struct bfq_queue *bfqq)
 
 /*
  * If we expire a queue that is waiting for the arrival of a new
- * request, we may prevent the fictitious timestamp backshifting that
+ * request, we may prevent the fictitious timestamp back-shifting that
  * allows the guarantees of the queue to be preserved (see [1] for
  * this tricky aspect). Hence we return true only if this condition
  * does not hold, or if the queue is slow enough to deserve only to be
@@ -1903,9 +1929,9 @@ static inline bool bfq_bfqq_must_idle(struct bfq_queue *bfqq)
 {
 	struct bfq_data *bfqd = bfqq->bfqd;
 
-	return (RB_EMPTY_ROOT(&bfqq->sort_list) && bfqd->bfq_slice_idle != 0 &&
-		bfq_bfqq_must_not_expire(bfqq) &&
-		!bfq_queue_nonrot_noidle(bfqd, bfqq));
+	return RB_EMPTY_ROOT(&bfqq->sort_list) && bfqd->bfq_slice_idle != 0 &&
+	       bfq_bfqq_must_not_expire(bfqq) &&
+	       !bfq_queue_nonrot_noidle(bfqd, bfqq);
 }
 
 /*
@@ -2009,11 +2035,11 @@ static void bfq_update_raising_data(struct bfq_data *bfqd,
 		 * If too much time has elapsed from the beginning
 		 * of this weight-raising period, stop it.
 		 */
-		if (jiffies - bfqq->last_rais_start_finish >
-			bfqq->raising_cur_max_time) {
+		if (time_is_before_jiffies(bfqq->last_rais_start_finish +
+					   bfqq->raising_cur_max_time)) {
 			bfqq->last_rais_start_finish = jiffies;
 			bfq_log_bfqq(bfqd, bfqq,
-				     "wrais ending at %llu msec,"
+				     "wrais ending at %lu, "
 				     "rais_max_time %u",
 				     bfqq->last_rais_start_finish,
 				     jiffies_to_msecs(bfqq->
@@ -2424,7 +2450,11 @@ static void bfq_init_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 
 	bfqq->raising_coeff = 1;
 	bfqq->last_rais_start_finish = 0;
-	bfqq->soft_rt_next_start = -1;
+	/*
+	 * Set to the value for which bfqq will not be deemed as
+	 * soft rt when it becomes backlogged.
+	 */
+	bfqq->soft_rt_next_start = bfq_infinity_from_now(jiffies);
 }
 
 static struct bfq_queue *bfq_find_alloc_queue(struct bfq_data *bfqd,
@@ -2793,10 +2823,14 @@ static void bfq_completed_request(struct request_queue *q, struct request *rq)
 		RQ_BIC(rq)->ttime.last_end_request = jiffies;
 
 	/*
-	 * The computation of softrt_next_start was scheduled for the next
-	 * request completion: it is now time to compute it.
+	 * If we are waiting to discover whether the request pattern of the
+	 * task associated with the queue is actually isochronous, and
+	 * both requisites for this condition to hold are satisfied, then
+	 * compute soft_rt_next_start (see the comments to the function
+	 * bfq_bfqq_softrt_next_start()).
 	 */
-	if (bfq_bfqq_softrt_update(bfqq) && RB_EMPTY_ROOT(&bfqq->sort_list))
+	if (bfq_bfqq_softrt_update(bfqq) && bfqq->dispatched == 0 &&
+	    RB_EMPTY_ROOT(&bfqq->sort_list))
 		bfqq->soft_rt_next_start =
 			bfq_bfqq_softrt_next_start(bfqd, bfqq);
 
@@ -3081,7 +3115,7 @@ static inline void __bfq_put_async_bfqq(struct bfq_data *bfqd,
  * Release all the bfqg references to its async queues.  If we are
  * deallocating the group these queues may still contain requests, so
  * we reparent them to the root cgroup (i.e., the only one that will
- * exist for sure untill all the requests on a device are gone).
+ * exist for sure until all the requests on a device are gone).
  */
 static void bfq_put_async_queues(struct bfq_data *bfqd, struct bfq_group *bfqg)
 {
@@ -3508,7 +3542,7 @@ static int __init bfq_init(void)
 		return -ENOMEM;
 
 	elv_register(&iosched_bfq);
-	printk(KERN_INFO "BFQ I/O-scheduler version: v7");
+	pr_info("BFQ I/O-scheduler version: v7r2");
 
 	return 0;
 }
@@ -3523,5 +3557,3 @@ module_init(bfq_init);
 module_exit(bfq_exit);
 
 MODULE_AUTHOR("Fabio Checconi, Paolo Valente");
-MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Budget Fair Queueing IO scheduler");
