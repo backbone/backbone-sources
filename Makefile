@@ -1,6 +1,6 @@
 VERSION = 3
 PATCHLEVEL = 13
-SUBLEVEL = 5
+SUBLEVEL = 6
 EXTRAVERSION = -zen
 NAME = Vagueness Is Coming
 
