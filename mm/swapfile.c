@@ -773,7 +773,7 @@ void get_swap_range_of_type(int type, swp_entry_t *start, swp_entry_t *end,
 				si->lowest_bit = si->max;
 				si->highest_bit = 0;
 			}
-			for (i = start_at; i <= stop_at; i++)
+			for (i = start_at + 1; i <= stop_at; i++)
 				inc_cluster_info_page(si, si->cluster_info, i);
 			si->cluster_next = stop_at + 1;
 			*start = swp_entry(type, start_at);
