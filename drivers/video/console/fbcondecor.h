@@ -25,6 +25,7 @@ int fbcon_decor_init(void);
 int fbcon_decor_exit(void);
 int fbcon_decor_call_helper(char* cmd, unsigned short cons);
 int fbcon_decor_disable(struct vc_data *vc, unsigned char redraw);
+void fbcon_decor_reset(void);
 
 /* cfbcondecor.c */
 void fbcon_decor_putcs(struct vc_data *vc, struct fb_info *info, const unsigned short *s, int count, int yy, int xx);
