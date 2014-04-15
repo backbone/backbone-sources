@@ -1,8 +1,8 @@
 VERSION = 3
 PATCHLEVEL = 14
 SUBLEVEL = 1
-EXTRAVERSION = -zen
-NAME = Too Good For This Sinful Earth
+EXTRAVERSION = -backbone
+NAME = Shuffling Zombie Juror
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
