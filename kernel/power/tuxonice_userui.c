@@ -55,6 +55,13 @@ static int ui_helper_changed; /* Used at resume-time so don't overwrite value
 static int progress_granularity = 30;
 
 static DECLARE_WAIT_QUEUE_HEAD(userui_wait_for_key);
+static int userui_wait_should_wake;
+
+#define toi_stop_waiting_for_userui_key() \
+{ \
+	userui_wait_should_wake = true; \
+	wake_up_interruptible(&userui_wait_for_key); \
+}
 
 /**
  * ui_nl_set_state - Update toi_action based on a message from userui.
@@ -80,7 +87,7 @@ static void ui_nl_set_state(int n)
 
 	if (!test_action_state(TOI_PAUSE) &&
 			!test_action_state(TOI_SINGLESTEP))
-		wake_up_interruptible(&userui_wait_for_key);
+		toi_stop_waiting_for_userui_key();
 }
 
 /**
@@ -287,7 +294,8 @@ static void wait_for_key_via_userui(void)
 	add_wait_queue(&userui_wait_for_key, &wait);
 	set_current_state(TASK_INTERRUPTIBLE);
 
-	interruptible_sleep_on(&userui_wait_for_key);
+	wait_event_interruptible(userui_wait_for_key, userui_wait_should_wake);
+	userui_wait_should_wake = false;
 
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&userui_wait_for_key, &wait);
@@ -406,7 +414,7 @@ static void request_abort_hibernate(void)
 	toi_prepare_status(CLEAR_BAR, "--- ESCAPE PRESSED :"
 					" ABORTING HIBERNATION ---");
 	set_abort_result(TOI_ABORT_REQUESTED);
-	wake_up_interruptible(&userui_wait_for_key);
+	toi_stop_waiting_for_userui_key();
 }
 
 /**
@@ -469,7 +477,7 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		toi_bkd.toi_debug_state = (*data);
 		return 0;
 	case USERUI_MSG_SPACE:
-		wake_up_interruptible(&userui_wait_for_key);
+		toi_stop_waiting_for_userui_key();
 		return 0;
 	case USERUI_MSG_GET_POWERDOWN_METHOD:
 		toi_send_netlink_message(&ui_helper_data,
