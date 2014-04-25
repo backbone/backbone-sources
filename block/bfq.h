@@ -412,7 +412,9 @@ struct bfq_data {
 	struct request_queue *queue;
 
 	struct bfq_group *root_group;
+#ifdef CONFIG_CGROUP_BFQIO
 	int active_numerous_groups;
+#endif
 
 	struct rb_root rq_pos_tree;
 	struct rb_root queue_weights_tree;

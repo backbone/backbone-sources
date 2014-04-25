@@ -372,10 +372,12 @@ static inline bool bfq_differentiated_weights(struct bfq_data *bfqd)
 	return (!RB_EMPTY_ROOT(&bfqd->queue_weights_tree) &&
 		(bfqd->queue_weights_tree.rb_node->rb_left ||
 		 bfqd->queue_weights_tree.rb_node->rb_right)
+#ifdef CONFIG_CGROUP_BFQIO
 	       ) ||
 	       (!RB_EMPTY_ROOT(&bfqd->group_weights_tree) &&
 		(bfqd->group_weights_tree.rb_node->rb_left ||
 		 bfqd->group_weights_tree.rb_node->rb_right)
+#endif
 	       );
 }
 
@@ -2110,6 +2112,9 @@ static inline int bfq_may_expire_for_budg_timeout(struct bfq_queue *bfqq)
  * 1) all active queues have the same weight,
  * 2) all active groups have the same weight,
  * 3) all active groups have at most one active child each.
+ * In particular, the last two conditions are always true if hierarchical
+ * support and the cgroups interface are not enabled, hence no state needs
+ * to be maintained.
  *
  * According to the above considerations, the compound condition evaluates
  * to true and hence idling is performed if any of the above symmetry
@@ -2153,8 +2158,12 @@ static inline int bfq_may_expire_for_budg_timeout(struct bfq_queue *bfqq)
 static inline bool bfq_bfqq_must_not_expire(struct bfq_queue *bfqq)
 {
 	struct bfq_data *bfqd = bfqq->bfqd;
+#ifdef CONFIG_CGROUP_BFQIO
 #define symmetric_scenario	  (!bfqd->active_numerous_groups && \
 				   !bfq_differentiated_weights(bfqd))
+#else
+#define symmetric_scenario	  (!bfq_differentiated_weights(bfqd))
+#endif
 #define cond_for_seeky_on_ncq_hdd (bfq_bfqq_constantly_seeky(bfqq) && \
 				   bfqd->busy_in_flight_queues == \
 				   bfqd->const_seeky_busy_in_flight_queues)
@@ -3476,7 +3485,9 @@ static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 	}
 
 	bfqd->root_group = bfqg;
+#ifdef CONFIG_CGROUP_BFQIO
 	bfqd->active_numerous_groups = 0;
+#endif
 
 	init_timer(&bfqd->idle_slice_timer);
 	bfqd->idle_slice_timer.function = bfq_idle_slice_timer;
