@@ -1,7 +1,7 @@
 /*
- * kernel/power/incremental.c
+ * kernel/power/tuxonice_incremental.c
  *
- * Copyright (C) 2012 Nigel Cunningham (nigel at tuxonice net)
+ * Copyright (C) 2014 Nigel Cunningham (nigel at tuxonice net)
  *
  * This file is released under the GPLv2.
  *

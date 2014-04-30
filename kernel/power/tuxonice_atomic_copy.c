@@ -1,7 +1,7 @@
 /*
  * kernel/power/tuxonice_atomic_copy.c
  *
- * Copyright 2004-2010 Nigel Cunningham (nigel at tuxonice net)
+ * Copyright 2004-2014 Nigel Cunningham (nigel at tuxonice net)
  *
  * Distributed under GPLv2.
  *
