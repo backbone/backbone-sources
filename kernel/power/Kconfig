@@ -126,15 +126,12 @@ menuconfig TOI_CORE
 		depends on TOI_CORE
 
 	config TOI_INCREMENTAL
-		tristate "Incremental Image Support"
-		depends on TOI_CORE && CRYPTO && BROKEN
-		select CRYPTO_SHA1
-		default y
+		bool "Incremental Image Support"
+		depends on TOI_CORE && 64BIT
+		default n
 		---help---
-		  This option adds initial support for using hashing algorithms
-		  (a quick, internal implementation of Fletcher16 and SHA1 via
-		  cryptoapi) to discover the number of pages which are
-		  unchanged since the image was last written. It is hoped that
+		  This option adds initial support for using the page fault
+		  mechanism to track changes to pages. It is hoped that
 		  this will be an initial step toward implementing storing just
 		  the differences between consecutive images, which will
 		  increase the amount of storage needed for the image, but also
