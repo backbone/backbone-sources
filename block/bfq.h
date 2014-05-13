@@ -342,14 +342,17 @@ enum bfq_device_speed {
  *		 queue under service, even if it is idling).
  * @busy_in_flight_queues: number of @bfq_queues containing pending or
  *                         in-flight requests, plus the @bfq_queue in service,
- *			   even if idle but waiting for the possible arrival
- *			   of its next sync request.
+ *                         even if idle but waiting for the possible arrival
+ *                         of its next sync request; this field is used only
+ *                         for rotational devices.
  * @const_seeky_busy_in_flight_queues: number of constantly-seeky @bfq_queues
  *                                     (that is, seeky queues that expired
  *                                     for budget timeout at least once)
  *                                     containing pending or in-flight
- *					requests, including the in-service
- *					@bfq_queue if constantly seeky.
+ *                                     requests, including the in-service
+ *                                     @bfq_queue if constantly seeky; this
+ *                                     field is used only for rotational
+ *                                     devices.
  * @raised_busy_queues: number of weight-raised busy bfq_queues.
  * @queued: number of queued requests.
  * @rq_in_driver: number of requests dispatched and waiting for completion.
