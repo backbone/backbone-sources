@@ -1949,7 +1949,7 @@ static void bfq_bfqq_expire(struct bfq_data *bfqd,
 	if (BFQQ_SEEKY(bfqq) && reason == BFQ_BFQQ_BUDGET_TIMEOUT &&
 	    !bfq_bfqq_constantly_seeky(bfqq)) {
 		bfq_mark_bfqq_constantly_seeky(bfqq);
-		if (!blk_queue_nonrot(bfqq->bfqd->queue) && bfqd->hw_tag)
+		if (!blk_queue_nonrot(bfqd->queue))
 			bfqd->const_seeky_busy_in_flight_queues++;
 	}
 
@@ -2201,8 +2201,7 @@ static inline bool bfq_bfqq_must_idle(struct bfq_queue *bfqq)
 	struct bfq_data *bfqd = bfqq->bfqd;
 
 	return RB_EMPTY_ROOT(&bfqq->sort_list) && bfqd->bfq_slice_idle != 0 &&
-	       bfq_bfqq_must_not_expire(bfqq) &&
-	       !bfq_queue_nonrot_noidle(bfqd, bfqq);
+	       bfq_bfqq_must_not_expire(bfqq);
 }
 
 /*
@@ -2936,7 +2935,7 @@ static void bfq_rq_enqueued(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 	bfq_update_io_seektime(bfqd, bfqq, rq);
 	if (!BFQQ_SEEKY(bfqq) && bfq_bfqq_constantly_seeky(bfqq)) {
 		bfq_clear_bfqq_constantly_seeky(bfqq);
-		if (!blk_queue_nonrot(bfqq->bfqd->queue) && bfqd->hw_tag) {
+		if (!blk_queue_nonrot(bfqd->queue)) {
 			BUG_ON(!bfqd->const_seeky_busy_in_flight_queues);
 			bfqd->const_seeky_busy_in_flight_queues--;
 		}
@@ -3097,7 +3096,7 @@ static void bfq_completed_request(struct request_queue *q, struct request *rq)
 	if (!bfqq->dispatched && !bfq_bfqq_busy(bfqq)) {
 		bfq_weights_tree_remove(bfqd, &bfqq->entity,
 					&bfqd->queue_weights_tree);
-		if (!blk_queue_nonrot(bfqq->bfqd->queue) && bfqd->hw_tag) {
+		if (!blk_queue_nonrot(bfqd->queue)) {
 			BUG_ON(!bfqd->busy_in_flight_queues);
 			bfqd->busy_in_flight_queues--;
 			if (bfq_bfqq_constantly_seeky(bfqq)) {
@@ -3852,7 +3851,7 @@ static int __init bfq_init(void)
 	device_speed_thresh[1] = (R_fast[1] + R_slow[1]) / 2;
 
 	elv_register(&iosched_bfq);
-	pr_info("BFQ I/O-scheduler version: v7r3");
+	pr_info("BFQ I/O-scheduler version: v7r4");
 
 	return 0;
 }
