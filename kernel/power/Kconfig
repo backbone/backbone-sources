@@ -125,22 +125,6 @@ menuconfig TOI_CORE
 	comment "General Options"
 		depends on TOI_CORE
 
-	config TOI_INCREMENTAL
-		bool "Incremental Image Support"
-		depends on TOI_CORE && 64BIT
-		default n
-		---help---
-		  This option adds initial support for using the page fault
-		  mechanism to track changes to pages. It is hoped that
-		  this will be an initial step toward implementing storing just
-		  the differences between consecutive images, which will
-		  increase the amount of storage needed for the image, but also
-		  increase the speed at which writing an image occurs and
-		  reduce the wear and tear on drives.
-
-	comment "No increemntal image support available without Cryptoapi support."
-		depends on TOI_CORE && !CRYPTO
-
 	config TOI_PRUNE
 		tristate "Image pruning support"
 		depends on TOI_CORE && CRYPTO && BROKEN
@@ -212,6 +196,30 @@ menuconfig TOI_CORE
 		  kernel command line parameter suspend_act= to turn off the keep image
 		  bit. Keep image mode is a little less user friendly on purpose - it
 		  should not be used without thought!
+
+	config TOI_INCREMENTAL
+		bool "Incremental Image Support"
+		depends on TOI_CORE && 64BIT
+		default n
+		---help---
+		  This option enables the work in progress toward using the dirty page
+		  tracking to record changes to pages. It is hoped that
+		  this will be an initial step toward implementing storing just
+		  the differences between consecutive images, which will
+		  increase the amount of storage needed for the image, but also
+		  increase the speed at which writing an image occurs and
+		  reduce the wear and tear on drives.
+
+		  At the moment, all that is implemented is the first step of keeping
+		  an existing image and then comparing it to the contents in memory
+		  (by setting /sys/power/tuxonice/verify_image to 1 and triggering a
+		  (fake) resume) to see what the page change tracking should find to be
+		  different. If you have verify_image set to 1, TuxOnIce will automatically
+		  invalidate the old image when you next try to hibernate, so there's no
+		  greater chance of disk corruption than normal.
+
+	comment "No incremental image support available without Keep Image support."
+		depends on TOI_CORE && !TOI_KEEP_IMAGE
 
 	config TOI_REPLACE_SWSUSP
 		bool "Replace swsusp by default"
