@@ -715,9 +715,9 @@ static void generate_free_page_map(void)
 static int size_of_free_region(struct zone *zone, unsigned long start_pfn)
 {
 	unsigned long this_pfn = start_pfn,
-		      end_pfn = zone->zone_start_pfn + zone->spanned_pages - 1;
+		      end_pfn = zone_end_pfn(zone);
 
-	while (pfn_valid(this_pfn) && this_pfn <= end_pfn && PageNosaveFree(pfn_to_page(this_pfn)))
+	while (pfn_valid(this_pfn) && this_pfn < end_pfn && PageNosaveFree(pfn_to_page(this_pfn)))
 		this_pfn++;
 
 	return this_pfn - start_pfn;
