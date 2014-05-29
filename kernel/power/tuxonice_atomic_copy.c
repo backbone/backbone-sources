@@ -440,8 +440,8 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 	case ATOMIC_ALL_STEPS:
 		if (!suspend_time) {
 			events_check_enabled = false;
-			platform_leave(1);
 		}
+		platform_leave(1);
 	case ATOMIC_STEP_SYSCORE_RESUME:
 		syscore_resume();
 	case ATOMIC_STEP_IRQS:
