@@ -446,6 +446,11 @@ static void do_cleanup(int get_debug_info, int restarting)
 		boot_kernel_data_buffer = 0;
 	}
 
+	if (test_toi_state(TOI_DEVICE_HOTPLUG_LOCKED)) {
+		unlock_device_hotplug();
+		clear_toi_state(TOI_DEVICE_HOTPLUG_LOCKED);
+	}
+
 	clear_toi_state(TOI_BOOT_KERNEL);
 	if (current->flags & PF_SUSPEND_TASK)
 		thaw_processes();

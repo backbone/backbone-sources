@@ -1053,6 +1053,9 @@ int toi_prepare_image(void)
 	if (attempt_to_freeze())
 		return 1;
 
+	lock_device_hotplug();
+	set_toi_state(TOI_DEVICE_HOTPLUG_LOCKED);
+
 	if (!extra_pd1_pages_allowance)
 		get_extra_pd1_allowance();
 
