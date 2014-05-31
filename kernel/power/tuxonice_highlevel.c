@@ -290,6 +290,7 @@ static int allocate_bitmaps(void)
 	    toi_alloc_bitmap(&io_map) ||
 	    toi_alloc_bitmap(&nosave_map) ||
 	    toi_alloc_bitmap(&free_map) ||
+	    toi_alloc_bitmap(&compare_map) ||
 	    toi_alloc_bitmap(&page_resave_map))
 		return 1;
 
@@ -320,6 +321,7 @@ static void free_bitmaps(void)
 	toi_free_bitmap(&io_map);
 	toi_free_bitmap(&nosave_map);
 	toi_free_bitmap(&free_map);
+	toi_free_bitmap(&compare_map);
 	toi_free_bitmap(&page_resave_map);
 }
 

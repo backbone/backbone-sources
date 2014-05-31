@@ -702,6 +702,7 @@ DEFINE_MEMORY_BITMAP(page_resave_map);
 DEFINE_MEMORY_BITMAP(io_map);
 DEFINE_MEMORY_BITMAP(nosave_map);
 DEFINE_MEMORY_BITMAP(free_map);
+DEFINE_MEMORY_BITMAP(compare_map);
 
 int memory_bm_write(struct memory_bitmap *bm, int (*rw_chunk)
 	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size))

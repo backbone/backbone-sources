@@ -16,6 +16,7 @@ extern struct memory_bitmap *page_resave_map;
 extern struct memory_bitmap *io_map;
 extern struct memory_bitmap *nosave_map;
 extern struct memory_bitmap *free_map;
+extern struct memory_bitmap *compare_map;
 
 #define PagePageset1(page) \
 	(memory_bm_test_bit(pageset1_map, page_to_pfn(page)))
@@ -65,6 +66,13 @@ extern struct memory_bitmap *free_map;
 	(memory_bm_set_bit(free_map, page_to_pfn(page)))
 #define ClearPageNosaveFree(page) \
 	(memory_bm_clear_bit(free_map, page_to_pfn(page)))
+
+#define PageCompareChanged(page) (compare_map ? \
+		memory_bm_test_bit(compare_map, page_to_pfn(page)) : 0)
+#define SetPageCompareChanged(page) \
+	(memory_bm_set_bit(compare_map, page_to_pfn(page)))
+#define ClearPageCompareChanged(page) \
+	(memory_bm_clear_bit(compare_map, page_to_pfn(page)))
 
 extern void save_pageflags(struct memory_bitmap *pagemap);
 extern int load_pageflags(struct memory_bitmap *pagemap);
