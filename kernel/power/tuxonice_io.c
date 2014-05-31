@@ -937,14 +937,14 @@ int write_pageset(struct pagedir *pagedir)
 
 	start_time = jiffies;
 
-	if (rw_init_modules(1, pagedir->id)) {
+	if (rw_init_modules(WRITE, pagedir->id)) {
 		abort_hibernate(TOI_FAILED_MODULE_INIT,
 				"Failed to initialise modules for writing.");
 		error = 1;
 	}
 
 	if (!error)
-		error = do_rw_loop(1, finish_at, pageflags, base, barmax,
+		error = do_rw_loop(WRITE, finish_at, pageflags, base, barmax,
 				pagedir->id);
 
 	if (rw_cleanup_modules(WRITE) && !error) {
@@ -996,11 +996,11 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 
 	start_time = jiffies;
 
-	if (rw_init_modules(0, pagedir->id)) {
+	if (rw_init_modules(READ, pagedir->id)) {
 		toiActiveAllocator->remove_image();
 		result = 1;
 	} else
-		result = do_rw_loop(0, finish_at, pageflags, base, barmax,
+		result = do_rw_loop(READ, finish_at, pageflags, base, barmax,
 				pagedir->id);
 
 	if (rw_cleanup_modules(READ) && !result) {
