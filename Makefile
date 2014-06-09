@@ -1,8 +1,8 @@
 VERSION = 3
 PATCHLEVEL = 15
 SUBLEVEL = 0
-EXTRAVERSION =
-NAME = Shuffling Zombie Juror
+EXTRAVERSION = -zen
+NAME = The War on Straw
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
