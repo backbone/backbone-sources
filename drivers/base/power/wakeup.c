@@ -23,6 +23,7 @@
  * if wakeup events are registered during or immediately before the transition.
  */
 bool events_check_enabled __read_mostly;
+EXPORT_SYMBOL_GPL(events_check_enabled);
 
 /*
  * Combined counters of registered wakeup events and wakeup events in progress.
@@ -715,6 +716,7 @@ bool pm_wakeup_pending(void)
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(pm_wakeup_pending);
 
 /**
  * pm_get_wakeup_count - Read the number of registered wakeup events.
