@@ -1,8 +1,8 @@
 VERSION = 3
 PATCHLEVEL = 15
 SUBLEVEL = 1
-EXTRAVERSION = -zen
-NAME = The War on Straw
+EXTRAVERSION = -backbone
+NAME = Shuffling Zombie Juror
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
