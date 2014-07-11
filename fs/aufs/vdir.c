@@ -63,10 +63,8 @@ int au_nhash_alloc(struct au_nhash *nhash, unsigned int num_hash, gfp_t gfp)
 {
 	struct hlist_head *head;
 	unsigned int u;
-	size_t sz;
 
-	sz = sizeof(*nhash->nh_head) * num_hash;
-	head = kmalloc(sz, gfp);
+	head = kmalloc(sizeof(*nhash->nh_head) * num_hash, gfp);
 	if (head) {
 		nhash->nh_num = num_hash;
 		nhash->nh_head = head;

@@ -83,7 +83,7 @@ static int au_show_brs(struct seq_file *seq, struct super_block *sb)
 	struct path path;
 	struct au_hdentry *hdp;
 	struct au_branch *br;
-	au_br_perm_str_t perm;
+	char *perm;
 
 	err = 0;
 	bend = au_sbend(sb);
@@ -94,10 +94,14 @@ static int au_show_brs(struct seq_file *seq, struct super_block *sb)
 		path.dentry = hdp[bindex].hd_dentry;
 		err = au_seq_path(seq, &path);
 		if (err > 0) {
-			au_optstr_br_perm(&perm, br->br_perm);
-			err = seq_printf(seq, "=%s", perm.a);
-			if (err == -1)
-				err = -E2BIG;
+			perm = au_optstr_br_perm(br->br_perm);
+			if (perm) {
+				err = seq_printf(seq, "=%s", perm);
+				kfree(perm);
+				if (err == -1)
+					err = -E2BIG;
+			} else
+				err = -ENOMEM;
 		}
 		if (!err && bindex != bend)
 			err = seq_putc(seq, ':');
@@ -243,7 +247,7 @@ static int aufs_show_options(struct seq_file *m, struct dentry *dentry)
 	AuBool(SHWH, shwh);
 	AuBool(PLINK, plink);
 	AuBool(DIO, dio);
-	AuBool(DIRPERM1, dirperm1);
+	/* AuBool(DIRPERM1, dirperm1); */
 	/* AuBool(REFROF, refrof); */
 
 	v = sbinfo->si_wbr_create;
@@ -467,7 +471,7 @@ void au_array_free(void *array)
 void *au_array_alloc(unsigned long long *hint, au_arraycb_t cb, void *arg)
 {
 	void *array;
-	unsigned long long n, sz;
+	unsigned long long n;
 
 	array = NULL;
 	n = 0;
@@ -480,10 +484,9 @@ void *au_array_alloc(unsigned long long *hint, au_arraycb_t cb, void *arg)
 		goto out;
 	}
 
-	sz = sizeof(array) * *hint;
-	array = kmalloc(sz, GFP_NOFS);
+	array = kmalloc(sizeof(array) * *hint, GFP_NOFS);
 	if (unlikely(!array))
-		array = vmalloc(sz);
+		array = vmalloc(sizeof(array) * *hint);
 	if (unlikely(!array)) {
 		array = ERR_PTR(-ENOMEM);
 		goto out;

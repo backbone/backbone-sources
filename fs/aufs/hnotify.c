@@ -304,7 +304,6 @@ struct hn_job_args {
 static int hn_job(struct hn_job_args *a)
 {
 	const unsigned int isdir = au_ftest_hnjob(a->flags, ISDIR);
-	int e;
 
 	/* reset xino */
 	if (au_ftest_hnjob(a->flags, XINO0) && a->inode)
@@ -322,11 +321,11 @@ static int hn_job(struct hn_job_args *a)
 
 	/* make the generation obsolete */
 	if (au_ftest_hnjob(a->flags, GEN)) {
-		e = -1;
+		int err = -1;
 		if (a->inode)
-			e = hn_gen_by_inode(a->h_name, a->h_nlen, a->inode,
+			err = hn_gen_by_inode(a->h_name, a->h_nlen, a->inode,
 					      isdir);
-		if (e && a->dentry)
+		if (err && a->dentry)
 			hn_gen_by_name(a->dentry, isdir);
 		/* ignore this error */
 	}
