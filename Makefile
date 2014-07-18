@@ -1,6 +1,6 @@
 VERSION = 3
 PATCHLEVEL = 15
-SUBLEVEL = 5
+SUBLEVEL = 6
 EXTRAVERSION = -zen
 NAME = The War on Straw
 
