@@ -357,7 +357,6 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
   }
 
 	suspend_console();
-	ftrace_stop();
 	pm_restrict_gfp_mask();
 
   if (suspend_time) {
@@ -461,7 +460,6 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 		dpm_resume(msg);
 		if (error || !toi_in_suspend())
 			pm_restore_gfp_mask();
-		ftrace_start();
 		resume_console();
 	case ATOMIC_STEP_DPM_COMPLETE:
 		dpm_complete(msg);
