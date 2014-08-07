@@ -238,6 +238,9 @@ EXPORT_SYMBOL_GPL(toi_translate_err_default);
 
 void try_tuxonice_resume(void)
 {
+        if (!hibernation_available())
+                return;
+
 	/* Don't let it wrap around eventually */
 	if (num_resume_calls < 2)
 		num_resume_calls++;

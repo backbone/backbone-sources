@@ -217,6 +217,9 @@ int toi_register_module(struct toi_module_ops *module)
 	int i;
 	struct kobject *kobj;
 
+        if (!hibernation_available())
+          return -ENODEV;
+
 	module->enabled = 1;
 
 	if (toi_find_module_given_name(module->name)) {

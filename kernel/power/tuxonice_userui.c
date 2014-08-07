@@ -646,10 +646,11 @@ static __init int toi_user_ui_init(void)
 	ui_helper_data.not_ready = userui_cleanup_console;
 	init_completion(&ui_helper_data.wait_for_process);
 	result = toi_register_module(&userui_ops);
-	if (!result)
-		result = toi_register_ui_ops(&my_ui_ops);
-	if (result)
-		toi_unregister_module(&userui_ops);
+        if (!result) {
+          result = toi_register_ui_ops(&my_ui_ops);
+          if (result)
+            toi_unregister_module(&userui_ops);
+        }
 
 	return result;
 }

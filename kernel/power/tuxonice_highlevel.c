@@ -1296,6 +1296,12 @@ static __init int core_load(void)
 	printk(KERN_INFO "TuxOnIce " TOI_CORE_VERSION
 			" (http://tuxonice.net)\n");
 
+        if (!hibernation_available()) {
+          printk(KERN_INFO "TuxOnIce disabled due to request for hibernation"
+              " to be disabled in this kernel.\n");
+          return 1;
+        }
+
 	if (toi_sysfs_init())
 		return 1;
 
