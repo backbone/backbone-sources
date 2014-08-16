@@ -375,7 +375,8 @@ struct intel_crtc {
 	int16_t cursor_x, cursor_y;
 	int16_t cursor_width, cursor_height;
 	int16_t max_cursor_width, max_cursor_height;
-	bool cursor_visible;
+	uint32_t cursor_cntl;
+	uint32_t cursor_base;
 
 	struct intel_plane_config plane_config;
 	struct intel_crtc_config config;
