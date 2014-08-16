@@ -18,7 +18,9 @@ struct rq {
 	u64 rq_last_ran;
 	int rq_prio;
 	bool rq_running; /* There is a task running */
-
+#ifdef CONFIG_SMT_NICE
+	int rq_smt_bias; /* Policy/nice level bias across smt siblings */
+#endif
 	/* Accurate timekeeping data */
 	u64 timekeep_clock;
 	unsigned long user_pc, nice_pc, irq_pc, softirq_pc, system_pc,
@@ -77,10 +79,6 @@ struct rq {
 	unsigned int ttwu_count;
 	unsigned int ttwu_local;
 #endif /* CONFIG_SCHEDSTATS */
-
-#ifdef CONFIG_SMP
-	struct llist_head wake_list;
-#endif
 };
 
 #ifdef CONFIG_SMP
@@ -118,5 +116,7 @@ static inline u64 rq_clock_task(struct rq *rq)
  */
 #define for_each_domain(cpu, __sd) \
 	for (__sd = rcu_dereference_check_sched_domain(cpu_rq(cpu)->sd); __sd; __sd = __sd->parent)
+
+static inline void sched_ttwu_pending(void) { }
 
 #endif
