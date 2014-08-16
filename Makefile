@@ -1,8 +1,8 @@
 VERSION = 3
 PATCHLEVEL = 16
 SUBLEVEL = 1
-EXTRAVERSION = -zen
-NAME = Doctor Commando And The Commandos Of The Universe
+EXTRAVERSION = -backbone
+NAME = Museum of Fishiegoodies
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
