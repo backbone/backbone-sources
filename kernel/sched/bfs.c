@@ -150,7 +150,7 @@ EXPORT_SYMBOL(__smp_mb__after_atomic);
 
 void print_scheduler_version(void)
 {
-	printk(KERN_INFO "BFS CPU scheduler v0.450 by Con Kolivas.\n");
+	printk(KERN_INFO "BFS CPU scheduler v0.456 by Con Kolivas.\n");
 }
 
 /*
@@ -1187,6 +1187,13 @@ static inline void return_task(struct task_struct *p, bool deactivate)
 	}
 }
 
+/* Enter with grq lock held. We know p is on the local cpu */
+static inline void __set_tsk_resched(struct task_struct *p)
+{
+	set_tsk_need_resched(p);
+	set_preempt_need_resched();
+}
+
 /*
  * resched_task - mark a task 'to be rescheduled now'.
  *
@@ -1513,6 +1520,18 @@ ttwu_stat(struct task_struct *p, int cpu, int wake_flags)
 #endif /* CONFIG_SCHEDSTATS */
 }
 
+#ifdef CONFIG_SMP
+void scheduler_ipi(void)
+{
+	/*
+	 * Fold TIF_NEED_RESCHED into the preempt_count; anybody setting
+	 * TIF_NEED_RESCHED remotely (for the first time) will also send
+	 * this IPI.
+	 */
+	preempt_fold_need_resched();
+}
+#endif
+
 static inline void ttwu_activate(struct task_struct *p, struct rq *rq,
 				 bool is_sync)
 {
@@ -1784,7 +1803,7 @@ after_ts_init:
 			 * do child-runs-first in anticipation of an exec. This
 			 * usually avoids a lot of COW overhead.
 			 */
-			set_tsk_need_resched(parent);
+			__set_tsk_resched(parent);
 		} else
 			try_preempt(p, rq);
 	} else {
@@ -1796,7 +1815,7 @@ after_ts_init:
 			* be slightly earlier.
 			*/
 			rq->rq_time_slice = 0;
-			set_tsk_need_resched(parent);
+			__set_tsk_resched(parent);
 		}
 		time_slice_expired(p);
 	}
@@ -2921,9 +2940,10 @@ static void task_running_tick(struct rq *rq)
 
 	/* p->time_slice < RESCHED_US. We only modify task_struct under grq lock */
 	p = rq->curr;
+
 	grq_lock();
 	requeue_task(p);
-	set_tsk_need_resched(p);
+	__set_tsk_resched(p);
 	grq_unlock();
 }
 
@@ -4753,9 +4773,9 @@ EXPORT_SYMBOL(yield);
  */
 int __sched yield_to(struct task_struct *p, bool preempt)
 {
+	struct rq *rq, *p_rq;
 	unsigned long flags;
 	int yielded = 0;
-	struct rq *rq;
 
 	rq = this_rq();
 	grq_lock_irqsave(&flags);
@@ -4763,6 +4783,8 @@ int __sched yield_to(struct task_struct *p, bool preempt)
 		yielded = -ESRCH;
 		goto out_unlock;
 	}
+
+	p_rq = task_rq(p);
 	yielded = 1;
 	if (p->deadline > rq->rq_deadline)
 		p->deadline = rq->rq_deadline;
@@ -4770,7 +4792,8 @@ int __sched yield_to(struct task_struct *p, bool preempt)
 	rq->rq_time_slice = 0;
 	if (p->time_slice > timeslice())
 		p->time_slice = timeslice();
-	set_tsk_need_resched(rq->curr);
+	if (preempt && rq != rq)
+		resched_task(p_rq->curr);
 out_unlock:
 	grq_unlock_irqrestore(&flags);
 
@@ -5036,7 +5059,6 @@ void init_idle(struct task_struct *idle, int cpu)
 #if defined(CONFIG_SMP)
 	sprintf(idle->comm, "%s/%d", INIT_TASK_COMM, cpu);
 #endif
-	set_tsk_need_resched(idle);
 }
 
 void resched_cpu(int cpu)
@@ -5203,7 +5225,7 @@ out:
 	task_grq_unlock(&flags);
 
 	if (running_wrong)
-		_cond_resched();
+		__cond_resched();
 
 	return ret;
 }
