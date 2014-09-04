@@ -190,11 +190,11 @@ static struct dentry *aufs_lookup(struct inode *dir, struct dentry *dentry,
 
 	if (npositive) {
 		inode = au_new_inode(dentry, /*must_new*/0);
-		ret = (void *)inode;
-	}
-	if (IS_ERR(inode)) {
-		inode = NULL;
-		goto out_unlock;
+		if (IS_ERR(inode)) {
+			ret = (void *)inode;
+			inode = NULL;
+			goto out_unlock;
+		}
 	}
 
 	ret = d_splice_alias(inode, dentry);
@@ -369,7 +369,7 @@ void au_pin_hdir_unlock(struct au_pin *p)
 		au_hn_imtx_unlock(p->hdir);
 }
 
-static int au_pin_hdir_lock(struct au_pin *p)
+int au_pin_hdir_lock(struct au_pin *p)
 {
 	int err;
 
