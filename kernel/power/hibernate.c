@@ -39,6 +39,7 @@ static int nohibernate;
 static int resume_wait;
 static unsigned int resume_delay;
 char resume_file[256] = CONFIG_PM_STD_PARTITION;
+EXPORT_SYMBOL_GPL(resume_file);
 dev_t swsusp_resume_device;
 sector_t swsusp_resume_block;
 __visible int in_suspend __nosavedata;
