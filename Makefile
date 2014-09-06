@@ -1,7 +1,7 @@
 VERSION = 3
 PATCHLEVEL = 16
-SUBLEVEL = 1
-EXTRAVERSION = -backbone-r2
+SUBLEVEL = 2
+EXTRAVERSION = -backbone
 NAME = Museum of Fishiegoodies
 
 # *DOCUMENTATION*
