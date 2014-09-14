@@ -132,11 +132,11 @@ void toi_copy_pageset1(void)
 	int i;
 	unsigned long source_index, dest_index;
 
-	memory_bm_position_reset(pageset1_map);
-	memory_bm_position_reset(pageset1_copy_map);
+	toi_memory_bm_position_reset(pageset1_map);
+	toi_memory_bm_position_reset(pageset1_copy_map);
 
-	source_index = memory_bm_next_pfn(pageset1_map);
-	dest_index = memory_bm_next_pfn(pageset1_copy_map);
+	source_index = toi_memory_bm_next_pfn(pageset1_map);
+	dest_index = toi_memory_bm_next_pfn(pageset1_copy_map);
 
 	for (i = 0; i < pagedir1.size; i++) {
 		unsigned long *origvirt, *copyvirt;
@@ -180,8 +180,8 @@ void toi_copy_pageset1(void)
 		if (PageHighMem(copypage))
 			kunmap_atomic(copyvirt);
 
-		source_index = memory_bm_next_pfn(pageset1_map);
-		dest_index = memory_bm_next_pfn(pageset1_copy_map);
+		source_index = toi_memory_bm_next_pfn(pageset1_map);
+		dest_index = toi_memory_bm_next_pfn(pageset1_copy_map);
 	}
 }
 

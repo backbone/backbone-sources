@@ -987,7 +987,6 @@ struct proto {
 						struct sk_buff *skb);
 
 	void		(*release_cb)(struct sock *sk);
-	void		(*mtu_reduced)(struct sock *sk);
 
 	/* Keeping track of sk's, looking them up, and port selection methods. */
 	void			(*hash)(struct sock *sk);
@@ -2166,9 +2165,7 @@ sock_recv_timestamp(struct msghdr *msg, struct sock *sk, struct sk_buff *skb)
 	 */
 	if (sock_flag(sk, SOCK_RCVTSTAMP) ||
 	    (sk->sk_tsflags & SOF_TIMESTAMPING_RX_SOFTWARE) ||
-	    (kt.tv64 &&
-	     (sk->sk_tsflags & SOF_TIMESTAMPING_SOFTWARE ||
-	      skb_shinfo(skb)->tx_flags & SKBTX_ANY_SW_TSTAMP)) ||
+	    (kt.tv64 && sk->sk_tsflags & SOF_TIMESTAMPING_SOFTWARE) ||
 	    (hwtstamps->hwtstamp.tv64 &&
 	     (sk->sk_tsflags & SOF_TIMESTAMPING_RAW_HARDWARE)))
 		__sock_recv_timestamp(msg, sk, skb);
@@ -2199,9 +2196,11 @@ static inline void sock_recv_ts_and_drops(struct msghdr *msg, struct sock *sk,
 /**
  * sock_tx_timestamp - checks whether the outgoing packet is to be time stamped
  * @sk:		socket sending this packet
- * @tx_flags:	filled with instructions for time stamping
+ * @tx_flags:	completed with instructions for time stamping
+ *
+ * Note : callers should take care of initial *tx_flags value (usually 0)
  */
-void sock_tx_timestamp(struct sock *sk, __u8 *tx_flags);
+void sock_tx_timestamp(const struct sock *sk, __u8 *tx_flags);
 
 /**
  * sk_eat_skb - Release a skb if it is no longer needed

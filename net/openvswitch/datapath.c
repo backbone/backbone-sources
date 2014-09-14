@@ -47,8 +47,6 @@
 #include <linux/openvswitch.h>
 #include <linux/rculist.h>
 #include <linux/dmi.h>
-#include <linux/genetlink.h>
-#include <net/genetlink.h>
 #include <net/genetlink.h>
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
@@ -267,8 +265,11 @@ void ovs_dp_process_received_packet(struct vport *p, struct sk_buff *skb)
 		upcall.key = &key;
 		upcall.userdata = NULL;
 		upcall.portid = ovs_vport_find_upcall_portid(p, skb);
-		ovs_dp_upcall(dp, skb, &upcall);
-		consume_skb(skb);
+		error = ovs_dp_upcall(dp, skb, &upcall);
+		if (unlikely(error))
+			kfree_skb(skb);
+		else
+			consume_skb(skb);
 		stats_counter = &stats->n_missed;
 		goto out;
 	}
@@ -406,7 +407,7 @@ static int queue_userspace_packet(struct datapath *dp, struct sk_buff *skb,
 {
 	struct ovs_header *upcall;
 	struct sk_buff *nskb = NULL;
-	struct sk_buff *user_skb; /* to be queued to userspace */
+	struct sk_buff *user_skb = NULL; /* to be queued to userspace */
 	struct nlattr *nla;
 	struct genl_info info = {
 		.dst_sk = ovs_dp_get_net(dp)->genl_sock,
@@ -496,9 +497,11 @@ static int queue_userspace_packet(struct datapath *dp, struct sk_buff *skb,
 	((struct nlmsghdr *) user_skb->data)->nlmsg_len = user_skb->len;
 
 	err = genlmsg_unicast(ovs_dp_get_net(dp), user_skb, upcall_info->portid);
+	user_skb = NULL;
 out:
 	if (err)
 		skb_tx_error(skb);
+	kfree_skb(user_skb);
 	kfree_skb(nskb);
 	return err;
 }

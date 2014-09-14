@@ -35,7 +35,7 @@ static struct pbe **last_low_pbe_ptr;
 
 void toi_reset_alt_image_pageset2_pfn(void)
 {
-	memory_bm_position_reset(pageset2_map);
+  toi_memory_bm_position_reset(pageset2_map);
 }
 
 static struct page *first_conflicting_page;
@@ -70,17 +70,16 @@ struct page *___toi_get_nonconflicting_page(int can_be_highmem)
 
 
 	if (test_toi_state(TOI_LOADING_ALT_IMAGE) &&
-			pageset2_map &&
-			(ptoi_pfn != BM_END_OF_MAP)) {
+			pageset2_map && ptoi_pfn) {
 		do {
-			ptoi_pfn = memory_bm_next_pfn(pageset2_map);
-			if (ptoi_pfn != BM_END_OF_MAP) {
+			ptoi_pfn = toi_memory_bm_next_pfn(pageset2_map);
+			if (ptoi_pfn) {
 				page = pfn_to_page(ptoi_pfn);
 				if (!PagePageset1(page) &&
 				    (can_be_highmem || !PageHighMem(page)))
 					return page;
 			}
-		} while (ptoi_pfn != BM_END_OF_MAP);
+		} while (ptoi_pfn);
 	}
 
 	do {
@@ -152,11 +151,8 @@ int toi_get_pageset1_load_addresses(void)
 	int low_direct = 0, high_direct = 0, result = 0, i;
 	int high_page = 1, high_offset = 0, low_page = 1, low_offset = 0;
 
-	memory_bm_set_iterators(pageset1_map, 3);
-	memory_bm_position_reset(pageset1_map);
-
-	memory_bm_set_iterators(pageset1_copy_map, 2);
-	memory_bm_position_reset(pageset1_copy_map);
+	toi_memory_bm_position_reset(pageset1_map);
+	toi_memory_bm_position_reset(pageset1_copy_map);
 
 	last_low_pbe_ptr = &restore_pblist;
 
@@ -226,9 +222,9 @@ int toi_get_pageset1_load_addresses(void)
 	 * Now generate our pbes (which will be used for the atomic restore),
 	 * and free unneeded pages.
 	 */
-	memory_bm_position_reset(pageset1_copy_map);
-	for (pfn = memory_bm_next_pfn_index(pageset1_copy_map, 1); pfn != BM_END_OF_MAP;
-			pfn = memory_bm_next_pfn_index(pageset1_copy_map, 1)) {
+	toi_memory_bm_position_reset(pageset1_copy_map);
+	for (pfn = toi_memory_bm_next_pfn_index(pageset1_copy_map, 1); pfn;
+			pfn = toi_memory_bm_next_pfn_index(pageset1_copy_map, 1)) {
 		int is_high;
 		page = pfn_to_page(pfn);
 		is_high = PageHighMem(page);
@@ -243,8 +239,8 @@ int toi_get_pageset1_load_addresses(void)
 			if (!is_high)
 				low_pages_for_highmem--;
 			do {
-				orig_high_pfn = memory_bm_next_pfn_index(pageset1_map, 1);
-				BUG_ON(orig_high_pfn == BM_END_OF_MAP);
+				orig_high_pfn = toi_memory_bm_next_pfn_index(pageset1_map, 1);
+				BUG_ON(!orig_high_pfn);
 				orig_page = pfn_to_page(orig_high_pfn);
 			} while (!PageHighMem(orig_page) ||
 					PagePageset1Copy(orig_page));
@@ -280,8 +276,8 @@ int toi_get_pageset1_load_addresses(void)
 			struct page *orig_page;
 			low_pbes_done++;
 			do {
-				orig_low_pfn = memory_bm_next_pfn_index(pageset1_map, 2);
-				BUG_ON(orig_low_pfn == BM_END_OF_MAP);
+				orig_low_pfn = toi_memory_bm_next_pfn_index(pageset1_map, 2);
+				BUG_ON(!orig_low_pfn);
 				orig_page = pfn_to_page(orig_low_pfn);
 			} while (PageHighMem(orig_page) ||
 					PagePageset1Copy(orig_page));
@@ -323,8 +319,6 @@ int toi_get_pageset1_load_addresses(void)
 	free_conflicting_pages();
 
 out:
-	memory_bm_set_iterators(pageset1_map, 1);
-	memory_bm_set_iterators(pageset1_copy_map, 1);
 	return result;
 }
 

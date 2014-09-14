@@ -416,10 +416,10 @@ static int write_next_page(unsigned long *data_pfn, int *my_io_index,
 	char **my_checksum_locn = &__get_cpu_var(checksum_locn);
 	int result = 0, was_present;
 
-	*data_pfn = memory_bm_next_pfn(io_map);
+	*data_pfn = toi_memory_bm_next_pfn(io_map);
 
 	/* Another thread could have beaten us to it. */
-	if (*data_pfn == BM_END_OF_MAP) {
+	if (!*data_pfn) {
 		if (atomic_read(&io_count)) {
 			printk(KERN_INFO "Ran out of pfns but io_count is "
 					"still %d.\n", atomic_read(&io_count));
@@ -431,7 +431,7 @@ static int write_next_page(unsigned long *data_pfn, int *my_io_index,
 
 	*my_io_index = io_finish_at - atomic_sub_return(1, &io_count);
 
-	memory_bm_clear_bit(io_map, *data_pfn);
+	toi_memory_bm_clear_bit(io_map, *data_pfn);
 	page = pfn_to_page(*data_pfn);
 
 	was_present = kernel_page_present(page);
@@ -439,7 +439,7 @@ static int write_next_page(unsigned long *data_pfn, int *my_io_index,
 		kernel_map_pages(page, 1, 1);
 
 	if (io_pageset == 1)
-		*write_pfn = memory_bm_next_pfn(pageset1_map);
+		*write_pfn = toi_memory_bm_next_pfn(pageset1_map);
 	else {
 		*write_pfn = *data_pfn;
 		*my_checksum_locn = tuxonice_get_next_checksum();
@@ -523,12 +523,12 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 	unsigned long idx = 0;
 
 	if (io_pageset == 1 && (!pageset1_copy_map ||
-			!memory_bm_test_bit_index(pageset1_copy_map, write_pfn, cpu))) {
+			!toi_memory_bm_test_bit_index(pageset1_copy_map, write_pfn, cpu))) {
 		int is_high = PageHighMem(final_page);
 		copy_page = copy_page_from_orig_page(is_high ? (void *) write_pfn : final_page, is_high);
 	}
 
-	if (!memory_bm_test_bit_index(io_map, write_pfn, cpu)) {
+	if (!toi_memory_bm_test_bit_index(io_map, write_pfn, cpu)) {
 		toi_message(TOI_IO, TOI_VERBOSE, 0, "Discard %ld.", write_pfn);
 		mutex_lock(&io_mutex);
 		idx = atomic_add_return(1, &io_count);
@@ -546,7 +546,7 @@ static void use_read_page(unsigned long write_pfn, struct page *buffer)
 		kernel_map_pages(copy_page, 1, 0);
 	kunmap(copy_page);
 	kunmap(buffer);
-	memory_bm_clear_bit_index(io_map, write_pfn, cpu);
+	toi_memory_bm_clear_bit_index(io_map, write_pfn, cpu);
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "Read %d:%ld", idx, write_pfn);
 }
 
@@ -781,7 +781,7 @@ void toi_stop_other_threads(void)
  *
  * Create the io_map bitmap and call worker_rw_loop to perform I/O operations.
  **/
-static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
+static int do_rw_loop(int write, int finish_at, struct toi_memory_bitmap *pageflags,
 		int base, int barmax, int pageset)
 {
 	int index = 0, cpu, result = 0, workers_started;
@@ -811,16 +811,16 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	}
 
 	/* Ensure all bits clear */
-	memory_bm_clear(io_map);
+	toi_memory_bm_clear(io_map);
 
 	/* Set the bits for the pages to write */
-	memory_bm_position_reset(pageflags);
+	toi_memory_bm_position_reset(pageflags);
 
-	pfn = memory_bm_next_pfn(pageflags);
+	pfn = toi_memory_bm_next_pfn(pageflags);
 
-	while (pfn != BM_END_OF_MAP && index < finish_at) {
-		memory_bm_set_bit(io_map, pfn);
-		pfn = memory_bm_next_pfn(pageflags);
+	while (pfn && index < finish_at) {
+		toi_memory_bm_set_bit(io_map, pfn);
+		pfn = toi_memory_bm_next_pfn(pageflags);
 		index++;
 	}
 
@@ -828,7 +828,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 
 	atomic_set(&io_count, finish_at);
 
-	memory_bm_position_reset(pageset1_map);
+	toi_memory_bm_position_reset(pageset1_map);
 
 	mutex_lock(&io_mutex);
 
@@ -840,11 +840,8 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 
 	workers_started = atomic_read(&toi_num_other_threads);
 
-	memory_bm_set_iterators(io_map, atomic_read(&toi_num_other_threads) + 1);
-	memory_bm_position_reset(io_map);
-
-	memory_bm_set_iterators(pageset1_copy_map, atomic_read(&toi_num_other_threads) + 1);
-	memory_bm_position_reset(pageset1_copy_map);
+	toi_memory_bm_position_reset(io_map);
+	toi_memory_bm_position_reset(pageset1_copy_map);
 
 	toi_worker_command = TOI_IO_WORKER_RUN;
 	wake_up(&toi_worker_wait_queue);
@@ -881,9 +878,9 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 				" %d/%d MB ",
 				MB(io_base + io_finish_at), MB(io_barmax));
 
-		memory_bm_position_reset(io_map);
-		next = memory_bm_next_pfn(io_map);
-		if  (next != BM_END_OF_MAP) {
+		toi_memory_bm_position_reset(io_map);
+		next = toi_memory_bm_next_pfn(io_map);
+		if  (next) {
 			printk(KERN_INFO "Finished I/O loop but still work to "
 					"do?\nFinish at = %d. io_count = %d.\n",
 					finish_at, atomic_read(&io_count));
@@ -911,7 +908,7 @@ int write_pageset(struct pagedir *pagedir)
 	int finish_at, base = 0;
 	int barmax = pagedir1.size + pagedir2.size;
 	long error = 0;
-	struct memory_bitmap *pageflags;
+	struct toi_memory_bitmap *pageflags;
 	unsigned long start_time, end_time;
 
 	/*
@@ -977,7 +974,7 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 	int result = 0, base = 0;
 	int finish_at = pagedir->size;
 	int barmax = pagedir1.size + pagedir2.size;
-	struct memory_bitmap *pageflags;
+	struct toi_memory_bitmap *pageflags;
 	unsigned long start_time, end_time;
 
 	if (pagedir->id == 1) {
@@ -1462,7 +1459,7 @@ int write_image_header(void)
 		goto write_image_header_abort;
 	}
 
-	if (memory_bm_write(pageset1_map,
+	if (toi_memory_bm_write(pageset1_map,
 				toiActiveAllocator->rw_header_chunk)) {
 		abort_hibernate(TOI_FAILED_IO,
 				"Failed to write bitmaps.");
@@ -1724,7 +1721,7 @@ static int __read_pageset1(void)
 	 * See _toi_rw_header_chunk in tuxonice_bio.c:
 	 * Initialize pageset1_map by reading the map from the image.
 	 */
-	if (memory_bm_read(pageset1_map, toiActiveAllocator->rw_header_chunk))
+	if (toi_memory_bm_read(pageset1_map, toiActiveAllocator->rw_header_chunk))
 		goto out_thaw;
 
 	/*

@@ -220,7 +220,7 @@ static void toi_mark_pages_for_pageset2(void)
 {
 	struct attention_list *this = attention_list;
 
-	memory_bm_clear(pageset2_map);
+	toi_memory_bm_clear(pageset2_map);
 
 	if (test_action_state(TOI_NO_PAGESET2) || no_ps2_needed)
 		return;
@@ -744,7 +744,7 @@ static void flag_image_pages(int atomic_copy)
 
 	num_nosave = 0;
 
-	memory_bm_clear(pageset1_map);
+	toi_memory_bm_clear(pageset1_map);
 
 	generate_free_page_map();
 
@@ -817,13 +817,13 @@ static void flag_image_pages(int atomic_copy)
 
 void toi_recalculate_image_contents(int atomic_copy)
 {
-	memory_bm_clear(pageset1_map);
+	toi_memory_bm_clear(pageset1_map);
 	if (!atomic_copy) {
 		unsigned long pfn;
-		memory_bm_position_reset(pageset2_map);
-		for (pfn = memory_bm_next_pfn(pageset2_map);
-				pfn != BM_END_OF_MAP;
-				pfn = memory_bm_next_pfn(pageset2_map))
+		toi_memory_bm_position_reset(pageset2_map);
+		for (pfn = toi_memory_bm_next_pfn(pageset2_map);
+				pfn;
+				pfn = toi_memory_bm_next_pfn(pageset2_map))
 			ClearPagePageset1Copy(pfn_to_page(pfn));
 		/* Need to call this before getting pageset1_size! */
 		toi_mark_pages_for_pageset2();
