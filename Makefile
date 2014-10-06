@@ -1,8 +1,8 @@
 VERSION = 3
 PATCHLEVEL = 17
 SUBLEVEL = 1
-EXTRAVERSION =
-NAME = Shuffling Zombie Juror
+EXTRAVERSION = -zen
+NAME = We All Live In A Yellow Penguin
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
