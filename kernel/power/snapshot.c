@@ -720,56 +720,6 @@ static int memory_bm_find_bit(struct memory_bitmap *bm, unsigned long pfn,
 	return 0;
 }
 
-/*
- *	memory_rtree_find_bit - Find the bit for pfn in the memory
- *				bitmap
- *
- *	Walks the radix tree to find the page which contains the bit for
- *	pfn and returns the bit position in **addr and *bit_nr.
- */
-static int memory_rtree_find_bit(struct memory_bitmap *bm, unsigned long pfn,
-				 void **addr, unsigned int *bit_nr)
-{
-	struct mem_zone_bm_rtree *curr, *zone;
-	struct rtree_node *node;
-	int i, block_nr;
-
-	zone = NULL;
-
-	/* Find the right zone */
-	list_for_each_entry(curr, &bm->zones, list) {
-		if (pfn >= curr->start_pfn && pfn < curr->end_pfn) {
-			zone = curr;
-			break;
-		}
-	}
-
-	if (!zone)
-		return -EFAULT;
-
-	/*
-	 * We have a zone. Now walk the radix tree to find the leave
-	 * node for our pfn.
-	 */
-	node      = zone->rtree;
-	block_nr  = (pfn - zone->start_pfn) >> BM_BLOCK_SHIFT;
-
-	for (i = zone->levels; i > 0; i--) {
-		int index;
-
-		index = block_nr >> ((i - 1) * BM_RTREE_LEVEL_SHIFT);
-		index &= BM_RTREE_LEVEL_MASK;
-		BUG_ON(node->data[index] == 0);
-		node = (struct rtree_node *)node->data[index];
-	}
-
-	/* Set return values */
-	*addr = node->data;
-	*bit_nr = (pfn - zone->start_pfn) & BM_BLOCK_MASK;
-
-	return 0;
-}
-
 static void memory_bm_set_bit(struct memory_bitmap *bm, unsigned long pfn)
 {
 	void *addr;
@@ -777,10 +727,6 @@ static void memory_bm_set_bit(struct memory_bitmap *bm, unsigned long pfn)
 	int error;
 
 	error = memory_bm_find_bit(bm, pfn, &addr, &bit);
-	BUG_ON(error);
-	set_bit(bit, addr);
-
-	error = memory_rtree_find_bit(bm, pfn, &addr, &bit);
 	BUG_ON(error);
 	set_bit(bit, addr);
 }
@@ -794,13 +740,6 @@ static int mem_bm_set_bit_check(struct memory_bitmap *bm, unsigned long pfn)
 	error = memory_bm_find_bit(bm, pfn, &addr, &bit);
 	if (!error)
 		set_bit(bit, addr);
-	else
-		return error;
-
-	error = memory_rtree_find_bit(bm, pfn, &addr, &bit);
-	if (!error)
-		set_bit(bit, addr);
-
 	return error;
 }
 
@@ -813,42 +752,25 @@ static void memory_bm_clear_bit(struct memory_bitmap *bm, unsigned long pfn)
 	error = memory_bm_find_bit(bm, pfn, &addr, &bit);
 	BUG_ON(error);
 	clear_bit(bit, addr);
-
-	error = memory_rtree_find_bit(bm, pfn, &addr, &bit);
-	BUG_ON(error);
-	clear_bit(bit, addr);
 }
 
 static int memory_bm_test_bit(struct memory_bitmap *bm, unsigned long pfn)
 {
 	void *addr;
 	unsigned int bit;
-	int error, error2;
-	int v;
+	int error;
 
 	error = memory_bm_find_bit(bm, pfn, &addr, &bit);
 	BUG_ON(error);
-	v = test_bit(bit, addr);
-
-	error2 = memory_rtree_find_bit(bm, pfn, &addr, &bit);
-	BUG_ON(error2);
-
-	WARN_ON_ONCE(v != test_bit(bit, addr));
-
-	return v;
+	return test_bit(bit, addr);
 }
 
 static bool memory_bm_pfn_present(struct memory_bitmap *bm, unsigned long pfn)
 {
 	void *addr;
 	unsigned int bit;
-	int present;
 
-	present = !memory_bm_find_bit(bm, pfn, &addr, &bit);
-
-	WARN_ON_ONCE(present != !memory_rtree_find_bit(bm, pfn, &addr, &bit));
-
-	return present;
+	return !memory_bm_find_bit(bm, pfn, &addr, &bit);
 }
 
 /**
