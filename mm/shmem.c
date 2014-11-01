@@ -2923,7 +2923,7 @@ SYSCALL_DEFINE2(memfd_create,
 		goto err_name;
 	}
 
-	file = shmem_file_setup(name, 0, VM_NORESERVE);
+	file = shmem_file_setup(name, 0, VM_NORESERVE, 0);
 	if (IS_ERR(file)) {
 		error = PTR_ERR(file);
 		goto err_fd;
