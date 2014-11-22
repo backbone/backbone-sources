@@ -1,6 +1,6 @@
 VERSION = 3
 PATCHLEVEL = 14
-SUBLEVEL = 24
+SUBLEVEL = 25
 EXTRAVERSION = -backbone
 NAME = Shuffling Zombie Juror
 
