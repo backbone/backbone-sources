@@ -150,7 +150,7 @@ EXPORT_SYMBOL(__smp_mb__after_atomic);
 
 void print_scheduler_version(void)
 {
-	printk(KERN_INFO "BFS CPU scheduler v0.457 by Con Kolivas.\n");
+	printk(KERN_INFO "BFS CPU scheduler v0.458 by Con Kolivas.\n");
 }
 
 /*
@@ -647,14 +647,6 @@ static void enqueue_task(struct task_struct *p, struct rq *rq)
 	sched_info_queued(rq, p);
 }
 
-/* Only idle task does this as a real time task*/
-static inline void enqueue_task_head(struct task_struct *p)
-{
-	__set_bit(p->prio, grq.prio_bitmap);
-	list_add(&p->run_list, grq.queue + p->prio);
-	sched_info_queued(task_rq(p), p);
-}
-
 static inline void requeue_task(struct task_struct *p)
 {
 	sched_info_queued(task_rq(p), p);
@@ -990,16 +982,6 @@ static inline int locality_diff(struct task_struct *p, struct rq *rq)
 EXPORT_SYMBOL_GPL(cpu_scaling);
 EXPORT_SYMBOL_GPL(cpu_nonscaling);
 
-/*
- * activate_idle_task - move idle task to the _front_ of runqueue.
- */
-static inline void activate_idle_task(struct task_struct *p)
-{
-	enqueue_task_head(p);
-	grq.nr_running++;
-	inc_qnr();
-}
-
 static inline int normal_prio(struct task_struct *p)
 {
 	if (has_rt_policy(p))
@@ -1083,9 +1065,10 @@ void set_task_cpu(struct task_struct *p, unsigned int cpu)
 	 */
 	WARN_ON_ONCE(debug_locks && !lockdep_is_held(&grq.lock));
 #endif
+	if (task_cpu(p) == cpu)
+		return;
 	trace_sched_migrate_task(p, cpu);
-	if (task_cpu(p) != cpu)
-		perf_sw_event(PERF_COUNT_SW_CPU_MIGRATIONS, 1, NULL, 0);
+	perf_sw_event(PERF_COUNT_SW_CPU_MIGRATIONS, 1, NULL, 0);
 
 	/*
 	 * After ->cpu is set up to a new value, task_grq_lock(p, ...) can be
@@ -1093,6 +1076,10 @@ void set_task_cpu(struct task_struct *p, unsigned int cpu)
 	 * per-task data have been completed by this moment.
 	 */
 	smp_wmb();
+	if (p->on_rq) {
+		task_rq(p)->soft_affined--;
+		cpu_rq(cpu)->soft_affined++;
+	}
 	task_thread_info(p)->cpu = cpu;
 }
 
