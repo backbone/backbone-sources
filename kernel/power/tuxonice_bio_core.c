@@ -1685,7 +1685,7 @@ static int toi_bio_parse_sig_location(char *commandline,
 
 	if (colon) {
 		unsigned long block;
-		temp_result = strict_strtoul(colon + 1, 0, &block);
+		temp_result = kstrtoul(colon + 1, 0, &block);
 		if (!temp_result)
 			resume_firstblock = (int) block;
 	} else

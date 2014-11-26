@@ -235,7 +235,7 @@ void toi_power_down(void)
 					(int) size);
 		else {
 			unsigned long since_epoch;
-			if (!strict_strtoul(array, 0, &since_epoch)) {
+			if (!kstrtoul(array, 0, &since_epoch)) {
 				/* Clear any wakeup time. */
 				write_alarm_file(0);
 

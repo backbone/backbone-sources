@@ -112,7 +112,7 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 	case TOI_SYSFS_DATA_BIT:
 		{
 		unsigned long value;
-		result = strict_strtoul(my_buf, 0, &value);
+		result = kstrtoul(my_buf, 0, &value);
 		if (result)
 			break;
 		if (value)
@@ -126,7 +126,7 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 	case TOI_SYSFS_DATA_INTEGER:
 		{
 			long temp;
-			result = strict_strtol(my_buf, 0, &temp);
+			result = kstrtol(my_buf, 0, &temp);
 			if (result)
 				break;
 			*(sysfs_data->data.integer.variable) = (int) temp;
@@ -137,7 +137,7 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 		{
 			long *variable =
 				sysfs_data->data.a_long.variable;
-			result = strict_strtol(my_buf, 0, variable);
+			result = kstrtol(my_buf, 0, variable);
 			if (result)
 				break;
 			BOUND(variable, a_long);
@@ -147,7 +147,7 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 		{
 			unsigned long *variable =
 				sysfs_data->data.ul.variable;
-			result = strict_strtoul(my_buf, 0, variable);
+			result = kstrtoul(my_buf, 0, variable);
 			if (result)
 				break;
 			BOUND(variable, ul);

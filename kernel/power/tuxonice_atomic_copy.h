@@ -21,3 +21,5 @@ enum {
 
 int toi_go_atomic(pm_message_t state, int toi_time);
 void toi_end_atomic(int stage, int toi_time, int error);
+
+extern void platform_recover(int platform_mode);

@@ -62,7 +62,6 @@ extern bool freezer_test_done;
 extern int hibernation_snapshot(int platform_mode);
 extern int hibernation_restore(int platform_mode);
 extern int hibernation_platform_enter(void);
-extern void platform_recover(int platform_mode);
 
 #else /* !CONFIG_HIBERNATION */
 
