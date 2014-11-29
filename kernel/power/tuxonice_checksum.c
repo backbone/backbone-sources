@@ -302,9 +302,9 @@ void check_checksums(void)
 	this_checksum = 0;
 
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "Verifying checksums.");
-	memory_bm_position_reset(pageset2_map);
-	for (pfn = memory_bm_next_pfn(pageset2_map); pfn != BM_END_OF_MAP;
-			pfn = memory_bm_next_pfn(pageset2_map)) {
+	toi_memory_bm_position_reset(pageset2_map);
+	for (pfn = toi_memory_bm_next_pfn(pageset2_map); pfn;
+			pfn = toi_memory_bm_next_pfn(pageset2_map)) {
 		int ret;
 		char *pa;
 		struct page *page = pfn_to_page(pfn);
