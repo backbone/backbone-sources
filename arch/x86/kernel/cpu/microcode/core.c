@@ -85,7 +85,6 @@
 #include <linux/syscore_ops.h>
 
 #include <asm/microcode.h>
-#include <asm/microcode_intel.h>
 #include <asm/processor.h>
 #include <asm/cpu_device_id.h>
 #include <asm/perf_event.h>
@@ -466,8 +465,6 @@ static void mc_bp_resume(void)
 
 	if (uci->valid && uci->mc)
 		microcode_ops->apply_microcode(cpu);
-	else if (!uci->mc)
-		load_ucode_intel_ap();
 }
 
 static struct syscore_ops mc_syscore_ops = {
