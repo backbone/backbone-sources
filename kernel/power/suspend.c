@@ -371,6 +371,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 	platform_suspend_recover(state);
 	goto Resume_devices;
 }
+EXPORT_SYMBOL_GPL(suspend_devices_and_enter);
 
 /**
  * suspend_finish - Clean up before finishing the suspend sequence.
