@@ -99,6 +99,8 @@ static mm_segment_t oldfs;
 static DEFINE_MUTEX(tuxonice_in_use);
 static int block_dump_save;
 
+int toi_trace_index;
+
 /* Binary signature if an image is present */
 char tuxonice_signature[9] = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
 EXPORT_SYMBOL_GPL(tuxonice_signature);
@@ -151,6 +153,7 @@ static char *result_strings[] = {
  **/
 void toi_finish_anything(int hibernate_or_resume)
 {
+	toi_running = 0;
 	toi_cleanup_modules(hibernate_or_resume);
 	toi_put_modules();
 	if (hibernate_or_resume) {
@@ -180,6 +183,8 @@ int toi_start_anything(int hibernate_or_resume)
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 
+        toi_trace_index = 0;
+
 	if (hibernate_or_resume) {
     lock_system_sleep();
 
@@ -208,8 +213,10 @@ int toi_start_anything(int hibernate_or_resume)
 	if (!toiActiveAllocator)
 		toi_attempt_to_parse_resume_device(!hibernate_or_resume);
 
-	if (!toi_initialise_modules_late(hibernate_or_resume))
-		return 0;
+        if (!toi_initialise_modules_late(hibernate_or_resume)) {
+            toi_running = 1; /* For the swsusp code we use :< */
+            return 0;
+        }
 
 	toi_cleanup_modules(hibernate_or_resume);
 early_init_err:
@@ -250,8 +257,9 @@ static void mark_nosave_pages(void)
 		unsigned long pfn;
 
 		for (pfn = region->start_pfn; pfn < region->end_pfn; pfn++)
-			if (pfn_valid(pfn))
+			if (pfn_valid(pfn)) {
 				SetPageNosave(pfn_to_page(pfn));
+                        }
 	}
 }
 
@@ -738,12 +746,13 @@ static void map_ps2_pages(int enable)
 {
 	unsigned long pfn = 0;
 
-	pfn = toi_memory_bm_next_pfn(pageset2_map);
+        memory_bm_position_reset(pageset2_map);
+	pfn = memory_bm_next_pfn(pageset2_map, 0);
 
-	while (pfn) {
+	while (pfn != BM_END_OF_MAP) {
 		struct page *page = pfn_to_page(pfn);
 		kernel_map_pages(page, 1, enable);
-		pfn = toi_memory_bm_next_pfn(pageset2_map);
+		pfn = memory_bm_next_pfn(pageset2_map, 0);
 	}
 }
 
@@ -890,7 +899,7 @@ static int do_load_atomic_copy(void)
  **/
 static void prepare_restore_load_alt_image(int prepare)
 {
-	static struct toi_memory_bitmap *pageset1_map_save, *pageset1_copy_map_save;
+	static struct memory_bitmap *pageset1_map_save, *pageset1_copy_map_save;
 
 	if (prepare) {
 		pageset1_map_save = pageset1_map;
@@ -900,9 +909,9 @@ static void prepare_restore_load_alt_image(int prepare)
 		set_toi_state(TOI_LOADING_ALT_IMAGE);
 		toi_reset_alt_image_pageset2_pfn();
 	} else {
-		toi_memory_bm_free(pageset1_map, 0);
+		toi_free_bitmap(&pageset1_map);
 		pageset1_map = pageset1_map_save;
-		toi_memory_bm_free(pageset1_copy_map, 0);
+		toi_free_bitmap(&pageset1_copy_map);
 		pageset1_copy_map = pageset1_copy_map_save;
 		clear_toi_state(TOI_NOW_RESUMING);
 		clear_toi_state(TOI_LOADING_ALT_IMAGE);
@@ -1237,6 +1246,8 @@ static struct toi_sysfs_data sysfs_params[] = {
 #endif
 	SYSFS_BIT("no_readahead", SYSFS_RW, &toi_bkd.toi_action,
 			TOI_NO_READAHEAD, 0),
+	SYSFS_BIT("trace_debug_on", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_TRACE_DEBUG_ON, 0),
 #ifdef CONFIG_TOI_KEEP_IMAGE
 	SYSFS_BIT("keep_image", SYSFS_RW , &toi_bkd.toi_action, TOI_KEEP_IMAGE,
 			0),

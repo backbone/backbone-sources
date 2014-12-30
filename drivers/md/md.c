@@ -33,7 +33,6 @@
 */
 
 #include <linux/kthread.h>
-#include <linux/freezer.h>
 #include <linux/blkdev.h>
 #include <linux/sysctl.h>
 #include <linux/seq_file.h>
@@ -7221,8 +7220,6 @@ void md_do_sync(struct md_thread *thread)
 	 *
 	 */
 
-	set_freezable();
-
 	do {
 		mddev->curr_resync = 2;
 
@@ -7246,9 +7243,6 @@ void md_do_sync(struct md_thread *thread)
 					 * time 'round when curr_resync == 2
 					 */
 					continue;
-
-				try_to_freeze();
-
 				/* We need to wait 'interruptible' so as not to
 				 * contribute to the load average, and not to
 				 * be caught by 'softlockup'
@@ -7261,7 +7255,6 @@ void md_do_sync(struct md_thread *thread)
 					       " share one or more physical units)\n",
 					       desc, mdname(mddev), mdname(mddev2));
 					mddev_put(mddev2);
-					try_to_freeze();
 					if (signal_pending(current))
 						flush_signals(current);
 					schedule();
@@ -7634,10 +7627,8 @@ static void md_start_sync(struct work_struct *ws)
  */
 void md_check_recovery(struct mddev *mddev)
 {
-#ifdef CONFIG_FREEZER
-	if (mddev->suspended || unlikely(atomic_read(&system_freezing_cnt)))
+	if (mddev->suspended)
 		return;
-#endif
 
 	if (mddev->bitmap)
 		bitmap_daemon_work(mddev);

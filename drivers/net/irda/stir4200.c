@@ -738,9 +738,7 @@ static int stir_transmit_thread(void *arg)
 	struct net_device *dev = stir->netdev;
 	struct sk_buff *skb;
 
-	set_freezable();
-
-        while (!kthread_freezable_should_stop(NULL)) {
+        while (!kthread_should_stop()) {
 #ifdef CONFIG_PM
 		/* if suspending, then power off and wait */
 		if (unlikely(freezing(current))) {

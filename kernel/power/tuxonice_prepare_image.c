@@ -119,6 +119,8 @@ static void pageset2_full(void)
 	unsigned long flags;
 	int i;
 
+        toi_trace_index++;
+
 	for_each_populated_zone(zone) {
 		spin_lock_irqsave(&zone->lru_lock, flags);
 		for_each_lru(i) {
@@ -130,8 +132,10 @@ static void pageset2_full(void)
 
 				mapping = page_mapping(page);
 				if (!mapping || !mapping->host ||
-				    !(mapping->host->i_flags & S_ATOMIC_COPY))
+				    !(mapping->host->i_flags & S_ATOMIC_COPY)) {
+                                        TOI_TRACE_DEBUG(page_to_pfn(page), "_Pageset2 pageset2_full.");
 					SetPagePageset2(page);
+                                }
 			}
 		}
 		spin_unlock_irqrestore(&zone->lru_lock, flags);
@@ -153,6 +157,8 @@ static void toi_mark_task_as_pageset(struct task_struct *t, int pageset2)
 
 	if (!mm || !mm->mmap)
 		return;
+
+        toi_trace_index++;
 
 	if (!irqs_disabled())
 		down_read(&mm->mmap_sem);
@@ -177,9 +183,11 @@ static void toi_mark_task_as_pageset(struct task_struct *t, int pageset2)
 			    mapping->host->i_flags & S_ATOMIC_COPY)
 				continue;
 
-			if (pageset2)
+			if (pageset2) {
+                                TOI_TRACE_DEBUG(page_to_pfn(page), "_MarkTaskAsPageset 1");
 				SetPagePageset2(page);
-			else {
+                        } else {
+                                TOI_TRACE_DEBUG(page_to_pfn(page), "_MarkTaskAsPageset 2");
 				ClearPagePageset2(page);
 				SetPagePageset1(page);
 			}
@@ -220,7 +228,7 @@ static void toi_mark_pages_for_pageset2(void)
 {
 	struct attention_list *this = attention_list;
 
-	toi_memory_bm_clear(pageset2_map);
+	memory_bm_clear(pageset2_map);
 
 	if (test_action_state(TOI_NO_PAGESET2) || no_ps2_needed)
 		return;
@@ -743,8 +751,9 @@ static void flag_image_pages(int atomic_copy)
 	set_highmem_size(pagedir2, 0);
 
 	num_nosave = 0;
+        toi_trace_index++;
 
-	toi_memory_bm_clear(pageset1_map);
+	memory_bm_clear(pageset1_map);
 
 	generate_free_page_map();
 
@@ -760,11 +769,20 @@ static void flag_image_pages(int atomic_copy)
 			struct page *page;
 			int chunk_size;
 
-			if (!pfn_valid(pfn))
-				continue;
+			if (!pfn_valid(pfn)) {
+                            TOI_TRACE_DEBUG(pfn, "_Flag Invalid");
+                            continue;
+                        }
 
 			chunk_size = size_of_free_region(zone, pfn);
 			if (chunk_size) {
+                            unsigned long y;
+                            for (y = pfn; y < pfn + chunk_size; y++) {
+                                page = pfn_to_page(y);
+                                TOI_TRACE_DEBUG(y, "_Flag Free");
+                                ClearPagePageset1(page);
+                                ClearPagePageset2(page);
+                            }
 				num_free += chunk_size;
 				loop += chunk_size - 1;
 				continue;
@@ -773,20 +791,24 @@ static void flag_image_pages(int atomic_copy)
 			page = pfn_to_page(pfn);
 
 			if (PageNosave(page)) {
-				num_nosave++;
-				continue;
-			}
+                            char *desc = PagePageset1Copy(page) ? "Pageset1Copy" : "NoSave";
+                            TOI_TRACE_DEBUG(pfn, "_Flag %s", desc);
+                            num_nosave++;
+                            continue;
+                        }
 
 			page = highmem ? saveable_highmem_page(zone, pfn) :
 				saveable_page(zone, pfn);
 
 			if (!page) {
+                                TOI_TRACE_DEBUG(pfn, "_Flag Nosave2");
 				num_nosave++;
 				continue;
 			}
 
 			if (PagePageset2(page)) {
 				pagedir2.size++;
+                                TOI_TRACE_DEBUG(pfn, "_Flag PS2");
 				if (PageHighMem(page))
 					inc_highmem_size(pagedir2);
 				else
@@ -800,6 +822,7 @@ static void flag_image_pages(int atomic_copy)
 				}
 			} else {
 				pagedir1.size++;
+                                TOI_TRACE_DEBUG(pfn, "_Flag PS1");
 				SetPagePageset1(page);
 				if (PageHighMem(page))
 					inc_highmem_size(pagedir1);
@@ -817,17 +840,18 @@ static void flag_image_pages(int atomic_copy)
 
 void toi_recalculate_image_contents(int atomic_copy)
 {
-	toi_memory_bm_clear(pageset1_map);
+	memory_bm_clear(pageset1_map);
 	if (!atomic_copy) {
 		unsigned long pfn;
-		toi_memory_bm_position_reset(pageset2_map);
-		for (pfn = toi_memory_bm_next_pfn(pageset2_map);
-				pfn;
-				pfn = toi_memory_bm_next_pfn(pageset2_map))
+		memory_bm_position_reset(pageset2_map);
+		for (pfn = memory_bm_next_pfn(pageset2_map, 0);
+				pfn != BM_END_OF_MAP;
+				pfn = memory_bm_next_pfn(pageset2_map, 0))
 			ClearPagePageset1Copy(pfn_to_page(pfn));
 		/* Need to call this before getting pageset1_size! */
 		toi_mark_pages_for_pageset2();
 	}
+        memory_bm_position_reset(pageset2_map);
 	flag_image_pages(atomic_copy);
 
 	if (!atomic_copy) {

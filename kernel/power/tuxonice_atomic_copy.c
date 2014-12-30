@@ -132,11 +132,11 @@ void toi_copy_pageset1(void)
 	int i;
 	unsigned long source_index, dest_index;
 
-	toi_memory_bm_position_reset(pageset1_map);
-	toi_memory_bm_position_reset(pageset1_copy_map);
+	memory_bm_position_reset(pageset1_map);
+	memory_bm_position_reset(pageset1_copy_map);
 
-	source_index = toi_memory_bm_next_pfn(pageset1_map);
-	dest_index = toi_memory_bm_next_pfn(pageset1_copy_map);
+	source_index = memory_bm_next_pfn(pageset1_map, 0);
+	dest_index = memory_bm_next_pfn(pageset1_copy_map, 0);
 
 	for (i = 0; i < pagedir1.size; i++) {
 		unsigned long *origvirt, *copyvirt;
@@ -180,8 +180,8 @@ void toi_copy_pageset1(void)
 		if (PageHighMem(copypage))
 			kunmap_atomic(copyvirt);
 
-		source_index = toi_memory_bm_next_pfn(pageset1_map);
-		dest_index = toi_memory_bm_next_pfn(pageset1_copy_map);
+		source_index = memory_bm_next_pfn(pageset1_map, 0);
+		dest_index = memory_bm_next_pfn(pageset1_copy_map, 0);
 	}
 }
 
@@ -259,8 +259,6 @@ int toi_hibernate(void)
 {
 	int error;
 
-	toi_running = 1; /* For the swsusp code we use :< */
-
 	error = toi_lowlevel_builtin();
 
 	if (!error) {
@@ -279,7 +277,6 @@ int toi_hibernate(void)
 				bkd->size));
 	}
 
-	toi_running = 0;
 	return error;
 }
 
@@ -294,8 +291,6 @@ int toi_hibernate(void)
 int toi_atomic_restore(void)
 {
 	int error;
-
-	toi_running = 1;
 
 	toi_prepare_status(DONT_CLEAR_BAR,	"Atomic restore.");
 
@@ -330,7 +325,6 @@ Failed:
 #ifdef CONFIG_HIGHMEM
 	free_pbe_list(&restore_highmem_pblist, 1);
 #endif
-	toi_running = 0;
 	return 1;
 }
 
@@ -458,8 +452,12 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 		if (suspend_time && (error & 2))
 			platform_recover(1);
 		dpm_resume(msg);
-		if (error || !toi_in_suspend())
+		if (!toi_in_suspend()) {
+                    dpm_resume_end(PMSG_RECOVER);
+                }
+		if (error || !toi_in_suspend()) {
 			pm_restore_gfp_mask();
+                }
 		resume_console();
 	case ATOMIC_STEP_DPM_COMPLETE:
 		dpm_complete(msg);

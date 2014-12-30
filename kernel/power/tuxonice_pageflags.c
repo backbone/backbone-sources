@@ -16,6 +16,6 @@
 
 int toi_pageflags_space_needed(void)
 {
-	return toi_memory_bm_space_needed(pageset1_map);
+	return memory_bm_space_needed(pageset1_map);
 }
 EXPORT_SYMBOL_GPL(toi_pageflags_space_needed);

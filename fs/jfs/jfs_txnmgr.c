@@ -2751,8 +2751,6 @@ int jfs_lazycommit(void *arg)
 	unsigned long flags;
 	struct jfs_sb_info *sbi;
 
-	set_freezable();
-
 	do {
 		LAZY_LOCK(flags);
 		jfs_commit_thread_waking = 0;	/* OK to wake another thread */
@@ -2811,7 +2809,7 @@ int jfs_lazycommit(void *arg)
 			schedule();
 			remove_wait_queue(&jfs_commit_thread_wait, &wq);
 		}
-	} while (!kthread_freezable_should_stop(NULL));
+	} while (!kthread_should_stop());
 
 	if (!list_empty(&TxAnchor.unlock_queue))
 		jfs_err("jfs_lazycommit being killed w/pending transactions!");
@@ -2936,8 +2934,6 @@ int jfs_sync(void *arg)
 	struct jfs_inode_info *jfs_ip;
 	tid_t tid;
 
-	set_freezable();
-
 	do {
 		/*
 		 * write each inode on the anonymous inode list
@@ -2999,7 +2995,7 @@ int jfs_sync(void *arg)
 			TXN_UNLOCK();
 			schedule();
 		}
-	} while (!kthread_freezable_should_stop(NULL));
+	} while (!kthread_should_stop());
 
 	jfs_info("jfs_sync being killed");
 	return 0;

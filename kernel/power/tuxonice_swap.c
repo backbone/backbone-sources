@@ -236,8 +236,13 @@ static int toi_swap_allocate_storage(struct toi_bdev_info *chain,
 
 	while (gotten < request) {
 		swp_entry_t start, end;
-		get_swap_range_of_type(chain->allocator_index, &start, &end,
-				request - gotten + 1);
+                if (0) {
+                    /* Broken at the moment for SSDs */
+                    get_swap_range_of_type(chain->allocator_index, &start, &end,
+                            request - gotten + 1);
+                } else {
+                    start = end = get_swap_page_of_type(chain->allocator_index);
+                }
 		if (start.val) {
 			int added = end.val - start.val + 1;
 			if (toi_add_to_extent_chain(&chain->allocations,

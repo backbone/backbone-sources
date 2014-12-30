@@ -49,7 +49,7 @@ static unsigned long page_list;
 static int toi_num_resaved;
 
 static unsigned long this_checksum, next_page;
-static int checksum_index;
+static int checksum_count;
 
 static inline int checksum_pages_needed(void)
 {
@@ -241,7 +241,7 @@ int allocate_checksum_pages(void)
 	}
 
 	next_page = (unsigned long) page_list;
-	checksum_index = 0;
+	checksum_count = 0;
 
 	return 0;
 }
@@ -251,14 +251,14 @@ char *tuxonice_get_next_checksum(void)
 	if (!toi_checksum_ops.enabled)
 		return NULL;
 
-	if (checksum_index % CHECKSUMS_PER_PAGE)
+	if (checksum_count % CHECKSUMS_PER_PAGE)
 		this_checksum += CHECKSUM_SIZE;
 	else {
 		this_checksum = next_page + sizeof(void *);
 		next_page = *((unsigned long *) next_page);
 	}
 
-	checksum_index++;
+	checksum_count++;
 	return (char *) this_checksum;
 }
 
@@ -287,9 +287,10 @@ int tuxonice_calc_checksum(struct page *page, char *checksum_locn)
 
 void check_checksums(void)
 {
-	int pfn, index = 0, cpu = smp_processor_id();
+	int index = 0, cpu = smp_processor_id();
 	char current_checksum[CHECKSUM_SIZE];
 	struct cpu_context *ctx = &per_cpu(contexts, cpu);
+        unsigned long pfn;
 
 	if (!toi_checksum_ops.enabled) {
 		toi_message(TOI_IO, TOI_VERBOSE, 0, "Checksumming disabled.");
@@ -301,37 +302,44 @@ void check_checksums(void)
 	toi_num_resaved = 0;
 	this_checksum = 0;
 
+        toi_trace_index++;
+
 	toi_message(TOI_IO, TOI_VERBOSE, 0, "Verifying checksums.");
-	toi_memory_bm_position_reset(pageset2_map);
-	for (pfn = toi_memory_bm_next_pfn(pageset2_map); pfn;
-			pfn = toi_memory_bm_next_pfn(pageset2_map)) {
-		int ret;
+	memory_bm_position_reset(pageset2_map);
+	for (pfn = memory_bm_next_pfn(pageset2_map, 0); pfn != BM_END_OF_MAP;
+			pfn = memory_bm_next_pfn(pageset2_map, 0)) {
+		int ret, resave_needed = false;
 		char *pa;
 		struct page *page = pfn_to_page(pfn);
 
-		if (index % CHECKSUMS_PER_PAGE) {
-			this_checksum += CHECKSUM_SIZE;
-		} else {
-			this_checksum = next_page + sizeof(void *);
-			next_page = *((unsigned long *) next_page);
-		}
+                if (index < checksum_count) {
+                    if (index % CHECKSUMS_PER_PAGE) {
+                        this_checksum += CHECKSUM_SIZE;
+                    } else {
+                        this_checksum = next_page + sizeof(void *);
+                        next_page = *((unsigned long *) next_page);
+                    }
 
-		/* Done when IRQs disabled so must be atomic */
-		pa = kmap_atomic(page);
-		memcpy(ctx->buf, pa, PAGE_SIZE);
-		kunmap_atomic(pa);
-		ret = crypto_hash_digest(&ctx->desc, ctx->sg, PAGE_SIZE,
-							current_checksum);
+                    /* Done when IRQs disabled so must be atomic */
+                    pa = kmap_atomic(page);
+                    memcpy(ctx->buf, pa, PAGE_SIZE);
+                    kunmap_atomic(pa);
+                    ret = crypto_hash_digest(&ctx->desc, ctx->sg, PAGE_SIZE,
+                            current_checksum);
 
-		if (ret) {
-			printk(KERN_INFO "Digest failed. Returned %d.\n", ret);
-			return;
-		}
+                    if (ret) {
+                        printk(KERN_INFO "Digest failed. Returned %d.\n", ret);
+                        return;
+                    }
 
-		if (memcmp(current_checksum, (char *) this_checksum,
-							CHECKSUM_SIZE)) {
-			toi_message(TOI_IO, TOI_VERBOSE, 0, "Resaving %ld.",
-					pfn);
+                    resave_needed = memcmp(current_checksum, (char *) this_checksum,
+                            CHECKSUM_SIZE);
+                } else {
+                    resave_needed = true;
+                }
+
+                if (resave_needed) {
+			TOI_TRACE_DEBUG(pfn, "_Resaving %d", resave_needed);
 			SetPageResave(pfn_to_page(pfn));
 			toi_num_resaved++;
 			if (test_action_state(TOI_ABORT_ON_RESAVE_NEEDED))

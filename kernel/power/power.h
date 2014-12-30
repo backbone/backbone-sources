@@ -327,3 +327,10 @@ extern int pm_wake_lock(const char *buf);
 extern int pm_wake_unlock(const char *buf);
 
 #endif /* !CONFIG_PM_WAKELOCKS */
+
+#ifdef CONFIG_TOI
+unsigned long toi_get_nonconflicting_page(void);
+#define BM_END_OF_MAP	(~0UL)
+#else
+#define toi_get_nonconflicting_page() { do { } while(0); }
+#endif

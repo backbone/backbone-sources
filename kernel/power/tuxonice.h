@@ -72,6 +72,7 @@ enum {
 	TOI_NO_PS2_IF_UNNEEDED,
 	TOI_POST_RESUME_BREAKPOINT,
 	TOI_NO_READAHEAD,
+        TOI_TRACE_DEBUG_ON,
 };
 
 extern unsigned long toi_bootflags_mask;
@@ -225,4 +226,11 @@ extern char tuxonice_signature[9];
 extern int toi_start_other_threads(void);
 extern void toi_stop_other_threads(void);
 
+extern int toi_trace_index;
+#define TOI_TRACE_DEBUG(PFN, DESC, ...) \
+    do { \
+        if (test_action_state(TOI_TRACE_DEBUG_ON)) { \
+            printk("*TOI* %ld %02d" DESC "\n", PFN, toi_trace_index, ##__VA_ARGS__); \
+        } \
+    } while(0)
 #endif
