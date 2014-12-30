@@ -698,8 +698,10 @@ static int toi_start_one_readahead(int dedicated_thread)
 	int oom = 0, result;
 
 	result = throttle_if_needed(dedicated_thread ? THROTTLE_WAIT : 0);
-	if (result)
-		return result;
+	if (result) {
+            printk("toi_start_one_readahead: throttle_if_needed returned %d.\n", result);
+            return result;
+        }
 
 	mutex_lock(&toi_bio_readahead_mutex);
 
@@ -709,6 +711,7 @@ static int toi_start_one_readahead(int dedicated_thread)
 		if (!buffer) {
 			if (oom && !dedicated_thread) {
 				mutex_unlock(&toi_bio_readahead_mutex);
+                                printk("toi_start_one_readahead: oom and !dedicated thread %d.\n", result);
 				return -ENOMEM;
 			}
 
@@ -719,6 +722,9 @@ static int toi_start_one_readahead(int dedicated_thread)
 	}
 
 	result = toi_bio_rw_page(READ, virt_to_page(buffer), 1, 0);
+        if (result) {
+            printk("toi_start_one_readahead: toi_bio_rw_page returned %d.\n", result);
+        }
 	if (result == -ENOSPC)
 		toi__free_page(12, virt_to_page(buffer));
 	mutex_unlock(&toi_bio_readahead_mutex);
@@ -809,11 +815,14 @@ static int toi_bio_get_next_page_read(int no_readahead)
 	 * delay submitting the read until after we've gotten the
 	 * extents out of the first page.
 	 */
-	if (unlikely(no_readahead && toi_start_one_readahead(0))) {
-		printk(KERN_EMERG "No readahead and toi_start_one_readahead "
-				"returned non-zero.\n");
-		return -EIO;
-	}
+        if (unlikely(no_readahead)) {
+            int result = toi_start_one_readahead(0);
+            if (result) {
+                printk(KERN_EMERG "No readahead and toi_start_one_readahead "
+                        "returned non-zero.\n");
+                return -EIO;
+            }
+        }
 
 	if (unlikely(!readahead_list_head)) {
 		/*
