@@ -16,6 +16,7 @@
 #include <linux/crypto.h>
 #include <linux/cpu.h>
 #include <linux/ctype.h>
+#include <linux/kthread.h>
 #include "tuxonice_io.h"
 #include "tuxonice.h"
 #include "tuxonice_extent.h"
@@ -103,7 +104,7 @@ static void copyback_high(void) { }
 
 char toi_wait_for_keypress_dev_console(int timeout)
 {
-	int fd, this_timeout = 255;
+	int fd, this_timeout = 255, orig_kthread = 0;
 	char key = '\0';
 	struct termios t, t_backup;
 
@@ -136,6 +137,11 @@ new_timeout:
 	if (sys_ioctl(fd, TCSETS, (long)&t) < 0)
 		goto out_restore;
 
+        if (current->flags & PF_KTHREAD) {
+            orig_kthread = (current->flags & PF_KTHREAD);
+            current->flags &= ~PF_KTHREAD;
+        }
+
 	while (1) {
 		if (sys_read(fd, &key, 1) <= 0) {
 			if (timeout)
@@ -153,6 +159,9 @@ new_timeout:
 		} else
 			break;
 	}
+        if (orig_kthread) {
+            current->flags |= PF_KTHREAD;
+        }
 
 out_restore:
 	sys_ioctl(fd, TCSETS, (long)&t_backup);
