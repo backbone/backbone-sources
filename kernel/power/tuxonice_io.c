@@ -1706,20 +1706,12 @@ static int __read_pageset1(void)
 
 	set_toi_state(TOI_NOW_RESUMING);
 
-	if (!test_action_state(TOI_LATE_CPU_HOTPLUG)) {
-		toi_prepare_status(DONT_CLEAR_BAR, "Disable nonboot cpus.");
-		if (disable_nonboot_cpus()) {
-			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
-			goto out_reset_console;
-		}
-	}
-
 	result = pm_notifier_call_chain(PM_RESTORE_PREPARE);
 	if (result)
 		goto out_notifier_call_chain;;
 
 	if (usermodehelper_disable())
-		goto out_enable_nonboot_cpus;
+		goto out_enable_usermodehelper;
 
 	current->flags |= PF_NOFREEZE;
 	freeze_result = FREEZE_IN_PROGRESS;
@@ -1785,12 +1777,10 @@ out_thaw:
 	wait_event(freeze_wait, freeze_result != FREEZE_IN_PROGRESS);
 	trap_non_toi_io = 0;
 	thaw_processes();
+out_enable_usermodehelper:
 	usermodehelper_enable();
-out_enable_nonboot_cpus:
-	enable_nonboot_cpus();
 out_notifier_call_chain:
-  pm_notifier_call_chain(PM_POST_RESTORE);
-out_reset_console:
+        pm_notifier_call_chain(PM_POST_RESTORE);
 	toi_cleanup_console();
 out_remove_image:
 	result = -EINVAL;

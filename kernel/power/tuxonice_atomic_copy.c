@@ -393,14 +393,12 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		return 1;
 	}
 
-	if (test_action_state(TOI_LATE_CPU_HOTPLUG)) {
-		if (disable_nonboot_cpus()) {
-			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
-			toi_end_atomic(ATOMIC_STEP_CPU_HOTPLUG,
-					suspend_time, 1);
-			return 1;
-		}
-	}
+        if (disable_nonboot_cpus()) {
+            set_abort_result(TOI_CPU_HOTPLUG_FAILED);
+            toi_end_atomic(ATOMIC_STEP_CPU_HOTPLUG,
+                    suspend_time, 1);
+            return 1;
+        }
 
 	local_irq_disable();
 
@@ -440,8 +438,7 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 	case ATOMIC_STEP_IRQS:
 		local_irq_enable();
 	case ATOMIC_STEP_CPU_HOTPLUG:
-		if (test_action_state(TOI_LATE_CPU_HOTPLUG))
-			enable_nonboot_cpus();
+                enable_nonboot_cpus();
 	case ATOMIC_STEP_PLATFORM_FINISH:
 		if (!suspend_time && error & 2)
 			platform_restore_cleanup(1);

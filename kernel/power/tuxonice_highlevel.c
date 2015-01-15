@@ -463,9 +463,6 @@ static void do_cleanup(int get_debug_info, int restarting)
 		toi_free_page(20, (unsigned long) buffer);
 	}
 
-	if (!test_action_state(TOI_LATE_CPU_HOTPLUG))
-		enable_nonboot_cpus();
-
 	if (!restarting)
 		toi_cleanup_console();
 
@@ -560,12 +557,6 @@ static int toi_init(int restarting)
 		printk(KERN_ERR "TuxOnIce: Failed to allocate "
 				"boot_kernel_data_buffer.\n");
 		set_result_state(TOI_OUT_OF_MEMORY);
-		return 1;
-	}
-
-	if (!test_action_state(TOI_LATE_CPU_HOTPLUG) &&
-			disable_nonboot_cpus()) {
-		set_abort_result(TOI_CPU_HOTPLUG_FAILED);
 		return 1;
 	}
 
@@ -1234,8 +1225,6 @@ static struct toi_sysfs_data sysfs_params[] = {
 			TOI_NO_PAGESET2, 0),
 	SYSFS_BIT("no_pageset2_if_unneeded", SYSFS_RW, &toi_bkd.toi_action,
 			TOI_NO_PS2_IF_UNNEEDED, 0),
-	SYSFS_BIT("late_cpu_hotplug", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_LATE_CPU_HOTPLUG, 0),
 	SYSFS_STRING("binary_signature", SYSFS_READONLY,
 			tuxonice_signature, 9, 0, NULL),
 	SYSFS_INT("max_workers", SYSFS_RW, &toi_max_workers, 0, NR_CPUS, 0,
