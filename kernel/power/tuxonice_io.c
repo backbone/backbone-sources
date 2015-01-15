@@ -332,9 +332,9 @@ static struct page *copy_page_from_orig_page(struct page *orig_page, int is_high
 {
 	int index, min, max;
 	struct page *high_page = NULL,
-		    **my_last_high_page = &__get_cpu_var(last_high_page),
-		    **my_last_sought = &__get_cpu_var(last_sought);
-	struct pbe *this, **my_last_low_page = &__get_cpu_var(last_low_page);
+		    **my_last_high_page = raw_cpu_ptr(&last_high_page),
+		    **my_last_sought = raw_cpu_ptr(&last_sought);
+	struct pbe *this, **my_last_low_page = raw_cpu_ptr(&last_low_page);
 	void *compare;
 
 	if (is_high) {
@@ -413,7 +413,7 @@ static int write_next_page(unsigned long *data_pfn, int *my_io_index,
 		unsigned long *write_pfn)
 {
 	struct page *page;
-	char **my_checksum_locn = &__get_cpu_var(checksum_locn);
+	char **my_checksum_locn = raw_cpu_ptr(&checksum_locn);
 	int result = 0, was_present;
 
 	*data_pfn = memory_bm_next_pfn(io_map, 0);
