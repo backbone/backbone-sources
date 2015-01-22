@@ -234,3 +234,9 @@ extern int toi_trace_index;
         } \
     } while(0)
 #endif
+
+#ifdef CONFIG_TOI_KEEP_IMAGE
+#define toi_keeping_image test_action_state(TOI_KEEP_IMAGE)
+#else
+#define toi_keeping_image (0)
+#endif

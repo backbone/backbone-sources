@@ -437,7 +437,7 @@ static void do_cleanup(int get_debug_info, int restarting)
 	if (!restarting)
 		toi_stop_other_threads();
 
-	if (test_action_state(TOI_KEEP_IMAGE) &&
+	if (toi_keeping_image &&
 	    !test_result_state(TOI_ABORTED)) {
 		toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
 			"TuxOnIce: Not invalidating the image due "
@@ -490,7 +490,7 @@ static void do_cleanup(int get_debug_info, int restarting)
  **/
 static int check_still_keeping_image(void)
 {
-	if (test_action_state(TOI_KEEP_IMAGE)) {
+	if (toi_keeping_image) {
 		printk(KERN_INFO "Image already stored: powering down "
 				"immediately.");
 		do_toi_step(STEP_HIBERNATE_POWERDOWN);

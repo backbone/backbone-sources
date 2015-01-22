@@ -1763,7 +1763,7 @@ static int __read_pageset1(void)
 	toi_cond_pause(1, "About to restore original kernel.");
 	result = 0;
 
-	if (!test_action_state(TOI_KEEP_IMAGE) &&
+	if (!toi_keeping_image &&
 	    toiActiveAllocator->mark_resume_attempted)
 		toiActiveAllocator->mark_resume_attempted(1);
 
@@ -1784,7 +1784,7 @@ out_notifier_call_chain:
 	toi_cleanup_console();
 out_remove_image:
 	result = -EINVAL;
-	if (!test_action_state(TOI_KEEP_IMAGE))
+	if (!toi_keeping_image)
 		toiActiveAllocator->remove_image();
 	toiActiveAllocator->read_header_cleanup();
 	noresume_reset_modules();
