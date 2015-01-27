@@ -2719,8 +2719,6 @@ int toi_alloc_bitmap(struct memory_bitmap **bm)
     if (!bm1)
         return -ENOMEM;
 
-    printk("Bitmap allocated is %p.\n", bm1);
-
     error = memory_bm_create(bm1, GFP_KERNEL, PG_ANY);
     if (error) {
         printk("Error returned - %d.\n", error);
