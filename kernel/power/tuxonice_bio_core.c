@@ -977,10 +977,10 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
 			 * read readahead_list_head into toi_writer_buffer
 			 */
 			int result = toi_bio_get_next_page_read(no_readahead);
-			if (result) {
+			if (result && bytes_left) {
 				printk("toi_bio_get_next_page_read "
-						"returned %d.\n", result);
-				return result;
+                                        "returned %d. Expecting to read %d bytes.\n", result, bytes_left);
+                                return result;
 			}
 		} else {
 			toi_bio_queue_write(&toi_writer_buffer);
