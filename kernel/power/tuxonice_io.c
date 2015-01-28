@@ -594,7 +594,8 @@ static int worker_rw_loop(void *data)
 
         if (!alloc_cpumask_var(&orig_mask, GFP_KERNEL)) {
 		printk(KERN_EMERG "Failed to allocate cpumask for TuxOnIce I/O thread %ld.\n", (unsigned long) data);
-                return -ENOMEM;
+                result = -ENOMEM;
+                goto out;
         }
 
 	cpumask_copy(orig_mask, tsk_cpus_allowed(current));
@@ -727,6 +728,7 @@ top:
 	if (thread_num)
 		atomic_dec(&toi_num_other_threads);
 
+out:
 	toi_message(TOI_IO, TOI_LOW, 0, "Thread %d exiting.", thread_num);
 	toi__free_page(28, buffer);
 	free_cpumask_var(orig_mask);
