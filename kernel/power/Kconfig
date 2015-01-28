@@ -199,7 +199,7 @@ menuconfig TOI_CORE
 
 	config TOI_INCREMENTAL
 		bool "Incremental Image Support"
-		depends on TOI_CORE && 64BIT
+		depends on TOI_CORE && 64BIT && TOI_KEEP_IMAGE
 		default n
 		---help---
 		  This option enables the work in progress toward using the dirty page
