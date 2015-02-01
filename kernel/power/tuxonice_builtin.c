@@ -341,6 +341,86 @@ int toi_do_flag_zram_disks(void)
 EXPORT_SYMBOL_GPL(toi_do_flag_zram_disks);
 #endif
 
+/* toi_generate_free_page_map
+ *
+ * Description:	This routine generates a bitmap of free pages from the
+ * 		lists used by the memory manager. We then use the bitmap
+ * 		to quickly calculate which pages to save and in which
+ * 		pagesets.
+ */
+void toi_generate_free_page_map(void)
+{
+	int order, cpu, t;
+	unsigned long flags, i;
+	struct zone *zone;
+	struct list_head *curr;
+	unsigned long pfn;
+	struct page *page;
+
+	for_each_populated_zone(zone) {
+
+		if (!zone->spanned_pages)
+			continue;
+
+		spin_lock_irqsave(&zone->lock, flags);
+
+		for (i = 0; i < zone->spanned_pages; i++) {
+			pfn = zone->zone_start_pfn + i;
+
+			if (!pfn_valid(pfn))
+				continue;
+
+			page = pfn_to_page(pfn);
+
+			ClearPageNosaveFree(page);
+		}
+
+		for_each_migratetype_order(order, t) {
+			list_for_each(curr,
+					&zone->free_area[order].free_list[t]) {
+				unsigned long j;
+
+				pfn = page_to_pfn(list_entry(curr, struct page,
+							lru));
+				for (j = 0; j < (1UL << order); j++)
+					SetPageNosaveFree(pfn_to_page(pfn + j));
+			}
+		}
+
+		for_each_online_cpu(cpu) {
+			struct per_cpu_pageset *pset =
+				per_cpu_ptr(zone->pageset, cpu);
+			struct per_cpu_pages *pcp = &pset->pcp;
+			struct page *page;
+			int t;
+
+			for (t = 0; t < MIGRATE_PCPTYPES; t++)
+				list_for_each_entry(page, &pcp->lists[t], lru)
+					SetPageNosaveFree(page);
+		}
+
+		spin_unlock_irqrestore(&zone->lock, flags);
+	}
+}
+EXPORT_SYMBOL_GPL(toi_generate_free_page_map);
+
+/* toi_size_of_free_region
+ *
+ * Description:	Return the number of pages that are free, beginning with and
+ * 		including this one.
+ */
+int toi_size_of_free_region(struct zone *zone, unsigned long start_pfn)
+{
+	unsigned long this_pfn = start_pfn,
+		      end_pfn = zone_end_pfn(zone);
+
+	while (pfn_valid(this_pfn) && this_pfn < end_pfn && PageNosaveFree(pfn_to_page(this_pfn)))
+		this_pfn++;
+
+	return this_pfn - start_pfn;
+}
+EXPORT_SYMBOL(toi_size_of_free_region);
+
 static int __init toi_wait_setup(char *str)
 {
 	int value;

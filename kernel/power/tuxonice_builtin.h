@@ -31,6 +31,8 @@ extern int toi_force_no_multithreaded;
 extern void toi_read_lock_tasklist(void);
 extern void toi_read_unlock_tasklist(void);
 extern int toi_in_suspend(void);
+extern void toi_generate_free_page_map(void);
+extern int toi_size_of_free_region(struct zone *zone, unsigned long start_pfn);
 
 #ifdef CONFIG_TOI_ZRAM_SUPPORT
 extern int toi_do_flag_zram_disks(void);
