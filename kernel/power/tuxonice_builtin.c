@@ -404,6 +404,17 @@ void toi_generate_free_page_map(void)
 }
 EXPORT_SYMBOL_GPL(toi_generate_free_page_map);
 
+/* toi_generate_pagetable_map
+ *
+ * Populate a map of where pagetable pages are, so we don't mark the
+ * leaves read-only and create recursive page faults.
+ *
+ * We're only interested in the bottom level.
+ */
+void toi_generate_pagetable_map(void)
+{
+}
+
 /* toi_size_of_free_region
  *
  * Description:	Return the number of pages that are free, beginning with and
@@ -420,6 +431,116 @@ int toi_size_of_free_region(struct zone *zone, unsigned long start_pfn)
 	return this_pfn - start_pfn;
 }
 EXPORT_SYMBOL(toi_size_of_free_region);
+
+#ifdef CONFIG_TOI_INCREMENTAL
+/**
+ * TuxOnIce's incremental image support works by marking all memory apart from
+ * the page tables read-only, then in the page-faults that result enabling
+ * writing if appropriate and flagging the page as dirty. Free pages are also
+ * marked as dirty and not protected so that if allocated, they will be included
+ * in the image without further processing.
+ *
+ * toi_reset_dirtiness is called when and image exists and incremental images are
+ * enabled, and each time we resume thereafter. It is not invoked on a fresh boot.
+ *
+ * This routine should be called from a single-cpu-running context to avoid races in setting
+ * page dirty/read only flags.
+ *
+ * TODO: Make "it is not invoked on a fresh boot" true  when I've finished developing it!
+ *
+ * TODO: Consider Xen paravirt guest boot issues. See arch/x86/mm/pageattr.c.
+ **/
+static __init int toi_reset_dirtiness(void)
+{
+	struct zone *zone;
+	unsigned long loop;
+        int allocated_bitmaps = 0;
+
+        if (!free_map) {
+            BUG_ON(toi_alloc_bitmap(&free_map));
+            BUG_ON(toi_alloc_bitmap(&toi_pt_map));
+            allocated_bitmaps = 1;
+        }
+
+        printk(KERN_EMERG "Generate free page map.\n");
+        toi_generate_free_page_map();
+
+        printk(KERN_EMERG "Generate pagetable map.\n");
+        toi_generate_pagetable_map();
+
+        printk(KERN_EMERG "Reset dirtiness.\n");
+        for_each_populated_zone(zone) {
+            // 64 bit only. No need to worry about highmem.
+            //int highmem = is_highmem(zone);
+
+            for (loop = 0; loop < zone->spanned_pages; loop++) {
+                unsigned long pfn = zone->zone_start_pfn + loop;
+                struct page *page;
+                int chunk_size;
+
+                if (!pfn_valid(pfn)) {
+                    continue;
+                }
+
+                chunk_size = toi_size_of_free_region(zone, pfn);
+                if (chunk_size) {
+                    unsigned long y;
+                    for (y = pfn; y < pfn + chunk_size; y++) {
+                        page = pfn_to_page(y);
+                        /*
+                         * If the page gets allocated, it will be need
+                         * saving in an image.
+                         * Don't bother with explicitly removing any
+                         * RO protection applied below.
+                         */
+                        SetPageTOI_Dirty(page);
+                    }
+                    continue;
+                }
+
+                page = pfn_to_page(pfn);
+
+                if (PageNosave(page) || PagePagetable(page)) {
+                    continue;
+                }
+
+                /**
+                 * Do we need to (re)protect the page?
+                 * If it is already protected (PageTOI_RO), there is
+                 * nothing to do - skip the following.
+                 * If it is marked as dirty (PageTOI_Dirty), it was
+                 * either free and has been allocated or has been
+                 * written to and marked dirty. Reset the dirty flag
+                 * and (re)apply the protection.
+                 */
+                if (!PageTOI_RO(page)) {
+                    /**
+                     * Don't worry about whether the Dirty flag is
+                     * already set. If this is our first call, it
+                     * won't be.
+                     */
+
+                    preempt_disable();
+
+                    ClearPageTOI_Dirty(page);
+                    SetPageTOI_RO(page);
+
+                    preempt_enable();
+                }
+            }
+        }
+
+        if (allocated_bitmaps) {
+            toi_free_bitmap(&toi_pt_map);
+            toi_free_bitmap(&free_map);
+        }
+
+        return 0;
+}
+
+// Pre-SMP
+early_initcall(toi_reset_dirtiness);
+#endif
 
 static int __init toi_wait_setup(char *str)
 {
