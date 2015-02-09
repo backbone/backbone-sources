@@ -159,9 +159,10 @@ static void __init probe_page_size_mask(void)
 {
 	init_gbpages();
 
-#if !defined(CONFIG_DEBUG_PAGEALLOC) && !defined(CONFIG_KMEMCHECK)
+#if !defined(CONFIG_DEBUG_PAGEALLOC) && !defined(CONFIG_KMEMCHECK) && !defined(CONFIG_TOI_INCREMENTAL)
 	/*
-	 * For CONFIG_DEBUG_PAGEALLOC, identity mapping will use small pages.
+         * For CONFIG_DEBUG_PAGEALLOC or TuxOnIce's incremental image support,
+         * identity mapping will use small pages.
 	 * This will simplify cpa(), which otherwise needs to support splitting
 	 * large pages into small in interrupt context, etc.
 	 */
