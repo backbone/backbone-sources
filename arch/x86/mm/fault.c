@@ -905,10 +905,25 @@ mm_fault_error(struct pt_regs *regs, unsigned long error_code,
 	}
 }
 
+static int toi_fault(unsigned long error_code, pte_t *pte)
+{
+#ifdef CONFIG_TOI_INCREMENTAL
+    struct page *page = pte_page(*pte);
+    if (PageTOI_RO(page)) {
+        set_pte_atomic(pte, pte_mkwrite(*pte));
+        SetPageTOI_Dirty(page);
+        ClearPageTOI_RO(page);
+        return 1;
+    }
+#endif
+
+    return 0;
+}
+
 static int spurious_fault_check(unsigned long error_code, pte_t *pte)
 {
 	if ((error_code & PF_WRITE) && !pte_write(*pte))
-		return 0;
+            return toi_fault(error_code, pte);
 
 	if ((error_code & PF_INSTR) && !pte_exec(*pte))
 		return 0;
