@@ -2661,7 +2661,7 @@ int restore_highmem(void)
 #endif /* CONFIG_HIGHMEM */
 
 struct memory_bitmap *pageset1_map, *pageset2_map, *free_map, *nosave_map,
-  *pageset1_copy_map, *io_map, *page_resave_map, *compare_map, *toi_pt_map;
+  *pageset1_copy_map, *io_map, *page_resave_map, *compare_map;
 
 int resume_attempted;
 EXPORT_SYMBOL_GPL(resume_attempted);

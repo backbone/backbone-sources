@@ -43,7 +43,6 @@ extern struct memory_bitmap *io_map;
 extern struct memory_bitmap *nosave_map;
 extern struct memory_bitmap *free_map;
 extern struct memory_bitmap *compare_map;
-extern struct memory_bitmap *toi_pt_map;
 
 #define PagePageset1(page) \
 	(pageset1_map && memory_bm_test_bit(pageset1_map, smp_processor_id(), page_to_pfn(page)))
@@ -100,13 +99,6 @@ extern struct memory_bitmap *toi_pt_map;
 	(memory_bm_set_bit(compare_map, smp_processor_id(), page_to_pfn(page)))
 #define ClearPageCompareChanged(page) \
 	(memory_bm_clear_bit(compare_map, smp_processor_id(), page_to_pfn(page)))
-
-#define PagePagetable(page) (toi_pt_map ? \
-		memory_bm_test_bit(toi_pt_map, smp_processor_id(), page_to_pfn(page)) : 0)
-#define SetPagePagetable(page) \
-	(memory_bm_set_bit(toi_pt_map, smp_processor_id(), page_to_pfn(page)))
-#define ClearPagePagetable(page) \
-	(memory_bm_clear_bit(toi_pt_map, smp_processor_id(), page_to_pfn(page)))
 
 extern void save_pageflags(struct memory_bitmap *pagemap);
 extern int load_pageflags(struct memory_bitmap *pagemap);
