@@ -4,6 +4,7 @@ ccflags-$(CONFIG_PM_DEBUG)	:= -DDEBUG
 tuxonice_core-y := tuxonice_modules.o
 
 obj-$(CONFIG_TOI)		+= tuxonice_builtin.o
+obj-$(CONFIG_TOI_INCREMENTAL)   += tuxonice_incremental.o
 
 tuxonice_core-$(CONFIG_PM_DEBUG)	+= tuxonice_alloc.o
 
@@ -20,7 +21,6 @@ tuxonice_core-$(CONFIG_NET)	+= tuxonice_storage.o tuxonice_netlink.o
 
 obj-$(CONFIG_TOI_CORE)		+= tuxonice_core.o
 obj-$(CONFIG_TOI_PRUNE)		+= tuxonice_prune.o
-obj-$(CONFIG_TOI_INCREMENTAL)	+= tuxonice_incremental.o
 obj-$(CONFIG_TOI_CRYPTO)	+= tuxonice_compress.o
 
 tuxonice_bio-y := tuxonice_bio_core.o tuxonice_bio_chains.o \
