@@ -110,7 +110,7 @@ enum pageflags {
 	PG_compound_lock,
 #endif
 #ifdef CONFIG_TOI_INCREMENTAL
-	PG_toi_ignore,		/* Ignore this page */
+	PG_toi_untracked,	/* Don't track dirtiness of this page - assume always dirty */
 	PG_toi_ro,		/* Page was made RO by TOI */
 	PG_toi_cbw,		/* Copy the page before it is written to */
 	PG_toi_dirty,		/* Page has been modified */
@@ -292,7 +292,7 @@ PAGEFLAG_FALSE(HWPoison)
 #ifdef CONFIG_TOI_INCREMENTAL
 PAGEFLAG(TOI_RO, toi_ro)
 PAGEFLAG(TOI_Dirty, toi_dirty)
-PAGEFLAG(TOI_Ignore, toi_ignore)
+PAGEFLAG(TOI_Untracked, toi_untracked)
 PAGEFLAG(TOI_CBW, toi_cbw)
 #endif
 
