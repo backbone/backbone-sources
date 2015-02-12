@@ -203,9 +203,15 @@ void toi_generate_untracked_map(void)
         struct task_struct *p, *t;
 
         for_each_process_thread(p, t) {
+            int i;
+            struct page *stack_page = virt_to_page(p->stack);
+
             debug("Setting task %s task info page %p (%p) untracked. Stack %p (%p-%p)\n", p->comm, virt_to_page(p), p, p->stack, stack_page, stack_page + (1 << THREAD_SIZE_ORDER) - 1);
             SetPageTOI_Untracked(virt_to_page(p));
-            SetPageTOI_Untracked(virt_to_page(p->stack));
+
+            for (i = 0; i < (1 << THREAD_SIZE_ORDER); i++) {
+                SetPageTOI_Untracked(stack_page + i);
+            }
         }
     }
 
