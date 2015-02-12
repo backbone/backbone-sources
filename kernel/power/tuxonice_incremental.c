@@ -252,7 +252,7 @@ static __init int toi_reset_dirtiness(void)
         debug(KERN_EMERG "Generate free page map.\n");
         toi_generate_free_page_map();
 
-	kdb_init(1);
+        toi_generate_untracked_map();
 
         if (1) {
         debug(KERN_EMERG "Reset dirtiness.\n");
