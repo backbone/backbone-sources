@@ -39,6 +39,12 @@ unsigned int toi_search;
 extern void kdb_init(int level);
 extern noinline void kgdb_breakpoint(void);
 
+#if 1
+#define debug(a, b...) do { printk(a, ##b); } while(0)
+#else
+#define debug(a, b...) do { } while(0)
+#endif
+
 /* Multipliers for offsets within the PTEs */
 #define PTE_LEVEL_MULT (PAGE_SIZE)
 #define PMD_LEVEL_MULT (PTRS_PER_PTE * PTE_LEVEL_MULT)
@@ -61,7 +67,7 @@ static void note_page(void *addr)
         unsigned int level;
         pte_t *pte = lookup_address((unsigned long) addr, &level);
         struct page *pt_page2 = pte_page(*pte);
-        printk("Note page %p (=> %p => %p|%ld).\n", addr, pte, pt_page2, page_to_pfn(pt_page2));
+        debug("Note page %p (=> %p => %p|%ld).\n", addr, pte, pt_page2, page_to_pfn(pt_page2));
         SetPageTOI_Untracked(pt_page2);
         lastpage = page;
     }
@@ -172,7 +178,7 @@ static void toi_set_paravirt_ops_untracked(void) {
 
     unsigned long pvpfn = page_to_pfn(virt_to_page(__parainstructions)),
                   pvpfn_end = page_to_pfn(virt_to_page(__parainstructions_end));
-    printk(KERN_EMERG ".parainstructions goes from pfn %ld to %ld.\n", pvpfn, pvpfn_end);
+    debug(KERN_EMERG ".parainstructions goes from pfn %ld to %ld.\n", pvpfn, pvpfn_end);
     for (i = pvpfn; i <= pvpfn_end; i++) {
         SetPageTOI_Untracked(pfn_to_page(i));
     }
@@ -197,7 +203,7 @@ void toi_generate_untracked_map(void)
         struct task_struct *p, *t;
 
         for_each_process_thread(p, t) {
-            printk("Setting task %s page %p (%p) untracked. Stack %p (%p)\n", p->comm, virt_to_page(p), p, p->stack, virt_to_page(p->stack));
+            debug("Setting task %s task info page %p (%p) untracked. Stack %p (%p-%p)\n", p->comm, virt_to_page(p), p, p->stack, stack_page, stack_page + (1 << THREAD_SIZE_ORDER) - 1);
             SetPageTOI_Untracked(virt_to_page(p));
             SetPageTOI_Untracked(virt_to_page(p->stack));
         }
@@ -232,18 +238,18 @@ static __init int toi_reset_dirtiness(void)
         int allocated_bitmaps = 0;
 
         if (!free_map) {
-            printk(KERN_EMERG "Allocating free and pagetable bitmaps.\n");
+            debug(KERN_EMERG "Allocating free and pagetable bitmaps.\n");
             BUG_ON(toi_alloc_bitmap(&free_map));
             allocated_bitmaps = 1;
         }
 
-        printk(KERN_EMERG "Generate free page map.\n");
+        debug(KERN_EMERG "Generate free page map.\n");
         toi_generate_free_page_map();
 
 	kdb_init(1);
 
         if (1) {
-        printk(KERN_EMERG "Reset dirtiness.\n");
+        debug(KERN_EMERG "Reset dirtiness.\n");
         for_each_populated_zone(zone) {
             // 64 bit only. No need to worry about highmem.
             //int highmem = is_highmem(zone);
@@ -267,7 +273,7 @@ static __init int toi_reset_dirtiness(void)
                      * We'll SetPageTOI_Dirty(page) if/when it
                      * gets allocated.
                      */
-                    printk("Skipping %d free pages.\n", chunk_size);
+                    debug("Skipping %d free pages.\n", chunk_size);
                     loop += chunk_size - 1;
                     continue;
                 }
@@ -299,7 +305,7 @@ static __init int toi_reset_dirtiness(void)
 
                     ClearPageTOI_Dirty(page);
                     SetPageTOI_RO(page);
-                    printk(KERN_EMERG "%saking page %ld (%p|%p) read only.\n", enforce ? "M" : "Not m", pfn, page, page_address(page));
+                    debug(KERN_EMERG "%saking page %ld (%p|%p) read only.\n", enforce ? "M" : "Not m", pfn, page, page_address(page));
 
                     if (pfn == 7694) {
                         //extern int kgdb_break_asap;
@@ -323,7 +329,7 @@ static __init int toi_reset_dirtiness(void)
             toi_free_bitmap(&free_map);
         }
 
-        printk(KERN_EMERG "Done resetting dirtiness.\n");
+        debug(KERN_EMERG "Done resetting dirtiness.\n");
         return 0;
 }
 
