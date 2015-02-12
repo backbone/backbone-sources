@@ -905,25 +905,80 @@ mm_fault_error(struct pt_regs *regs, unsigned long error_code,
 	}
 }
 
-static int toi_fault(unsigned long error_code, pte_t *pte)
-{
 #ifdef CONFIG_TOI_INCREMENTAL
+/**
+ * toi_fault_check - Handle a fault caused by TOI's write protection
+ *
+ * Also used by the double fault handler
+ */
+int toi_fault_check(pte_t *pte)
+{
     struct page *page = pte_page(*pte);
     if (PageTOI_RO(page)) {
+        pgd_t *pgd = __va(read_cr3());
+        /*
+         * If this is a TuxOnIce caused fault, we may not have permission to
+         * write to a page needed to reset the permissions of the original
+         * page. Use swapper_pg_dir to get around this.
+         */
+        load_cr3(swapper_pg_dir);
+
         set_pte_atomic(pte, pte_mkwrite(*pte));
         SetPageTOI_Dirty(page);
         ClearPageTOI_RO(page);
+        load_cr3(pgd);
         return 1;
     }
-#endif
-
     return 0;
 }
+
+/**
+ * toi_fault - Handle a fault caused by TOI's write protection
+ *
+ * Note that we don't care about the error code. If called from the double
+ * fault handler, we won't have one. We just check to see if the page was made
+ * RO by TOI, and mark it dirty/release the protection if it was.
+ */
+int toi_fault(unsigned long address)
+{
+    pgd_t *pgd;
+    pud_t *pud;
+    pmd_t *pmd;
+    pte_t *pte;
+
+    pgd = init_mm.pgd + pgd_index(address);
+    if (!pgd_present(*pgd))
+        return 0;
+
+    pud = pud_offset(pgd, address);
+    if (!pud_present(*pud))
+        return 0;
+
+    if (pud_large(*pud))
+        return toi_fault_check((pte_t *) pud);
+
+    pmd = pmd_offset(pud, address);
+    if (!pmd_present(*pmd))
+        return 0;
+
+    if (pmd_large(*pmd))
+        return toi_fault_check((pte_t *) pmd);
+
+    pte = pte_offset_kernel(pmd, address);
+    if (!pte_present(*pte))
+        return 0;
+
+    return toi_fault_check(pte);
+}
+NOKPROBE_SYMBOL(toi_fault);
+#else
+#define toi_fault(addr) do { } while(0)
+#endif
 
 static int spurious_fault_check(unsigned long error_code, pte_t *pte)
 {
 	if ((error_code & PF_WRITE) && !pte_write(*pte))
-            return toi_fault(error_code, pte);
+                return 0;
 
 	if ((error_code & PF_INSTR) && !pte_exec(*pte))
 		return 0;
@@ -1085,6 +1140,15 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	if (kmemcheck_active(regs))
 		kmemcheck_hide(regs);
 	prefetchw(&mm->mmap_sem);
+
+        /*
+         * Detect and handle page faults due to TuxOnIce making pages read-only
+         * so that it can create incremental images.
+         *
+         * Do it early to avoid double faults.
+         */
+        if (unlikely(toi_fault(address)))
+            return;
 
 	if (unlikely(kmmio_fault(regs, address)))
 		return;
