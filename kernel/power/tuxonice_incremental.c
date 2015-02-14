@@ -241,52 +241,28 @@ static int toi_reset_dirtiness(void)
 {
 	struct zone *zone;
 	unsigned long loop;
-        int allocated_bitmaps = 0;
-
-        if (!free_map) {
-            debug(KERN_EMERG "Allocating free and pagetable bitmaps.\n");
-            BUG_ON(toi_alloc_bitmap(&free_map));
-            allocated_bitmaps = 1;
-        }
-
-        debug(KERN_EMERG "Generate free page map.\n");
-        toi_generate_free_page_map();
 
         toi_generate_untracked_map();
 
-        if (1) {
         debug(KERN_EMERG "Reset dirtiness.\n");
         for_each_populated_zone(zone) {
             // 64 bit only. No need to worry about highmem.
-            //int highmem = is_highmem(zone);
-
             for (loop = 0; loop < zone->spanned_pages; loop++) {
                 unsigned long pfn = zone->zone_start_pfn + loop;
                 struct page *page;
-                int chunk_size;
 
                 if (!pfn_valid(pfn)) {
                     continue;
                 }
 
-                chunk_size = toi_size_of_free_region(zone, pfn);
-                if (chunk_size) {
-                    /*
-                     * If the page gets allocated, it will be need
-                     * saving in an image.
-                     * Don't bother with explicitly removing any
-                     * RO protection applied below.
-                     * We'll SetPageTOI_Dirty(page) if/when it
-                     * gets allocated.
-                     */
-                    debug("Skipping %d free pages.\n", chunk_size);
-                    loop += chunk_size - 1;
+                page = pfn_to_page(pfn);
+
+                if (PageNosave(page)) {
+                    SetPageTOI_Untracked(page);
                     continue;
                 }
 
-                page = pfn_to_page(pfn);
-
-                if (PageNosave(page) || PageTOI_Untracked(page)) {
+                if (PageTOI_Untracked(page)) {
                     continue;
                 }
 
@@ -313,26 +289,12 @@ static int toi_reset_dirtiness(void)
                     SetPageTOI_RO(page);
                     debug(KERN_EMERG "%saking page %ld (%p|%p) read only.\n", enforce ? "M" : "Not m", pfn, page, page_address(page));
 
-                    if (pfn == 7694) {
-                        //extern int kgdb_break_asap;
-                        //kgdb_break_asap = 1;
-
-                        //kdb_init(1);
-                        //kgdb_break_asap = 0;
-                        //kgdb_breakpoint();
-                    }
-
                     if (enforce)
                         set_memory_ro((unsigned long) page_address(page), 1);
 
                     preempt_enable();
                 }
             }
-        }
-        }
-
-        if (allocated_bitmaps) {
-            toi_free_bitmap(&free_map);
         }
 
         debug(KERN_EMERG "Done resetting dirtiness.\n");
