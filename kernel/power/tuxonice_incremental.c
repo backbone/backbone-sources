@@ -187,37 +187,36 @@ static void toi_set_paravirt_ops_untracked(void) {
 #define toi_set_paravirt_ops_untracked() { do { } while(0) }
 #endif
 
+extern void toi_mark_per_cpus_pages_untracked(void);
+
 void toi_generate_untracked_map(void)
 {
+    struct task_struct *p, *t;
+
     /* Pagetable pages */
     toi_ptdump_walk_pgd_level(NULL);
 
-    /* Printk buffer */
-    toi_set_logbuf_untracked();
+    /* Printk buffer - not normally needed but can be helpful for debugging. */
+    //toi_set_logbuf_untracked();
 
     /* Paravirt ops */
     toi_set_paravirt_ops_untracked();
 
     /* Task structs and stacks */
-    {
-        struct task_struct *p, *t;
+    for_each_process_thread(p, t) {
+        int i;
+        struct page *stack_page = virt_to_page(p->stack);
 
-        for_each_process_thread(p, t) {
-            int i;
-            struct page *stack_page = virt_to_page(p->stack);
+        debug("Setting task %s task info page %p (%p) untracked. Stack %p (%p-%p)\n", p->comm, virt_to_page(p), p, p->stack, stack_page, stack_page + (1 << THREAD_SIZE_ORDER) - 1);
+        SetPageTOI_Untracked(virt_to_page(p));
 
-            debug("Setting task %s task info page %p (%p) untracked. Stack %p (%p-%p)\n", p->comm, virt_to_page(p), p, p->stack, stack_page, stack_page + (1 << THREAD_SIZE_ORDER) - 1);
-            SetPageTOI_Untracked(virt_to_page(p));
-
-            for (i = 0; i < (1 << THREAD_SIZE_ORDER); i++) {
-                SetPageTOI_Untracked(stack_page + i);
-            }
+        for (i = 0; i < (1 << THREAD_SIZE_ORDER); i++) {
+            SetPageTOI_Untracked(stack_page + i);
         }
     }
 
-    /* IST stacks */
-
     /* Per CPU data */
+    toi_mark_per_cpus_pages_untracked();
 }
 
 /**
