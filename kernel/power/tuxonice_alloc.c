@@ -142,6 +142,7 @@ unsigned long toi_get_free_pages(int fail_num, gfp_t mask,
 {
 	unsigned long result;
 
+        mask |= ___GFP_TOI_NOTRACK;
 	if (toi_alloc_ops.enabled)
 		MIGHT_FAIL(fail_num, 0);
 	result = __get_free_pages(mask, order);
@@ -160,6 +161,7 @@ struct page *toi_alloc_page(int fail_num, gfp_t mask)
 
 	if (toi_alloc_ops.enabled)
 		MIGHT_FAIL(fail_num, NULL);
+        mask |= ___GFP_TOI_NOTRACK;
 	result = alloc_page(mask);
 	if (toi_alloc_ops.enabled)
 		alloc_update_stats(fail_num, (void *) result, PAGE_SIZE);
@@ -175,6 +177,7 @@ unsigned long toi_get_zeroed_page(int fail_num, gfp_t mask)
 
 	if (toi_alloc_ops.enabled)
 		MIGHT_FAIL(fail_num, 0);
+        mask |= ___GFP_TOI_NOTRACK;
 	result = get_zeroed_page(mask);
 	if (toi_alloc_ops.enabled)
 		alloc_update_stats(fail_num, (void *) result, PAGE_SIZE);

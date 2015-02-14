@@ -980,6 +980,9 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags)
 		struct page *p = page + i;
 		if (unlikely(check_new_page(p)))
 			return 1;
+                if (unlikely(gfp_flags & ___GFP_TOI_NOTRACK)) {
+                    SetPageTOI_Untracked(page);
+                }
 	}
 
 	set_page_private(page, 0);
