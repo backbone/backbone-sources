@@ -706,6 +706,10 @@ static inline int free_pages_check(struct page *page)
 	if (unlikely(page->mem_cgroup))
 		bad_reason = "page still charged to cgroup";
 #endif
+#ifdef CONFIG_TOI_INCREMENTAL
+        if (unlikely(PageTOI_Untracked(page)))
+            ClearPageTOI_Untracked(page);
+#endif
 	if (unlikely(bad_reason)) {
 		bad_page(page, bad_reason, bad_flags);
 		return 1;
