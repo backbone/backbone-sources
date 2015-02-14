@@ -39,7 +39,7 @@ unsigned int toi_search;
 extern void kdb_init(int level);
 extern noinline void kgdb_breakpoint(void);
 
-#if 1
+#if 0
 #define debug(a, b...) do { printk(a, ##b); } while(0)
 #else
 #define debug(a, b...) do { } while(0)
