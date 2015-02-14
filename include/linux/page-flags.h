@@ -294,6 +294,11 @@ PAGEFLAG(TOI_RO, toi_ro)
 PAGEFLAG(TOI_Dirty, toi_dirty)
 PAGEFLAG(TOI_Untracked, toi_untracked)
 PAGEFLAG(TOI_CBW, toi_cbw)
+#else
+PAGEFLAG_FALSE(TOI_RO)
+PAGEFLAG_FALSE(TOI_Dirty)
+PAGEFLAG_FALSE(TOI_Untracked)
+PAGEFLAG_FALSE(TOI_CBW)
 #endif
 
 u64 stable_page_flags(struct page *page);

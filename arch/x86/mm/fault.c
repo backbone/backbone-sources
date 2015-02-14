@@ -972,7 +972,7 @@ int toi_fault(unsigned long address)
 }
 NOKPROBE_SYMBOL(toi_fault);
 #else
-#define toi_fault(addr) do { } while(0)
+#define toi_fault(addr) (0)
 #endif
 
 static int spurious_fault_check(unsigned long error_code, pte_t *pte)
