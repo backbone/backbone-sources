@@ -277,7 +277,7 @@ static inline void suspend_thaw_processes(void)
 
 extern struct page *saveable_page(struct zone *z, unsigned long p);
 #ifdef CONFIG_HIGHMEM
-extern void *saveable_highmem_page(struct zone *z, unsigned long p);
+struct page *saveable_highmem_page(struct zone *z, unsigned long p);
 #else
 static
 inline void *saveable_highmem_page(struct zone *z, unsigned long p)
