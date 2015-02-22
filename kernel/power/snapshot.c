@@ -1812,7 +1812,7 @@ alloc_highmem_pages(struct memory_bitmap *bm, unsigned int nr_highmem)
 		struct page *page;
 
 		page = alloc_image_page(__GFP_HIGHMEM);
-		memory_bm_set_bit(bm, page_to_pfn(page));
+		memory_bm_set_bit(bm, 0, page_to_pfn(page));
 	}
 	return nr_highmem;
 }
@@ -2174,12 +2174,12 @@ static unsigned int count_highmem_image_pages(struct memory_bitmap *bm)
 	unsigned int cnt = 0;
 
 	memory_bm_position_reset(bm);
-	pfn = memory_bm_next_pfn(bm);
+	pfn = memory_bm_next_pfn(bm, 0);
 	while (pfn != BM_END_OF_MAP) {
 		if (PageHighMem(pfn_to_page(pfn)))
 			cnt++;
 
-		pfn = memory_bm_next_pfn(bm);
+		pfn = memory_bm_next_pfn(bm, 0);
 	}
 	return cnt;
 }
@@ -2224,7 +2224,7 @@ prepare_highmem_image(struct memory_bitmap *bm, unsigned int *nr_highmem_p)
 		page = alloc_page(__GFP_HIGHMEM);
 		if (!swsusp_page_is_free(page)) {
 			/* The page is "safe", set its bit the bitmap */
-			memory_bm_set_bit(bm, page_to_pfn(page));
+			memory_bm_set_bit(bm, 0, page_to_pfn(page));
 			safe_highmem_pages++;
 		}
 		/* Mark the page as allocated */
@@ -2282,7 +2282,7 @@ get_highmem_page_buffer(struct page *page, struct chain_allocator *ca)
 
 		/* Copy of the page will be stored in high memory */
 		kaddr = buffer;
-		tmp = pfn_to_page(memory_bm_next_pfn(safe_highmem_bm));
+		tmp = pfn_to_page(memory_bm_next_pfn(safe_highmem_bm, 0));
 		safe_highmem_pages--;
 		last_highmem_page = tmp;
 		pbe->copy_page = tmp;

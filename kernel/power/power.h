@@ -37,7 +37,7 @@ static inline char *check_image_kernel(struct swsusp_info *info)
 			"architecture specific data" : NULL;
 }
 #else
-extern char *check_image_kernel(struct swsusp_info *info);
+static char *check_image_kernel(struct swsusp_info *info);
 #endif /* CONFIG_ARCH_HIBERNATION_HEADER */
 extern int init_header(struct swsusp_info *info);
 
@@ -275,12 +275,12 @@ static inline void suspend_thaw_processes(void)
 }
 #endif
 
-extern struct page *saveable_page(struct zone *z, unsigned long p);
+extern struct page *saveable_page(struct zone *zone, unsigned long pfn);
 #ifdef CONFIG_HIGHMEM
-extern void *saveable_highmem_page(struct zone *z, unsigned long p);
+extern struct page *saveable_highmem_page(struct zone *zone, unsigned long pfn);
 #else
 static
-inline void *saveable_highmem_page(struct zone *z, unsigned long p)
+inline struct page *saveable_highmem_page(struct zone *zone, unsigned long pfn)
 {
 	return NULL;
 }
