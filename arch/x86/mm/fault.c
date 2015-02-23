@@ -907,11 +907,9 @@ mm_fault_error(struct pt_regs *regs, unsigned long error_code,
 
 #ifdef CONFIG_TOI_INCREMENTAL
 /**
- * toi_fault_check - Handle a fault caused by TOI's write protection
- *
- * Also used by the double fault handler
+ * _toi_make_writable - Defuse TOI's write protection
  */
-int toi_fault_check(pte_t *pte)
+int _toi_make_writable(pte_t *pte)
 {
     struct page *page = pte_page(*pte);
     if (PageTOI_RO(page)) {
@@ -933,13 +931,17 @@ int toi_fault_check(pte_t *pte)
 }
 
 /**
- * toi_fault - Handle a fault caused by TOI's write protection
+ * toi_make_writable - Handle a (potential) fault caused by TOI's write protection
  *
- * Note that we don't care about the error code. If called from the double
- * fault handler, we won't have one. We just check to see if the page was made
- * RO by TOI, and mark it dirty/release the protection if it was.
+ * Make a page writable that was protected. Might be because of a fault, or
+ * because we're allocating it and want it to be untracked.
+ *
+ * Note that in the fault handling case, we don't care about the error code. If
+ * called from the double fault handler, we won't have one. We just check to
+ * see if the page was made RO by TOI, and mark it dirty/release the protection
+ * if it was.
  */
-int toi_fault(unsigned long address)
+int toi_make_writable(unsigned long address)
 {
     pgd_t *pgd;
     pud_t *pud;
@@ -955,24 +957,24 @@ int toi_fault(unsigned long address)
         return 0;
 
     if (pud_large(*pud))
-        return toi_fault_check((pte_t *) pud);
+        return _toi_make_writable((pte_t *) pud);
 
     pmd = pmd_offset(pud, address);
     if (!pmd_present(*pmd))
         return 0;
 
     if (pmd_large(*pmd))
-        return toi_fault_check((pte_t *) pmd);
+        return _toi_make_writable((pte_t *) pmd);
 
     pte = pte_offset_kernel(pmd, address);
     if (!pte_present(*pte))
         return 0;
 
-    return toi_fault_check(pte);
+    return _toi_make_writable(pte);
 }
-NOKPROBE_SYMBOL(toi_fault);
+NOKPROBE_SYMBOL(toi_make_writable);
 #else
-#define toi_fault(addr) (0)
+#define toi_make_writable(addr) (0)
 #endif
 
 static int spurious_fault_check(unsigned long error_code, pte_t *pte)
@@ -1147,7 +1149,7 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
          *
          * Do it early to avoid double faults.
          */
-        if (unlikely(toi_fault(address)))
+        if (unlikely(toi_make_writable(address)))
             return;
 
 	if (unlikely(kmmio_fault(regs, address)))
