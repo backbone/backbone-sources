@@ -11,8 +11,17 @@
 #ifdef CONFIG_TOI_INCREMENTAL
 extern void toi_set_logbuf_untracked(void);
 extern int toi_make_writable(unsigned long address);
+
+static inline int toi_incremental_support(void)
+{
+    return 1;
+}
 #else
 #define toi_set_logbuf_untracked() do { } while(0)
 #define toi_make_writable(addr) (0)
+static inline int toi_incremental_support(void)
+{
+    return 0;
+}
 #endif
 #endif
