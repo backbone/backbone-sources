@@ -67,7 +67,6 @@ static void note_page(void *addr)
         unsigned int level;
         pte_t *pte = lookup_address((unsigned long) addr, &level);
         struct page *pt_page2 = pte_page(*pte);
-        debug("Note page %p (=> %p => %p|%ld).\n", addr, pte, pt_page2, page_to_pfn(pt_page2));
         SetPageTOI_Untracked(pt_page2);
         lastpage = page;
     }
@@ -178,7 +177,6 @@ static void toi_set_paravirt_ops_untracked(void) {
 
     unsigned long pvpfn = page_to_pfn(virt_to_page(__parainstructions)),
                   pvpfn_end = page_to_pfn(virt_to_page(__parainstructions_end));
-    debug(KERN_EMERG ".parainstructions goes from pfn %ld to %ld.\n", pvpfn, pvpfn_end);
     for (i = pvpfn; i <= pvpfn_end; i++) {
         SetPageTOI_Untracked(pfn_to_page(i));
     }
@@ -256,7 +254,6 @@ static int toi_reset_dirtiness(void)
 
         toi_generate_untracked_map();
 
-        debug(KERN_EMERG "Reset dirtiness.\n");
         for_each_populated_zone(zone) {
             // 64 bit only. No need to worry about highmem.
             for (loop = 0; loop < zone->spanned_pages; loop++) {
@@ -299,7 +296,6 @@ static int toi_reset_dirtiness(void)
 
                     ClearPageTOI_Dirty(page);
                     SetPageTOI_RO(page);
-                    debug(KERN_EMERG "%saking page %ld (%p|%p) read only.\n", enforce ? "M" : "Not m", pfn, page, page_address(page));
 
                     if (enforce)
                         set_memory_ro((unsigned long) page_address(page), 1);
@@ -309,7 +305,6 @@ static int toi_reset_dirtiness(void)
             }
         }
 
-        debug(KERN_EMERG "Done resetting dirtiness.\n");
         return 0;
 }
 
