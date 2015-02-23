@@ -557,7 +557,7 @@ static inline void ClearPageSlabPfmemalloc(struct page *page)
  */
 #ifdef CONFIG_TOI_INCREMENTAL
 #define PAGE_FLAGS_CHECK_AT_PREP	(((1 << NR_PAGEFLAGS) - 1) & \
-        ~(1 << PG_toi_dirty | 1 << PG_toi_ro))
+        ~((1 << PG_toi_dirty) | (1 << PG_toi_ro)))
 #else
 #define PAGE_FLAGS_CHECK_AT_PREP	((1 << NR_PAGEFLAGS) - 1)
 #endif
