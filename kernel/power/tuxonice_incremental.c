@@ -213,7 +213,7 @@ void toi_generate_untracked_map(void)
     //toi_set_logbuf_untracked();
 
     /* Paravirt ops */
-    toi_set_paravirt_ops_untracked();
+    //toi_set_paravirt_ops_untracked();
 
     /* Task structs and stacks */
     for_each_process_thread(p, t) {
