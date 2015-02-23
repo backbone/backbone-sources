@@ -189,9 +189,22 @@ static void toi_set_paravirt_ops_untracked(void) {
 
 extern void toi_mark_per_cpus_pages_untracked(void);
 
+void toi_untrack_process(struct task_struct *p)
+{
+    struct page *stack_page = virt_to_page(p->stack);
+    int i;
+
+    SetPageTOI_Untracked(virt_to_page(p));
+
+    for (i = 0; i < (1 << THREAD_SIZE_ORDER); i++) {
+        SetPageTOI_Untracked(stack_page + i);
+    }
+}
+
 void toi_generate_untracked_map(void)
 {
     struct task_struct *p, *t;
+    int i;
 
     /* Pagetable pages */
     toi_ptdump_walk_pgd_level(NULL);
@@ -204,14 +217,13 @@ void toi_generate_untracked_map(void)
 
     /* Task structs and stacks */
     for_each_process_thread(p, t) {
-        int i;
-        struct page *stack_page = virt_to_page(p->stack);
+        toi_untrack_process(p);
+    }
 
-        debug("Setting task %s task info page %p (%p) untracked. Stack %p (%p-%p)\n", p->comm, virt_to_page(p), p, p->stack, stack_page, stack_page + (1 << THREAD_SIZE_ORDER) - 1);
-        SetPageTOI_Untracked(virt_to_page(p));
-
-        for (i = 0; i < (1 << THREAD_SIZE_ORDER); i++) {
-            SetPageTOI_Untracked(stack_page + i);
+    for (i = 0; i < NR_CPUS; i++) {
+        struct task_struct *idle = idle_task(i);
+        if (idle) {
+            toi_untrack_process(idle);
         }
     }
 
