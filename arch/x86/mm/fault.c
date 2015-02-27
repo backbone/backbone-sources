@@ -13,6 +13,7 @@
 #include <linux/hugetlb.h>		/* hstate_index_to_shift	*/
 #include <linux/prefetch.h>		/* prefetchw			*/
 #include <linux/context_tracking.h>	/* exception_enter(), ...	*/
+#include <linux/tuxonice.h>             /* incremental image support    */
 
 #include <asm/traps.h>			/* dotraplinkage, ...		*/
 #include <asm/pgalloc.h>		/* pgd_*(), ...			*/
@@ -651,6 +652,10 @@ no_context(struct pt_regs *regs, unsigned long error_code,
 	unsigned long flags;
 	int sig;
 
+        if (toi_make_writable(address)) {
+            return;
+        }
+
 	/* Are we prepared to handle this kernel fault? */
 	if (fixup_exception(regs)) {
 		/*
@@ -973,8 +978,6 @@ int toi_make_writable(unsigned long address)
     return _toi_make_writable(pte);
 }
 NOKPROBE_SYMBOL(toi_make_writable);
-#else
-#define toi_make_writable(addr) (0)
 #endif
 
 static int spurious_fault_check(unsigned long error_code, pte_t *pte)

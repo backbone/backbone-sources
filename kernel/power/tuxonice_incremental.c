@@ -40,11 +40,12 @@ extern void kdb_init(int level);
 extern noinline void kgdb_breakpoint(void);
 
 #if 0
-#define debug(a, b...) do { printk(a, ##b); } while(0)
+#define pr_debug(a, b...) do { printk(a, ##b); } while(0)
 #else
-#define debug(a, b...) do { } while(0)
+#define pr_debug(a, b...) do { } while(0)
 #endif
 
+#if 0
 /* Multipliers for offsets within the PTEs */
 #define PTE_LEVEL_MULT (PAGE_SIZE)
 #define PMD_LEVEL_MULT (PTRS_PER_PTE * PTE_LEVEL_MULT)
@@ -67,6 +68,7 @@ static void note_page(void *addr)
         unsigned int level;
         pte_t *pte = lookup_address((unsigned long) addr, &level);
         struct page *pt_page2 = pte_page(*pte);
+        //debug("Note page %p (=> %p => %p|%ld).\n", addr, pte, pt_page2, page_to_pfn(pt_page2));
         SetPageTOI_Untracked(pt_page2);
         lastpage = page;
     }
@@ -177,6 +179,7 @@ static void toi_set_paravirt_ops_untracked(void) {
 
     unsigned long pvpfn = page_to_pfn(virt_to_page(__parainstructions)),
                   pvpfn_end = page_to_pfn(virt_to_page(__parainstructions_end));
+    //debug(KERN_EMERG ".parainstructions goes from pfn %ld to %ld.\n", pvpfn, pvpfn_end);
     for (i = pvpfn; i <= pvpfn_end; i++) {
         SetPageTOI_Untracked(pfn_to_page(i));
     }
@@ -184,28 +187,38 @@ static void toi_set_paravirt_ops_untracked(void) {
 #else
 #define toi_set_paravirt_ops_untracked() { do { } while(0) }
 #endif
+#endif
 
 extern void toi_mark_per_cpus_pages_untracked(void);
 
-void toi_untrack_process(struct task_struct *p)
+void toi_untrack_stack(unsigned long *stack)
 {
-    struct page *stack_page = virt_to_page(p->stack);
     int i;
-
-    SetPageTOI_Untracked(virt_to_page(p));
+    struct page *stack_page = virt_to_page(stack);
 
     for (i = 0; i < (1 << THREAD_SIZE_ORDER); i++) {
+        pr_debug("Untrack stack page %p.\n", page_address(stack_page + i));
         SetPageTOI_Untracked(stack_page + i);
     }
+}
+void toi_untrack_process(struct task_struct *p)
+{
+    SetPageTOI_Untracked(virt_to_page(p));
+    pr_debug("Untrack process %d page %p.\n", p->pid, page_address(virt_to_page(p)));
+
+    toi_untrack_stack(p->stack);
 }
 
 void toi_generate_untracked_map(void)
 {
     struct task_struct *p, *t;
+    struct page *page;
+    pte_t *pte;
     int i;
+    unsigned int level;
 
     /* Pagetable pages */
-    toi_ptdump_walk_pgd_level(NULL);
+    //toi_ptdump_walk_pgd_level(NULL);
 
     /* Printk buffer - not normally needed but can be helpful for debugging. */
     //toi_set_logbuf_untracked();
@@ -216,17 +229,35 @@ void toi_generate_untracked_map(void)
     /* Task structs and stacks */
     for_each_process_thread(p, t) {
         toi_untrack_process(p);
+        //toi_untrack_stack((unsigned long *) t->thread.sp);
     }
 
     for (i = 0; i < NR_CPUS; i++) {
         struct task_struct *idle = idle_task(i);
+
         if (idle) {
+            pr_debug("Untrack idle process for CPU %d.\n", i);
             toi_untrack_process(idle);
         }
+
+        /* IRQ stack */
+        pr_debug("Untrack IRQ stack for CPU %d.\n", i);
+        toi_untrack_stack((unsigned long *)per_cpu(irq_stack_ptr, i));
     }
 
     /* Per CPU data */
-    toi_mark_per_cpus_pages_untracked();
+    //pr_debug("Untracking per CPU variable pages.\n");
+    //toi_mark_per_cpus_pages_untracked();
+
+    /* Init stack - for bringing up secondary CPUs */
+    page = virt_to_page(init_stack);
+    for (i = 0; i < DIV_ROUND_UP(sizeof(init_stack), PAGE_SIZE); i++) {
+        SetPageTOI_Untracked(page + i);
+    }
+
+    pte = lookup_address((unsigned long) &mmu_cr4_features, &level);
+    SetPageTOI_Untracked(pte_page(*pte));
+    SetPageTOI_Untracked(virt_to_page(trampoline_cr4_features));
 }
 
 /**
@@ -254,6 +285,7 @@ static int toi_reset_dirtiness(void)
 
         toi_generate_untracked_map();
 
+        debug(KERN_EMERG "Reset dirtiness.\n");
         for_each_populated_zone(zone) {
             // 64 bit only. No need to worry about highmem.
             for (loop = 0; loop < zone->spanned_pages; loop++) {
@@ -296,6 +328,7 @@ static int toi_reset_dirtiness(void)
 
                     ClearPageTOI_Dirty(page);
                     SetPageTOI_RO(page);
+                    //debug(KERN_EMERG "%saking page %ld (%p|%p) read only.\n", enforce ? "M" : "Not m", pfn, page, page_address(page));
 
                     if (enforce)
                         set_memory_ro((unsigned long) page_address(page), 1);
@@ -305,13 +338,14 @@ static int toi_reset_dirtiness(void)
             }
         }
 
+        debug(KERN_EMERG "Done resetting dirtiness.\n");
         return 0;
 }
 
 extern void toi_generate_untracked_map(void);
 
 // Leave early_initcall for pages to register untracked sections.
-core_initcall(toi_reset_dirtiness);
+early_initcall(toi_reset_dirtiness);
 
 static int __init toi_search_setup(char *str)
 {

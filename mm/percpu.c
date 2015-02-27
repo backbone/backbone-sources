@@ -2297,8 +2297,6 @@ void toi_mark_per_cpus_pages_untracked(void)
 
     struct page *page = virt_to_page(pcpu_base_addr);
 
-    printk("toi_mark_per_cpus_pages_untracked marking %p-%p (%p-%p).\n",
-            page, page + pcpu_pfns, pcpu_base_addr, pcpu_base_addr + PAGE_SIZE * pcpu_pfns);
     for (i = 0; i < pcpu_pfns; i++)
         SetPageTOI_Untracked(page + i);
 }
