@@ -247,7 +247,7 @@ void toi_generate_untracked_map(void)
 
     /* Per CPU data */
     //pr_debug("Untracking per CPU variable pages.\n");
-    //toi_mark_per_cpus_pages_untracked();
+    toi_mark_per_cpus_pages_untracked();
 
     /* Init stack - for bringing up secondary CPUs */
     page = virt_to_page(init_stack);
