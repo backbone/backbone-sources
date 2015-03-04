@@ -403,6 +403,9 @@ static int get_toi_page_state(const char *buffer, int count)
     struct zone *zone;
     int allocated_bitmaps = 0;
 
+    set_cpus_allowed_ptr(current,
+            cpumask_of(cpumask_first(cpu_online_mask)));
+
     if (!free_map) {
         BUG_ON(toi_alloc_bitmap(&free_map));
         allocated_bitmaps = 1;
@@ -457,6 +460,8 @@ static int get_toi_page_state(const char *buffer, int count)
     if (allocated_bitmaps) {
         toi_free_bitmap(&free_map);
     }
+
+    set_cpus_allowed_ptr(current, cpu_all_mask);
 
     SNPRINTF("TuxOnIce page breakdown:\n");
     SNPRINTF("- Free           : %d\n", free);
