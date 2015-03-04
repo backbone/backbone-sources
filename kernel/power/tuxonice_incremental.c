@@ -40,13 +40,13 @@ int toi_do_incremental_initcall;
 extern void kdb_init(int level);
 extern noinline void kgdb_breakpoint(void);
 
+#undef pr_debug
 #if 0
 #define pr_debug(a, b...) do { printk(a, ##b); } while(0)
 #else
 #define pr_debug(a, b...) do { } while(0)
 #endif
 
-#if 0
 /* Multipliers for offsets within the PTEs */
 #define PTE_LEVEL_MULT (PAGE_SIZE)
 #define PMD_LEVEL_MULT (PTRS_PER_PTE * PTE_LEVEL_MULT)
@@ -188,7 +188,6 @@ static void toi_set_paravirt_ops_untracked(void) {
 #else
 #define toi_set_paravirt_ops_untracked() { do { } while(0) }
 #endif
-#endif
 
 extern void toi_mark_per_cpus_pages_untracked(void);
 
@@ -219,13 +218,13 @@ void toi_generate_untracked_map(void)
     unsigned int level;
 
     /* Pagetable pages */
-    //toi_ptdump_walk_pgd_level(NULL);
+    toi_ptdump_walk_pgd_level(NULL);
 
     /* Printk buffer - not normally needed but can be helpful for debugging. */
     //toi_set_logbuf_untracked();
 
     /* Paravirt ops */
-    //toi_set_paravirt_ops_untracked();
+    toi_set_paravirt_ops_untracked();
 
     /* Task structs and stacks */
     for_each_process_thread(p, t) {
@@ -286,7 +285,7 @@ static int toi_reset_dirtiness(void)
 
         toi_generate_untracked_map();
 
-        debug(KERN_EMERG "Reset dirtiness.\n");
+        pr_debug(KERN_EMERG "Reset dirtiness.\n");
         for_each_populated_zone(zone) {
             // 64 bit only. No need to worry about highmem.
             for (loop = 0; loop < zone->spanned_pages; loop++) {
@@ -329,7 +328,7 @@ static int toi_reset_dirtiness(void)
 
                     ClearPageTOI_Dirty(page);
                     SetPageTOI_RO(page);
-                    //debug(KERN_EMERG "%saking page %ld (%p|%p) read only.\n", enforce ? "M" : "Not m", pfn, page, page_address(page));
+                    //pr_debug(KERN_EMERG "%saking page %ld (%p|%p) read only.\n", enforce ? "M" : "Not m", pfn, page, page_address(page));
 
                     if (enforce)
                         set_memory_ro((unsigned long) page_address(page), 1);
@@ -339,7 +338,7 @@ static int toi_reset_dirtiness(void)
             }
         }
 
-        debug(KERN_EMERG "Done resetting dirtiness.\n");
+        pr_debug(KERN_EMERG "Done resetting dirtiness.\n");
         return 0;
 }
 
