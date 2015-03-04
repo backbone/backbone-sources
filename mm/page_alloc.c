@@ -675,7 +675,8 @@ static inline int free_pages_check(struct page *page)
         if (unlikely(PageTOI_Untracked(page))) {
             // Make it writable and included in image if allocated.
             ClearPageTOI_Untracked(page);
-            toi_make_writable((unsigned long) page_address(page));
+            // If it gets allocated, it will be dirty from TOI's POV.
+            SetPageTOI_Dirty(page);
         }
 	if (unlikely(bad_reason)) {
 		bad_page(page, bad_reason, bad_flags);
@@ -972,7 +973,7 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
 		if (unlikely(check_new_page(p)))
 			return 1;
                 if (unlikely(toi_incremental_support() && gfp_flags & ___GFP_TOI_NOTRACK)) {
-                    // Make the page writable, and set it to be untracked.
+                    // Make the page writable if it's protected, and set it to be untracked.
                     SetPageTOI_Untracked(p);
                     toi_make_writable((unsigned long) page_address(p));
                 }
