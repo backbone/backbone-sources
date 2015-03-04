@@ -35,6 +35,7 @@
 
 int toi_disable_memory_ro;
 unsigned int toi_search;
+int toi_do_incremental_initcall;
 
 extern void kdb_init(int level);
 extern noinline void kgdb_breakpoint(void);
@@ -342,10 +343,17 @@ static int toi_reset_dirtiness(void)
         return 0;
 }
 
+static int toi_reset_dirtiness_initcall(void)
+{
+    if (toi_do_incremental_initcall) {
+        toi_reset_dirtiness();
+    }
+    return 1;
+}
 extern void toi_generate_untracked_map(void);
 
 // Leave early_initcall for pages to register untracked sections.
-early_initcall(toi_reset_dirtiness);
+early_initcall(toi_reset_dirtiness_initcall);
 
 static int __init toi_search_setup(char *str)
 {
@@ -368,5 +376,15 @@ static int __init toi_disable_memory_ro_setup(char *str)
 
 	return 1;
 }
-
 __setup("toi_no_ro", toi_disable_memory_ro_setup);
+
+static int __init toi_incremental_initcall_setup(char *str)
+{
+	int value;
+
+	if (sscanf(str, "=%d", &value) && value)
+		toi_do_incremental_initcall = value;
+
+	return 1;
+}
+__setup("toi_incremental_initcall", toi_incremental_initcall_setup);
