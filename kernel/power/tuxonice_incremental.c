@@ -216,6 +216,12 @@ void toi_generate_untracked_map(void)
     pte_t *pte;
     int i;
     unsigned int level;
+    static int been_here = 0;
+
+    if (been_here)
+        return;
+
+    been_here = 1;
 
     /* Pagetable pages */
     toi_ptdump_walk_pgd_level(NULL);
