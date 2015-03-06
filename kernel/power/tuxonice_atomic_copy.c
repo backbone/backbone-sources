@@ -112,6 +112,8 @@ void copyback_post(void)
 	 * wakeup when they are ready to use the computer again.
 	 */
 	toi_check_resleep();
+
+        toi_reset_dirtiness();
 }
 
 /**

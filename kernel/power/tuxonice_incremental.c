@@ -284,7 +284,7 @@ void toi_generate_untracked_map(void)
  * TODO: Consider Xen paravirt guest boot issues. See arch/x86/mm/pageattr.c.
  **/
 
-static int toi_reset_dirtiness(void)
+int toi_reset_dirtiness(void)
 {
 	struct zone *zone;
 	unsigned long loop;
