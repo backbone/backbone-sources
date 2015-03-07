@@ -1,7 +1,7 @@
 VERSION = 3
 PATCHLEVEL = 18
-SUBLEVEL = 8
-EXTRAVERSION = -backbone-r1
+SUBLEVEL = 9
+EXTRAVERSION = -backbone
 NAME = Diseased Newt
 
 # *DOCUMENTATION*
