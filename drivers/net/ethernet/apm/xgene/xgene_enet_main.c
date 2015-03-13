@@ -1025,17 +1025,23 @@ static int xgene_enet_remove(struct platform_device *pdev)
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id xgene_enet_acpi_match[] = {
 	{ "APMC0D05", },
+	{ "APMC0D30", },
+	{ "APMC0D31", },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, xgene_enet_acpi_match);
 #endif
 
+#ifdef CONFIG_OF
 static struct of_device_id xgene_enet_of_match[] = {
 	{.compatible = "apm,xgene-enet",},
+	{.compatible = "apm,xgene1-sgenet",},
+	{.compatible = "apm,xgene1-xgenet",},
 	{},
 };
 
 MODULE_DEVICE_TABLE(of, xgene_enet_of_match);
+#endif
 
 static struct platform_driver xgene_enet_driver = {
 	.driver = {

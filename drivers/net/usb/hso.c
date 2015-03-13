@@ -914,7 +914,7 @@ static void packetizeRx(struct hso_net *odev, unsigned char *ip_pkt,
 					/* We got no receive buffer. */
 					D1("could not allocate memory");
 					odev->rx_parse_state = WAIT_SYNC;
-					return;
+					continue;
 				}
 
 				/* Copy what we got so far. make room for iphdr
@@ -1594,7 +1594,7 @@ hso_wait_modem_status(struct hso_serial *serial, unsigned long arg)
 		}
 		cprev = cnow;
 	}
-	current->state = TASK_RUNNING;
+	__set_current_state(TASK_RUNNING);
 	remove_wait_queue(&tiocmget->waitq, &wait);
 
 	return ret;

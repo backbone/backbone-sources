@@ -1516,7 +1516,7 @@ int ovs_nla_put_identifier(const struct sw_flow *flow, struct sk_buff *skb)
 /* Called with ovs_mutex or RCU read lock. */
 int ovs_nla_put_masked_key(const struct sw_flow *flow, struct sk_buff *skb)
 {
-	return ovs_nla_put_key(&flow->mask->key, &flow->key,
+	return ovs_nla_put_key(&flow->key, &flow->key,
 				OVS_FLOW_ATTR_KEY, false, skb);
 }
 
@@ -1746,7 +1746,7 @@ static int validate_and_copy_set_tun(const struct nlattr *attr,
 	struct sw_flow_key key;
 	struct ovs_tunnel_info *tun_info;
 	struct nlattr *a;
-	int err, start, opts_type;
+	int err = 0, start, opts_type;
 
 	ovs_match_init(&match, &key, NULL);
 	opts_type = ipv4_tun_from_nlattr(nla_data(attr), &match, false, log);
@@ -2253,14 +2253,20 @@ static int masked_set_action_to_set_action_attr(const struct nlattr *a,
 						struct sk_buff *skb)
 {
 	const struct nlattr *ovs_key = nla_data(a);
+	struct nlattr *nla;
 	size_t key_len = nla_len(ovs_key) / 2;
 
 	/* Revert the conversion we did from a non-masked set action to
 	 * masked set action.
 	 */
-	if (nla_put(skb, OVS_ACTION_ATTR_SET, nla_len(a) - key_len, ovs_key))
+	nla = nla_nest_start(skb, OVS_ACTION_ATTR_SET);
+	if (!nla)
 		return -EMSGSIZE;
 
+	if (nla_put(skb, nla_type(ovs_key), key_len, nla_data(ovs_key)))
+		return -EMSGSIZE;
+
+	nla_nest_end(skb, nla);
 	return 0;
 }
 

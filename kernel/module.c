@@ -2311,11 +2311,13 @@ static void layout_symtab(struct module *mod, struct load_info *info)
 	info->symoffs = ALIGN(mod->core_size, symsect->sh_addralign ?: 1);
 	info->stroffs = mod->core_size = info->symoffs + ndst * sizeof(Elf_Sym);
 	mod->core_size += strtab_size;
+	mod->core_size = debug_align(mod->core_size);
 
 	/* Put string table section at end of init part of module. */
 	strsect->sh_flags |= SHF_ALLOC;
 	strsect->sh_entsize = get_offset(mod, &mod->init_size, strsect,
 					 info->index.str) | INIT_OFFSET_MASK;
+	mod->init_size = debug_align(mod->init_size);
 	pr_debug("\t%s\n", info->secstrings + strsect->sh_name);
 }
 
@@ -3023,8 +3025,13 @@ static void do_free_init(struct rcu_head *head)
 	kfree(m);
 }
 
-/* This is where the real work happens */
-static int do_init_module(struct module *mod)
+/*
+ * This is where the real work happens.
+ *
+ * Keep it uninlined to provide a reliable breakpoint target, e.g. for the gdb
+ * helper command 'lx-symbols'.
+ */
+static noinline int do_init_module(struct module *mod)
 {
 	int ret = 0;
 	struct mod_initfree *freeinit;
