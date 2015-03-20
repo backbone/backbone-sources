@@ -84,10 +84,15 @@ static int toi_bio_queue_flush_pages(int dedicated_thread);
 
 struct toi_module_ops toi_blockwriter_ops;
 
+struct toi_incremental_image_pointer toi_inc_ptr[2];
+
 #define TOTAL_OUTSTANDING_IO (atomic_read(&toi_io_in_progress) + \
 	       atomic_read(&toi_bio_queue_size))
 
 unsigned long raw_pages_allocd, header_pages_reserved;
+
+static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
+		int no_readahead);
 
 /**
  * set_free_mem_throttle - set the point where we pause to avoid oom.
@@ -597,6 +602,22 @@ static int toi_rw_init(int writing, int stream_number)
 	current_stream = stream_number;
 
 	more_readahead = 1;
+
+        if (writing) {
+            // Remember the location of this block so we can link to it.
+            toi_bio_store_inc_image_ptr(&toi_inc_ptr[1]);
+
+            // Store a blank pointer to the start of this incremental pageset
+            memset(&toi_inc_ptr[0], 0, sizeof(toi_inc_ptr[0]));
+            toi_rw_buffer(WRITE, (char *) &toi_inc_ptr[0], sizeof(toi_inc_ptr[0]), 0);
+
+            // Serialise extent chains if this is an incremental pageset
+            if (toi_writing_incremental_image)
+                toi_serialise_extent_chains();
+        } else {
+            // Read the start of the next incremental pageset (if any)
+            toi_rw_buffer(READ, (char *) &toi_inc_ptr[1], sizeof(toi_inc_ptr[1]), 0);
+        }
 
 	return toi_writer_buffer ? 0 : -ENOMEM;
 }
@@ -1807,6 +1828,7 @@ struct toi_module_ops toi_blockwriter_ops = {
 	.storage_allocated		= toi_bio_storage_allocated,
 	.reserve_header_space		= toi_bio_reserve_header_space,
 	.allocate_storage		= toi_bio_allocate_storage,
+        .free_unused_storage            = toi_bio_free_unused_storage,
 	.image_exists			= toi_bio_image_exists,
 	.mark_resume_attempted		= toi_bio_mark_resume_attempted,
 	.write_header_init		= toi_bio_write_header_init,

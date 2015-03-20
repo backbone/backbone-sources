@@ -27,6 +27,7 @@ unsigned long get_headerblock(void);
 dev_t get_header_dev_t(void);
 struct block_device *get_header_bdev(void);
 int toi_bio_allocate_storage(unsigned long request);
+void toi_bio_free_unused_storage(void);
 
 /* Signature functions */
 #define HaveImage "HaveImage"
@@ -84,3 +85,10 @@ int toi_bio_get_header_version(void);
 
 void close_resume_dev_t(int force);
 int open_resume_dev_t(int force, int quiet);
+
+struct toi_incremental_image_pointer {
+    unsigned long block;
+    int chain;
+};
+
+void toi_bio_store_inc_image_ptr(struct toi_incremental_image_pointer *ptr);

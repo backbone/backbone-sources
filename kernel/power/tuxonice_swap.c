@@ -315,6 +315,24 @@ static int toi_swap_register_storage(void)
 	return 0;
 }
 
+static unsigned long toi_swap_free_unused_storage(struct toi_bdev_info *chain, unsigned long used)
+{
+    struct hibernate_extent *extentpointer = NULL;
+    unsigned long extentvalue;
+    unsigned long i = 0, first_freed = 0;
+
+    toi_extent_for_each(&chain->allocations, extentpointer, extentvalue) {
+        i++;
+        if (i > used) {
+            swap_free((swp_entry_t) { extentvalue });
+            if (!first_freed)
+                first_freed = extentvalue;
+        }
+    }
+
+    return first_freed;
+}
+
 /*
  * workspace_size
  *
@@ -428,6 +446,7 @@ static struct toi_bio_allocator_ops toi_bio_swapops = {
 	.allocate_storage			= toi_swap_allocate_storage,
 	.bmap					= get_main_pool_phys_params,
 	.free_storage				= toi_swap_free_storage,
+        .free_unused_storage                    = toi_swap_free_unused_storage,
 };
 
 static struct toi_module_ops toi_swapops = {

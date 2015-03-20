@@ -401,6 +401,30 @@ static unsigned long chain_pages_used(struct toi_bdev_info *chain)
 	return size + state->offset - this->start;
 }
 
+void toi_bio_free_unused_storage_chain(struct toi_bdev_info *chain)
+{
+    unsigned long used = chain_pages_used(chain);
+
+    /* Free the storage */
+    unsigned long first_freed = 0;
+
+    if (chain->allocator->bio_allocator_ops->free_unused_storage)
+        first_freed = chain->allocator->bio_allocator_ops->free_unused_storage(chain, used);
+
+    printk(KERN_EMERG "Used %ld blocks in this chain. First extent freed is %lx.\n", used, first_freed);
+
+    /* Adjust / free the extents. */
+    toi_put_extent_chain_from(&chain->blocks, first_freed);
+
+    {
+        struct hibernate_extent *this = chain->blocks.first;
+        while (this) {
+            printk("Extent %lx-%lx.\n", this->start, this->end);
+            this = this->next;
+        }
+    }
+}
+
 /**
  * toi_serialise_extent_chain - write a chain in the image
  * @chain:	Chain to write.
@@ -920,6 +944,16 @@ static int toi_bio_register_storage(void)
 	return result;
 }
 
+void toi_bio_free_unused_storage(void)
+{
+    struct toi_bdev_info *this = prio_chain_head;
+
+    while (this) {
+        toi_bio_free_unused_storage_chain(this);
+        this = this->next;
+    }
+}
+
 int toi_bio_allocate_storage(unsigned long request)
 {
 	struct toi_bdev_info *chain = prio_chain_head;
@@ -1045,4 +1079,44 @@ int toi_bio_chains_debug_info(char *buffer, int size)
 	}
 
 	return len;
+}
+
+void toi_bio_store_inc_image_ptr(struct toi_incremental_image_pointer *ptr)
+{
+    struct toi_bdev_info *this = toi_writer_posn.current_chain,
+                         *cmp = prio_chain_head;
+
+    ptr->chain = 1;
+    while (this != cmp) {
+        ptr->chain++;
+        cmp = cmp->next;
+    }
+    ptr->block = this->blocks.current_offset;
+}
+
+void toi_bio_restore_inc_image_ptr(struct toi_incremental_image_pointer *ptr)
+{
+    int i = ptr->chain - 1;
+    struct toi_bdev_info *this;
+    struct hibernate_extent *hib;
+
+    /* Find chain by stored index */
+    this = prio_chain_head;
+    while (i) {
+        this = this->next;
+        i--;
+    }
+    toi_writer_posn.current_chain = this;
+
+    /* Restore block */
+    this->blocks.current_offset = ptr->block;
+
+    /* Find current offset from block number */
+    hib = this->blocks.first;
+
+    while (hib->start > ptr->block) {
+        hib = hib->next;
+    }
+
+    this->blocks.last_touched = this->blocks.current_extent = hib;
 }

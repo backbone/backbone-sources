@@ -113,6 +113,7 @@ struct toi_module_ops {
 	int (*register_storage) (void);
 	int (*allocate_storage) (unsigned long space_requested);
 	unsigned long (*storage_allocated) (void);
+	void (*free_unused_storage) (void);
 
 	/*
 	 * Routines used in image I/O.

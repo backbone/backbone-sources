@@ -73,6 +73,7 @@ enum {
 	TOI_POST_RESUME_BREAKPOINT,
 	TOI_NO_READAHEAD,
         TOI_TRACE_DEBUG_ON,
+        TOI_INCREMENTAL_IMAGE,
 };
 
 extern unsigned long toi_bootflags_mask;
@@ -233,16 +234,18 @@ extern int toi_trace_index;
             printk("*TOI* %ld %02d" DESC "\n", PFN, toi_trace_index, ##__VA_ARGS__); \
         } \
     } while(0)
-#endif
 
 #ifdef CONFIG_TOI_KEEP_IMAGE
-#define toi_keeping_image test_action_state(TOI_KEEP_IMAGE)
+#define toi_keeping_image (test_action_state(TOI_KEEP_IMAGE) || test_action_state(TOI_INCREMENTAL_IMAGE))
 #else
 #define toi_keeping_image (0)
 #endif
 
 #ifdef CONFIG_TOI_INCREMENTAL
 extern void toi_reset_dirtiness(void);
+extern int toi_writing_incremental_image;
 #else
 #define toi_reset_dirtiness() do { } while(0)
+#define toi_writing_incremental_image (0)
+#endif
 #endif

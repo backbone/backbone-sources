@@ -100,6 +100,7 @@ static DEFINE_MUTEX(tuxonice_in_use);
 static int block_dump_save;
 
 int toi_trace_index;
+int toi_writing_incremental_image;
 
 /* Binary signature if an image is present */
 char tuxonice_signature[9] = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
@@ -184,6 +185,7 @@ int toi_start_anything(int hibernate_or_resume)
 	set_fs(KERNEL_DS);
 
         toi_trace_index = 0;
+        toi_writing_incremental_image = 0;
 
 	if (hibernate_or_resume) {
     lock_system_sleep();
@@ -529,8 +531,16 @@ static void do_cleanup(int get_debug_info, int restarting)
 	    !test_result_state(TOI_ABORTED)) {
 		toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
 			"TuxOnIce: Not invalidating the image due "
-			"to Keep Image being enabled.");
+			"to Keep Image or Incremental Image being enabled.");
 		set_result_state(TOI_KEPT_IMAGE);
+
+                /*
+                 * For an incremental image, free unused storage so
+                 * swap (if any) can be used for normal system operation,
+                 * if so desired.
+                 */
+
+                toiActiveAllocator->free_unused_storage();
 	} else
 		if (toiActiveAllocator)
 			toiActiveAllocator->remove_image();
@@ -578,17 +588,22 @@ static void do_cleanup(int get_debug_info, int restarting)
  **/
 static int check_still_keeping_image(void)
 {
-	if (toi_keeping_image) {
-		printk(KERN_INFO "Image already stored: powering down "
-				"immediately.");
-		do_toi_step(STEP_HIBERNATE_POWERDOWN);
-		return 1;	/* Just in case we're using S3 */
-	}
+    if (toi_keeping_image) {
+        if (!test_action_state(TOI_INCREMENTAL_IMAGE)) {
+            printk(KERN_INFO "Image already stored: powering down "
+                    "immediately.");
+            do_toi_step(STEP_HIBERNATE_POWERDOWN);
+            return 1;
+        }
+        /* Incremental image - need to write new part */
+        toi_writing_incremental_image = 1;
+        return 0;
+    }
 
-	printk(KERN_INFO "Invalidating previous image.\n");
-	toiActiveAllocator->remove_image();
+    printk(KERN_INFO "Invalidating previous image.\n");
+    toiActiveAllocator->remove_image();
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -864,9 +879,10 @@ static int do_prepare_image(void)
 		return 1;
 
 	/*
-	 * If kept image and still keeping image and hibernating to RAM, we will
-	 * return 1 after hibernating and resuming (provided the power doesn't
-	 * run out. In that case, we skip directly to cleaning up and exiting.
+         * If kept image and still keeping image and hibernating to RAM, (non
+         * incremental image case) we will return 1 after hibernating and
+         * resuming (provided the power doesn't run out. In that case, we skip
+         * directly to cleaning up and exiting.
 	 */
 
 	if (!can_hibernate() ||
@@ -1332,6 +1348,8 @@ static struct toi_sysfs_data sysfs_params[] = {
 #ifdef CONFIG_TOI_INCREMENTAL
 	SYSFS_CUSTOM("pagestate", SYSFS_READONLY, get_toi_page_state, NULL, 0,
 			NULL),
+	SYSFS_BIT("incremental", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_INCREMENTAL_IMAGE, 1),
 #endif
 };
 

@@ -29,6 +29,7 @@
 #include <linux/sched.h>
 #include <asm/pgtable.h>
 #include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 #include <asm/page.h>
 #include "tuxonice_pageflags.h"
 #include "tuxonice_builtin.h"

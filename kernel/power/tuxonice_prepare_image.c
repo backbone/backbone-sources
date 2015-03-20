@@ -133,8 +133,12 @@ static void pageset2_full(void)
 				mapping = page_mapping(page);
 				if (!mapping || !mapping->host ||
 				    !(mapping->host->i_flags & S_ATOMIC_COPY)) {
+                                    if (PageTOI_RO(page) && test_result_state(TOI_KEPT_IMAGE)) {
+                                        TOI_TRACE_DEBUG(page_to_pfn(page), "_Pageset2 unmodified.");
+                                    } else {
                                         TOI_TRACE_DEBUG(page_to_pfn(page), "_Pageset2 pageset2_full.");
-					SetPagePageset2(page);
+                                        SetPagePageset2(page);
+                                    }
                                 }
 			}
 		}
@@ -182,6 +186,11 @@ static void toi_mark_task_as_pageset(struct task_struct *t, int pageset2)
 			if (mapping && mapping->host &&
 			    mapping->host->i_flags & S_ATOMIC_COPY && pageset2)
 				continue;
+
+                        if (PageTOI_RO(page) && test_result_state(TOI_KEPT_IMAGE)) {
+                                TOI_TRACE_DEBUG(page_to_pfn(page), "_Unmodified %d", pageset2 ? 1 : 2);
+                                continue;
+                        }
 
 			if (pageset2) {
                                 TOI_TRACE_DEBUG(page_to_pfn(page), "_MarkTaskAsPageset 1");
@@ -662,7 +671,7 @@ static void display_stats(int always, int sub_extra_pd1_allow)
  */
 static void flag_image_pages(int atomic_copy)
 {
-	int num_free = 0;
+	int num_free = 0, num_unmodified = 0;
 	unsigned long loop;
 	struct zone *zone;
 
@@ -728,6 +737,12 @@ static void flag_image_pages(int atomic_copy)
 				continue;
 			}
 
+                        if (PageTOI_RO(page) && test_result_state(TOI_KEPT_IMAGE)) {
+                            TOI_TRACE_DEBUG(pfn, "_Unmodified");
+                            num_unmodified++;
+                            continue;
+                        }
+
 			if (PagePageset2(page)) {
 				pagedir2.size++;
                                 TOI_TRACE_DEBUG(pfn, "_Flag PS2");
@@ -755,9 +770,9 @@ static void flag_image_pages(int atomic_copy)
 	if (!atomic_copy)
 		toi_message(TOI_EAT_MEMORY, TOI_MEDIUM, 0,
 			"Count data pages: Set1 (%d) + Set2 (%d) + Nosave (%ld)"
-						" + NumFree (%d) = %d.\n",
-			pagedir1.size, pagedir2.size, num_nosave, num_free,
-			pagedir1.size + pagedir2.size + num_nosave + num_free);
+				    " + Unmodified (%d) + NumFree (%d) = %d.\n",
+			pagedir1.size, pagedir2.size, num_nosave, num_unmodified,
+                        num_free, pagedir1.size + pagedir2.size + num_nosave + num_free);
 }
 
 void toi_recalculate_image_contents(int atomic_copy)
@@ -1040,6 +1055,9 @@ int toi_prepare_image(void)
 			!test_result_state(TOI_ABORTED));
 
 	result = image_not_ready(0);
+
+        /* TODO: Handle case where need to remove existing image and resave
+         * instead of adding to incremental image. */
 
 	if (!test_result_state(TOI_ABORTED)) {
 		if (result) {

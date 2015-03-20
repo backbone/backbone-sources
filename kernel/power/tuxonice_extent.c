@@ -27,10 +27,14 @@ static struct hibernate_extent *toi_get_extent(void)
 }
 
 /**
- * toi_put_extent_chain - free a whole chain of extents
+ * toi_put_extent_chain - free a chain of extents starting from value 'from'
  * @chain:	Chain to free.
+ *
+ * Note that 'from' is an extent value, and may be part way through an extent.
+ * In this case, the extent should be truncated (if necessary) and following
+ * extents freed.
  **/
-void toi_put_extent_chain(struct hibernate_extent_chain *chain)
+void toi_put_extent_chain_from(struct hibernate_extent_chain *chain, unsigned long from)
 {
 	struct hibernate_extent *this;
 
@@ -38,15 +42,35 @@ void toi_put_extent_chain(struct hibernate_extent_chain *chain)
 
 	while (this) {
 		struct hibernate_extent *next = this->next;
-		toi_kfree(2, this, sizeof(*this));
-		chain->num_extents--;
+
+                // Delete the whole extent?
+                if (this->start >= from) {
+                    chain->size -= (this->end - this->start + 1);
+                    if (chain->first == this)
+                        chain->first = next;
+                    if (chain->last_touched == this)
+                        chain->last_touched = NULL;
+                    if (chain->current_extent == this)
+                        chain->current_extent = NULL;
+                    toi_kfree(2, this, sizeof(*this));
+                    chain->num_extents--;
+                } else if (this->end >= from) {
+                    // Delete part of the extent
+                    chain->size -= (this->end - from + 1);
+                    this->start = from;
+                }
 		this = next;
 	}
+}
+EXPORT_SYMBOL_GPL(toi_put_extent_chain_from);
 
-	chain->first = NULL;
-	chain->last_touched = NULL;
-	chain->current_extent = NULL;
-	chain->size = 0;
+/**
+ * toi_put_extent_chain - free a whole chain of extents
+ * @chain:	Chain to free.
+ **/
+void toi_put_extent_chain(struct hibernate_extent_chain *chain)
+{
+    toi_put_extent_chain_from(chain, 0);
 }
 EXPORT_SYMBOL_GPL(toi_put_extent_chain);
 

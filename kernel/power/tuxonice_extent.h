@@ -41,4 +41,5 @@ if ((extent_chain)->first) \
 		 ((extentpointer) ? (extentpointer)->start : 0)) : \
 			(value)++))
 
+extern void toi_put_extent_chain_from(struct hibernate_extent_chain *chain, unsigned long from);
 #endif
