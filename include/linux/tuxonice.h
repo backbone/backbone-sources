@@ -16,6 +16,16 @@ static inline int toi_incremental_support(void)
 {
     return 1;
 }
+
+struct toi_cbw {
+    unsigned long pfn;
+    void *virt;
+};
+
+#define CBWS_PER_PAGE (PAGE_SIZE / sizeof(struct toi_cbw))
+
+extern struct toi_cbw **toi_first_cbw;
+extern int toi_next_cbw;
 #else
 #define toi_set_logbuf_untracked() do { } while(0)
 #define toi_make_writable(addr) (0)

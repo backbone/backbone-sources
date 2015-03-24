@@ -15,7 +15,7 @@
 #include "tuxonice_sysfs.h"
 #include "tuxonice.h"
 
-#define TOI_ALLOC_PATHS 40
+#define TOI_ALLOC_PATHS 41
 
 static DEFINE_MUTEX(toi_alloc_mutex);
 
@@ -70,7 +70,8 @@ static char *toi_alloc_desc[TOI_ALLOC_PATHS] = {
 	"cluster member",
 	"boot kernel data buffer",
 	"setting swap signature",
-	"block i/o bdev struct"
+	"block i/o bdev struct",
+        "copy before write", /* 40 */
 };
 
 #define MIGHT_FAIL(FAIL_NUM, FAIL_VAL) \

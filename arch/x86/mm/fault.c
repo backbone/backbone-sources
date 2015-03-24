@@ -912,6 +912,19 @@ mm_fault_error(struct pt_regs *regs, unsigned long error_code,
 
 #ifdef CONFIG_TOI_INCREMENTAL
 /**
+ * _toi_do_cbw - Do a copy-before-write before letting the faulting process continue
+ */
+static void _toi_do_cbw(struct page *page)
+{
+    if (!toi_first_cbw || !PageTOI_CBW(page))
+        return;
+
+    memcpy(toi_first_cbw[toi_next_cbw]->virt, page_address(page), PAGE_SIZE);
+    toi_first_cbw[toi_next_cbw]->pfn = page_to_pfn(page);
+    toi_next_cbw++;
+}
+
+/**
  * _toi_make_writable - Defuse TOI's write protection
  */
 int _toi_make_writable(pte_t *pte)
@@ -929,6 +942,10 @@ int _toi_make_writable(pte_t *pte)
         set_pte_atomic(pte, pte_mkwrite(*pte));
         SetPageTOI_Dirty(page);
         ClearPageTOI_RO(page);
+
+        if (PageTOI_CBW(page))
+            _toi_do_cbw(page);
+
         load_cr3(pgd);
         return 1;
     }

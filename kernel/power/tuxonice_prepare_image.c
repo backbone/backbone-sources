@@ -25,6 +25,7 @@
 #include <linux/hardirq.h>
 #include <linux/mmzone.h>
 #include <linux/console.h>
+#include <linux/tuxonice.h>
 
 #include "tuxonice_pageflags.h"
 #include "tuxonice_modules.h"
@@ -55,6 +56,49 @@ static struct attention_list *attention_list;
 
 #define PAGESET1 0
 #define PAGESET2 1
+
+struct toi_cbw **toi_first_cbw;
+int toi_next_cbw;
+
+/* Copy before write support */
+void toi_free_cbw_data(void)
+{
+    int i;
+
+    if (!toi_first_cbw)
+        return;
+
+    for (i = 0; i < CBWS_PER_PAGE; i++) {
+        if (toi_first_cbw[i]) {
+            toi_free_page(40, (unsigned long)toi_first_cbw[i]->virt);
+        }
+    }
+
+    toi_free_page(40, (unsigned long) toi_first_cbw);
+    toi_first_cbw = 0;
+}
+
+int toi_allocate_cbw_data(void)
+{
+    int i;
+
+    toi_first_cbw = (struct toi_cbw **) toi_get_zeroed_page(40, GFP_KERNEL);
+
+    if (!toi_first_cbw) {
+        return -ENOMEM;
+    }
+
+    for (i = 0; i < CBWS_PER_PAGE; i++) {
+        toi_first_cbw[i]->virt = (struct toi_cbw *) toi_alloc_page(40, GFP_KERNEL);
+
+        if (!toi_first_cbw[i]->virt) {
+            toi_free_cbw_data();
+            return -ENOMEM;
+        }
+    }
+
+    return 0;
+}
 
 void free_attention_list(void)
 {
