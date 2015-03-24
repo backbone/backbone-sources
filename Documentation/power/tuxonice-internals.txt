@@ -1,9 +1,13 @@
-		   TuxOnIce 3.0 Internal Documentation.
-			Updated to 26 March 2009
+		   TuxOnIce 4.0 Internal Documentation.
+			Updated to 23 March 2015
+
+(Please note that incremental image support mentioned in this document is work
+in progress. This document may need updating prior to the actual release of
+4.0!)
 
 1.  Introduction.
 
-    TuxOnIce 3.0 is an addition to the Linux Kernel, designed to
+    TuxOnIce 4.0 is an addition to the Linux Kernel, designed to
     allow the user to quickly shutdown and quickly boot a computer, without
     needing to close documents or programs. It is equivalent to the
     hibernate facility in some laptops. This implementation, however,
@@ -13,8 +17,8 @@
     prepared by Gabor Kuti and additional work by Pavel Machek and a
     host of others. This code has been substantially reworked by Nigel
     Cunningham, again with the help and testing of many others, not the
-    least of whom is Michael Frank. At its heart, however, the operation is
-    essentially the same as Gabor's version.
+    least of whom are Bernard Blackham and Michael Frank. At its heart,
+    however, the operation is essentially the same as Gabor's version.
 
 2.  Overview of operation.
 
@@ -46,7 +50,7 @@
     corruption. This would appear to imply a maximum image size of one half of
     the amount of RAM, but we have a solution... (again, below).
 
-    o In 2.6, we choose to play nicely with the other suspend-to-disk
+    o In 2.6 and later, we choose to play nicely with the other suspend-to-disk
     implementations.
 
 3.  Detailed description of internals.
@@ -56,24 +60,23 @@
     Safely quiescing the system is achieved using three separate but related
     aspects.
 
-    First, we note that the vast majority of processes don't need to run during
-    suspend. They can be 'frozen'. We therefore implement a refrigerator
-    routine, which processes enter and in which they remain until the cycle is
-    complete. Processes enter the refrigerator via try_to_freeze() invocations
-    at appropriate places.  A process cannot be frozen in any old place. It
-    must not be holding locks that will be needed for writing the image or
-    freezing other processes. For this reason, userspace processes generally
-    enter the refrigerator via the signal handling code, and kernel threads at
-    the place in their event loops where they drop locks and yield to other
-    processes or sleep.
-
-    The task of freezing processes is complicated by the fact that there can be
-    interdependencies between processes. Freezing process A before process B may
-    mean that process B cannot be frozen, because it stops at waiting for
-    process A rather than in the refrigerator. This issue is seen where
-    userspace waits on freezeable kernel threads or fuse filesystem threads. To
-    address this issue, we implement the following algorithm for quiescing
-    activity:
+    First, we use the vanilla kerne's support for freezing processes. This code
+    is based on the observation that the vast majority of processes don't need
+    to run during suspend. They can be 'frozen'. The kernel therefore
+    implements a refrigerator routine, which processes enter and in which they
+    remain until the cycle is complete. Processes enter the refrigerator via
+    try_to_freeze() invocations at appropriate places.  A process cannot be
+    frozen in any old place. It must not be holding locks that will be needed
+    for writing the image or freezing other processes. For this reason,
+    userspace processes generally enter the refrigerator via the signal
+    handling code, and kernel threads at the place in their event loops where
+    they drop locks and yield to other processes or sleep. The task of freezing
+    processes is complicated by the fact that there can be interdependencies
+    between processes. Freezing process A before process B may mean that
+    process B cannot be frozen, because it stops at waiting for process A
+    rather than in the refrigerator. This issue is seen where userspace waits
+    on freezeable kernel threads or fuse filesystem threads. To address this
+    issue, we implement the following algorithm for quiescing activity:
 
 	- Freeze filesystems (including fuse - userspace programs starting
 		new requests are immediately frozen; programs already running
@@ -95,10 +98,11 @@
     We have a number of constraints to meet in order to be able to successfully
     suspend and resume.
 
-    First, the image will be written in two parts, described below. One of these
-    parts needs to have an atomic copy made, which of course implies a maximum
-    size of one half of the amount of system memory. The other part ('pageset')
-    is not atomically copied, and can therefore be as large or small as desired.
+    First, the image will be written in two parts, described below. One of
+    these parts needs to have an atomic copy made, which of course implies a
+    maximum size of one half of the amount of system memory. The other part
+    ('pageset') is not atomically copied, and can therefore be as large or
+    small as desired.
 
     Second, we have constraints on the amount of storage available. In these
     calculations, we may also consider any compression that will be done. The
@@ -114,8 +118,9 @@
     are met, and seek to allocate the metadata for the image. If the constraints
     are not met, or we fail to allocate the required space for the metadata, we
     seek to free the amount of memory that we calculate is needed and try again.
-    We allow up to four iterations of this loop before aborting the cycle. If we
-    do fail, it should only be because of a bug in TuxOnIce's calculations.
+    We allow up to four iterations of this loop before aborting the cycle. If
+    we do fail, it should only be because of a bug in TuxOnIce's calculations
+    or the vanilla kernel code for freeing memory.
 
     These steps are merged together in the prepare_image function, found in
     prepare_image.c. The functions are merged because of the cyclical nature
@@ -187,7 +192,56 @@
     TuxOnIce might oops, we do our utmost to avoid syncing filesystems after
     copying pageset1.
 
-    e. Power down.
+    e. Incremental images
+
+    TuxOnIce 4.0 introduces a new incremental image mode which changes things a
+    little. When incremental images are enabled, we save a 'normal' image the
+    first time we hibernate. One resume however, we do not free the image or
+    the associated storage. Instead, it is retained until the next attempt at
+    hibernating and a mechanism is enabled which is used to track which pages
+    of memory are modified between the two cycles. The modified pages can then
+    be added to the existing image, rather than unmodified pages being saved
+    again unnecessarily.
+
+    Incremental image support is available in 64 bit Linux only, due to the
+    requirement for extra page flags.
+
+    This support is accomplished in the following way:
+
+    1) Tracking of pages.
+
+    The tracking of changed pages is accomplished using the page fault
+    mechanism. When we reach a point at which we want to start tracking
+    changes, most pages are marked read-only and also flagged as being
+    read-only because of this support. Since this cannot happen for every page
+    of RAM, some are marked as untracked and always treated as modified whn
+    preparing an incremental iamge. When a process attempts to modify a page
+    that is marked read-only in this way, a page fault occurs, with TuxOnIce
+    code marking the page writable and dirty before allowing the write to
+    continue. In this way, the effect of incremental images on performance is
+    minimised - a page only causes a fault once. Small modifications to the
+    page allocator further reduce the number of faults that occur - free pages
+    are not tracked; they are made writable and marked as dirty as part of
+    being allocated.
+
+    2) Saving the incremental image / atomicity.
+
+    The page fault mechanism is also used to improve the means by which
+    atomicity of the image is acheived. When it is time to do an atomic copy,
+    the flags for pages are reset, with the result being that it is no longer
+    necessary for us to do an atomic of pageset1. Instead, we normally write
+    the uncopied pages to disk. When an attempt is made to modify a page that
+    has not yet been saved, the page-fault mechanism makes a copy of the page
+    prior to allowing the write. This copy is then written to disk. Likewise,
+    on resume, if a process attempts to write to a page that has been read
+    while the rest of the image is still being loaded, a copy of that page is
+    made prior to the write being allowed. At the end of loading the image,
+    modified pages can thus be restored to their 'atomic copy' contents prior
+    to restarting normal operation. We also mark pages that are yet to be read
+    as invalid PFNs, so that we can capture as a bug any attempt by a
+    half-restored kernel to access a page that hasn't yet been reloaded.
+
+    f. Power down.
 
     Powering down uses standard kernel routines. TuxOnIce supports powering down
     using the ACPI S3, S4 and S5 methods or the kernel's non-ACPI power-off.
@@ -271,20 +325,21 @@
       struct extent *first, *last_touched;
     };
 
-    For each bdev, we need to store a little more info:
+    For each bdev, we need to store a little more info (simplified definition):
 
-    struct suspend_bdev_info {
+    struct toi_bdev_info {
        struct block_device *bdev;
+
+       char uuid[17];
        dev_t dev_t;
        int bmap_shift;
        int blocks_per_page;
     };
 
-    The dev_t is used to identify the device in the stored image. As a result,
-    we expect devices at resume time to have the same major and minor numbers
-    as they had while suspending.  This is primarily a concern where the user
-    utilises LVM for storage, as they will need to dmsetup their partitions in
-    such a way as to maintain this consistency at resume time.
+    The uuid is the main means used to identify the device in the storage
+    image. This means we can cope with the dev_t representation of a device
+    changing between saving the image and restoring it, as may happen on some
+    bioses or in the LVM case.
 
     bmap_shift and blocks_per_page apply the effects of variations in blocks
     per page settings for the filesystem and underlying bdev. For most
