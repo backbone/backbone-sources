@@ -721,7 +721,6 @@ swp_entry_t get_swap_page_of_type(int type)
 	spin_unlock(&si->lock);
 	return (swp_entry_t) {0};
 }
-EXPORT_SYMBOL_GPL(get_swap_page_of_type);
 
 static unsigned int find_next_to_unuse(struct swap_info_struct *si,
 					unsigned int prev, bool frontswap);
@@ -776,7 +775,6 @@ void get_swap_range_of_type(int type, swp_entry_t *start, swp_entry_t *end,
 	}
 	spin_unlock(&si->lock);
 }
-EXPORT_SYMBOL_GPL(get_swap_range_of_type);
 
 static struct swap_info_struct *swap_info_get(swp_entry_t entry)
 {
@@ -909,7 +907,6 @@ void swapcache_free(swp_entry_t entry)
 		spin_unlock(&p->lock);
 	}
 }
-EXPORT_SYMBOL_GPL(swap_free);
 
 /*
  * How many references to page are currently swapped out?
@@ -1660,7 +1657,6 @@ sector_t map_swap_entry(swp_entry_t entry, struct block_device **bdev)
 		BUG_ON(se == start_se);		/* It *must* be present */
 	}
 }
-EXPORT_SYMBOL_GPL(map_swap_entry);
 
 /*
  * Returns the page offset into bdev for the specified page's swap entry.
@@ -2011,7 +2007,6 @@ out:
 	putname(pathname);
 	return err;
 }
-EXPORT_SYMBOL_GPL(sys_swapoff);
 
 #ifdef CONFIG_PROC_FS
 static unsigned swaps_poll(struct file *file, poll_table *wait)
@@ -2619,7 +2614,6 @@ out:
 		mutex_unlock(&inode->i_mutex);
 	return error;
 }
-EXPORT_SYMBOL_GPL(sys_swapon);
 
 void si_swapinfo(struct sysinfo *val)
 {
@@ -2637,7 +2631,6 @@ void si_swapinfo(struct sysinfo *val)
 	val->totalswap = total_swap_pages + nr_to_be_unused;
 	spin_unlock(&swap_lock);
 }
-EXPORT_SYMBOL_GPL(si_swapinfo);
 
 /*
  * Verify that a swap entry is valid and increment its swap map count.
@@ -2789,7 +2782,6 @@ struct swap_info_struct *get_swap_info_struct(unsigned type)
 {
 	return swap_info[type];
 }
-EXPORT_SYMBOL_GPL(get_swap_info_struct);
 
 /*
  * add_swap_count_continuation - called when a swap count is duplicated

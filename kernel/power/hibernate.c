@@ -40,7 +40,6 @@ static int nohibernate;
 static int resume_wait;
 static unsigned int resume_delay;
 char resume_file[256] = CONFIG_PM_STD_PARTITION;
-EXPORT_SYMBOL_GPL(resume_file);
 dev_t swsusp_resume_device;
 sector_t swsusp_resume_block;
 __visible int in_suspend __nosavedata;
@@ -129,7 +128,6 @@ int platform_begin(int platform_mode)
 	return (platform_mode && hibernation_ops) ?
 		hibernation_ops->begin() : 0;
 }
-EXPORT_SYMBOL_GPL(platform_begin);
 
 /**
  * platform_end - Call platform to finish transition to the working state.
@@ -140,7 +138,6 @@ void platform_end(int platform_mode)
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->end();
 }
-EXPORT_SYMBOL_GPL(platform_end);
 
 /**
  * platform_pre_snapshot - Call platform to prepare the machine for hibernation.
@@ -155,7 +152,6 @@ int platform_pre_snapshot(int platform_mode)
 	return (platform_mode && hibernation_ops) ?
 		hibernation_ops->pre_snapshot() : 0;
 }
-EXPORT_SYMBOL_GPL(platform_pre_snapshot);
 
 /**
  * platform_leave - Call platform to prepare a transition to the working state.
@@ -171,7 +167,6 @@ void platform_leave(int platform_mode)
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->leave();
 }
-EXPORT_SYMBOL_GPL(platform_leave);
 
 /**
  * platform_finish - Call platform to switch the system to the working state.
@@ -187,7 +182,6 @@ void platform_finish(int platform_mode)
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->finish();
 }
-EXPORT_SYMBOL_GPL(platform_finish);
 
 /**
  * platform_pre_restore - Prepare for hibernate image restoration.
@@ -204,7 +198,6 @@ int platform_pre_restore(int platform_mode)
 	return (platform_mode && hibernation_ops) ?
 		hibernation_ops->pre_restore() : 0;
 }
-EXPORT_SYMBOL_GPL(platform_pre_restore);
 
 /**
  * platform_restore_cleanup - Switch to the working state after failing restore.
@@ -222,7 +215,6 @@ void platform_restore_cleanup(int platform_mode)
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->restore_cleanup();
 }
-EXPORT_SYMBOL_GPL(platform_restore_cleanup);
 
 /**
  * platform_recover - Recover from a failure to suspend devices.
@@ -233,7 +225,6 @@ void platform_recover(int platform_mode)
 	if (platform_mode && hibernation_ops && hibernation_ops->recover)
 		hibernation_ops->recover();
 }
-EXPORT_SYMBOL_GPL(platform_recover);
 
 /**
  * swsusp_show_speed - Print time elapsed between two events during hibernation.
@@ -594,7 +585,6 @@ int hibernation_platform_enter(void)
 
 	return error;
 }
-EXPORT_SYMBOL_GPL(hibernation_platform_enter);
 
 /**
  * power_down - Shut the machine down for hibernation.

@@ -6,6 +6,7 @@
  */
 
 #include <linux/suspend.h>
+#include <linux/module.h>
 #include "tuxonice.h"
 #include "tuxonice_modules.h"
 #include "tuxonice_sysfs.h"
@@ -15,10 +16,8 @@ LIST_HEAD(toi_filters);
 LIST_HEAD(toiAllocators);
 
 LIST_HEAD(toi_modules);
-EXPORT_SYMBOL_GPL(toi_modules);
 
 struct toi_module_ops *toiActiveAllocator;
-EXPORT_SYMBOL_GPL(toiActiveAllocator);
 
 static int toi_num_filters;
 int toiNumAllocators, toi_num_modules;
@@ -83,7 +82,6 @@ void print_toi_header_storage_for_modules(void)
 	printk(KERN_DEBUG "                     %zu\n",
 			bytes + sizeof(struct toi_module_header));
 }
-EXPORT_SYMBOL_GPL(print_toi_header_storage_for_modules);
 
 /*
  * toi_memory_for_modules
@@ -286,7 +284,6 @@ int toi_register_module(struct toi_module_ops *module)
 	}
 	return 0;
 }
-EXPORT_SYMBOL_GPL(toi_register_module);
 
 /*
  * toi_unregister_module
@@ -332,7 +329,6 @@ void toi_unregister_module(struct toi_module_ops *module)
 	list_del(&module->module_list);
 	toi_num_modules--;
 }
-EXPORT_SYMBOL_GPL(toi_unregister_module);
 
 /*
  * toi_move_module_tail
@@ -460,7 +456,6 @@ struct toi_module_ops *toi_get_next_filter(struct toi_module_ops *filter_sought)
 
 	return toiActiveAllocator;
 }
-EXPORT_SYMBOL_GPL(toi_get_next_filter);
 
 /**
  * toi_show_modules: Printk what support is loaded.

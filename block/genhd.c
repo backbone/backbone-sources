@@ -1413,7 +1413,6 @@ dev_t blk_lookup_fs_info(struct fs_info *seek)
 	class_dev_iter_exit(&iter);
 	return devt;
 }
-EXPORT_SYMBOL_GPL(blk_lookup_fs_info);
 
 /* Caller uses NULL, key to start. For each match found, we return a bdev on
  * which we have done blkdev_get, and we do the blkdev_put on block devices
@@ -1465,7 +1464,6 @@ out:
 		blkdev_put(last, FMODE_READ);
 	return next;
 }
-EXPORT_SYMBOL_GPL(next_bdev_of_type);
 
 /*
  * Disk events - monitor disk events like media change and eject request.

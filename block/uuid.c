@@ -360,7 +360,6 @@ void free_fs_info(struct fs_info *fs_info)
 
 	kfree(fs_info);
 }
-EXPORT_SYMBOL_GPL(free_fs_info);
 
 struct fs_info *fs_info_from_block_dev(struct block_device *bdev)
 {
@@ -496,7 +495,6 @@ no_uuid:
 
 	return fs_info;
 }
-EXPORT_SYMBOL_GPL(fs_info_from_block_dev);
 
 static int __init uuid_debug_setup(char *str)
 {

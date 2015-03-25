@@ -403,17 +403,4 @@ static __init int toi_prune_load(void)
 	return toi_register_module(&toi_prune_ops);
 }
 
-#ifdef MODULE
-static __exit void toi_prune_unload(void)
-{
-	toi_unregister_module(&toi_prune_ops);
-}
-
-module_init(toi_prune_load);
-module_exit(toi_prune_unload);
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Nigel Cunningham");
-MODULE_DESCRIPTION("Image Pruning Support for TuxOnIce");
-#else
 late_initcall(toi_prune_load);
-#endif

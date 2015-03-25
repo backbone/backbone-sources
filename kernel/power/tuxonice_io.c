@@ -22,6 +22,7 @@
 #include <linux/fs_struct.h>
 #include <linux/bio.h>
 #include <linux/fs_uuid.h>
+#include <linux/kmod.h>
 #include <asm/tlbflush.h>
 
 #include "tuxonice.h"
@@ -60,15 +61,12 @@ static DEFINE_PER_CPU(char *, checksum_locn);
 static DEFINE_PER_CPU(struct pbe *, last_low_page);
 static atomic_t io_count;
 atomic_t toi_io_workers;
-EXPORT_SYMBOL_GPL(toi_io_workers);
 
 static int using_flusher;
 
 DECLARE_WAIT_QUEUE_HEAD(toi_io_queue_flusher);
-EXPORT_SYMBOL_GPL(toi_io_queue_flusher);
 
 int toi_bio_queue_flusher_should_finish;
-EXPORT_SYMBOL_GPL(toi_bio_queue_flusher_should_finish);
 
 int toi_max_workers;
 
@@ -151,7 +149,6 @@ cleanup:
 	toi_deactivate_storage(0);
 	return returning;
 }
-EXPORT_SYMBOL_GPL(toi_attempt_to_parse_resume_device);
 
 void attempt_to_parse_resume_device2(void)
 {
@@ -159,7 +156,6 @@ void attempt_to_parse_resume_device2(void)
 	toi_attempt_to_parse_resume_device(0);
 	toi_cleanup_usm();
 }
-EXPORT_SYMBOL_GPL(attempt_to_parse_resume_device2);
 
 void save_restore_alt_param(int replace, int quiet)
 {

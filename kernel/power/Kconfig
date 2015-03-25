@@ -92,7 +92,7 @@ config PM_STD_PARTITION
 	  device.
 
 menuconfig TOI_CORE
-	tristate "Enhanced Hibernation (TuxOnIce)"
+	bool "Enhanced Hibernation (TuxOnIce)"
 	depends on HIBERNATION
 	default y
 	---help---
@@ -105,7 +105,7 @@ menuconfig TOI_CORE
 		depends on TOI_CORE
 
 	config TOI_FILE
-		tristate "File Allocator"
+		bool "File Allocator"
 		depends on TOI_CORE
 		default y
 		---help---
@@ -115,7 +115,7 @@ menuconfig TOI_CORE
 		  space to store an image.
 
 	config TOI_SWAP
-		tristate "Swap Allocator"
+		bool "Swap Allocator"
 		depends on TOI_CORE && SWAP
 		default y
 		---help---
@@ -126,7 +126,7 @@ menuconfig TOI_CORE
 		depends on TOI_CORE
 
 	config TOI_PRUNE
-		tristate "Image pruning support"
+		bool "Image pruning support"
 		depends on TOI_CORE && CRYPTO && BROKEN
 		default y
 		---help---
@@ -142,7 +142,7 @@ menuconfig TOI_CORE
 		depends on TOI_CORE && !CRYPTO
 
 	config TOI_CRYPTO
-		tristate "Compression support"
+		bool "Compression support"
 		depends on TOI_CORE && CRYPTO
 		default y
 		---help---
@@ -157,7 +157,7 @@ menuconfig TOI_CORE
 		depends on TOI_CORE && !CRYPTO
 
 	config TOI_USERUI
-		tristate "Userspace User Interface support"
+		bool "Userspace User Interface support"
 		depends on TOI_CORE && NET && (VT || SERIAL_CONSOLE)
 		default y
 		---help---
@@ -257,7 +257,7 @@ menuconfig TOI_CORE
 		  run anyway.
 
 	menuconfig TOI_CLUSTER
-		tristate "Cluster support"
+		bool "Cluster support"
 		default n
 		depends on TOI_CORE && NET && BROKEN
 		---help---

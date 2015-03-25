@@ -68,6 +68,7 @@
  */
 
 #include <linux/suspend.h>
+#include <linux/module.h>
 #include <linux/freezer.h>
 #include <generated/utsrelease.h>
 #include <linux/cpu.h>
@@ -93,7 +94,6 @@
 
 /*! Pageset metadata. */
 struct pagedir pagedir2 = {2};
-EXPORT_SYMBOL_GPL(pagedir2);
 
 static mm_segment_t oldfs;
 static DEFINE_MUTEX(tuxonice_in_use);
@@ -104,7 +104,6 @@ int toi_writing_incremental_image;
 
 /* Binary signature if an image is present */
 char tuxonice_signature[9] = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
-EXPORT_SYMBOL_GPL(tuxonice_signature);
 
 unsigned long boot_kernel_data_buffer;
 
@@ -922,7 +921,6 @@ int do_check_can_resume(void)
 	toi_deactivate_storage(0);
 	return result;
 }
-EXPORT_SYMBOL_GPL(do_check_can_resume);
 
 /**
  * do_load_atomic_copy - load the first part of an image, if it exists
@@ -1067,7 +1065,6 @@ out:
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(do_toi_step);
 
 /* -- Functions for kickstarting a hibernate or resume --- */
 
@@ -1405,32 +1402,4 @@ static __init int core_load(void)
 	return 0;
 }
 
-#ifdef MODULE
-/**
- * core_unload: Prepare to unload the core code.
- **/
-static __exit void core_unload(void)
-{
-	int i,
-	    numfiles = sizeof(sysfs_params) / sizeof(struct toi_sysfs_data);
-
-	toi_alloc_exit();
-	toi_checksum_exit();
-	toi_poweroff_exit();
-	toi_ui_exit();
-	toi_usm_exit();
-	toi_cluster_exit();
-
-	for (i = 0; i < numfiles; i++)
-		toi_unregister_sysfs_file(tuxonice_kobj, &sysfs_params[i]);
-
-	toi_core_fns = NULL;
-
-	toi_sysfs_exit();
-}
-MODULE_LICENSE("GPL");
-module_init(core_load);
-module_exit(core_unload);
-#else
 late_initcall(core_load);
-#endif

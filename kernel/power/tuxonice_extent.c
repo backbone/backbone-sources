@@ -62,7 +62,6 @@ void toi_put_extent_chain_from(struct hibernate_extent_chain *chain, unsigned lo
 		this = next;
 	}
 }
-EXPORT_SYMBOL_GPL(toi_put_extent_chain_from);
 
 /**
  * toi_put_extent_chain - free a whole chain of extents
@@ -72,7 +71,6 @@ void toi_put_extent_chain(struct hibernate_extent_chain *chain)
 {
     toi_put_extent_chain_from(chain, 0);
 }
-EXPORT_SYMBOL_GPL(toi_put_extent_chain);
 
 /**
  * toi_add_to_extent_chain - add an extent to an existing chain
@@ -144,4 +142,3 @@ int toi_add_to_extent_chain(struct hibernate_extent_chain *chain,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(toi_add_to_extent_chain);

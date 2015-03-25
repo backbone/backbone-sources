@@ -49,7 +49,6 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(block_unplug);
 DEFINE_IDA(blk_queue_ida);
 
 int trap_non_toi_io;
-EXPORT_SYMBOL_GPL(trap_non_toi_io);
 
 /*
  * For the allocated request tables

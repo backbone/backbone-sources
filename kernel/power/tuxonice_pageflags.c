@@ -9,8 +9,6 @@
  * store our image metadata.
  */
 
-#include <linux/list.h>
-#include <linux/module.h>
 #include "tuxonice_pageflags.h"
 #include "power.h"
 
@@ -18,4 +16,3 @@ int toi_pageflags_space_needed(void)
 {
 	return memory_bm_space_needed(pageset1_map);
 }
-EXPORT_SYMBOL_GPL(toi_pageflags_space_needed);

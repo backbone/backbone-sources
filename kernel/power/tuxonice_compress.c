@@ -449,17 +449,4 @@ static __init int toi_compress_load(void)
 	return toi_register_module(&toi_compression_ops);
 }
 
-#ifdef MODULE
-static __exit void toi_compress_unload(void)
-{
-	toi_unregister_module(&toi_compression_ops);
-}
-
-module_init(toi_compress_load);
-module_exit(toi_compress_unload);
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Nigel Cunningham");
-MODULE_DESCRIPTION("Compression Support for TuxOnIce");
-#else
 late_initcall(toi_compress_load);
-#endif

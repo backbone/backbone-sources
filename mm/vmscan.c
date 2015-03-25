@@ -3522,13 +3522,11 @@ unsigned long shrink_memory_mask(unsigned long nr_to_reclaim, gfp_t mask)
 
 	return nr_reclaimed;
 }
-EXPORT_SYMBOL_GPL(shrink_memory_mask);
 
 unsigned long shrink_all_memory(unsigned long nr_to_reclaim)
 {
 	return shrink_memory_mask(nr_to_reclaim, GFP_HIGHUSER_MOVABLE);
 }
-EXPORT_SYMBOL_GPL(shrink_all_memory);
 #endif /* CONFIG_HIBERNATION */
 
 /* It's optimal to keep kswapds on the same CPUs as their memory, but

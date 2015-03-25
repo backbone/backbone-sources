@@ -430,7 +430,6 @@ unsigned long real_nr_free_pages(unsigned long zone_idx_mask)
 	}
 	return result;
 }
-EXPORT_SYMBOL_GPL(real_nr_free_pages);
 
 /*
  * Discover how much extra memory will be required by the drivers
@@ -479,7 +478,6 @@ unsigned long get_header_storage_needed(void)
 
 	return DIV_ROUND_UP(bytes, PAGE_SIZE);
 }
-EXPORT_SYMBOL_GPL(get_header_storage_needed);
 
 /*
  * When freeing memory, pages from either pageset might be freed.
@@ -853,7 +851,6 @@ int try_allocate_extra_memory(void)
 	}
 	return 0;
 }
-
 
 /* update_image
  *

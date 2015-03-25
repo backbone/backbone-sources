@@ -655,22 +655,4 @@ static __init int toi_user_ui_init(void)
 	return result;
 }
 
-#ifdef MODULE
-/**
- * toi_user_ui_ext - Cleanup code for if the core is unloaded.
- */
-static __exit void toi_user_ui_exit(void)
-{
-	toi_netlink_close_complete(&ui_helper_data);
-	toi_remove_ui_ops(&my_ui_ops);
-	toi_unregister_module(&userui_ops);
-}
-
-module_init(toi_user_ui_init);
-module_exit(toi_user_ui_exit);
-MODULE_AUTHOR("Nigel Cunningham");
-MODULE_DESCRIPTION("TuxOnIce Userui Support");
-MODULE_LICENSE("GPL");
-#else
 late_initcall(toi_user_ui_init);
-#endif

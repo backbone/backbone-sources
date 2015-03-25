@@ -481,17 +481,4 @@ static __init int toi_file_load(void)
 	return toi_register_module(&toi_fileops);
 }
 
-#ifdef MODULE
-static __exit void toi_file_unload(void)
-{
-	toi_unregister_module(&toi_fileops);
-}
-
-module_init(toi_file_load);
-module_exit(toi_file_unload);
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Nigel Cunningham");
-MODULE_DESCRIPTION("TuxOnIce FileAllocator");
-#else
 late_initcall(toi_file_load);
-#endif

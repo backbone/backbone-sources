@@ -62,7 +62,6 @@ int console_printk[4] = {
 	CONSOLE_LOGLEVEL_MIN,		/* minimum_console_loglevel */
 	CONSOLE_LOGLEVEL_DEFAULT,	/* default_console_loglevel */
 };
-EXPORT_SYMBOL_GPL(console_printk);
 
 /*
  * Low level drivers may need that to know if they can schedule in
@@ -2079,7 +2078,6 @@ void suspend_console(void)
 	console_suspended = 1;
 	up_console_sem();
 }
-EXPORT_SYMBOL_GPL(suspend_console);
 
 void resume_console(void)
 {
@@ -2089,7 +2087,6 @@ void resume_console(void)
 	console_suspended = 0;
 	console_unlock();
 }
-EXPORT_SYMBOL_GPL(resume_console);
 
 /**
  * console_cpu_notify - print deferred console messages after CPU hotplug

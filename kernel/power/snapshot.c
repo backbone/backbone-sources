@@ -2665,7 +2665,6 @@ struct memory_bitmap *pageset1_map, *pageset2_map, *free_map, *nosave_map,
   *pageset1_copy_map, *io_map, *page_resave_map, *compare_map;
 
 int resume_attempted;
-EXPORT_SYMBOL_GPL(resume_attempted);
 
 int memory_bm_write(struct memory_bitmap *bm, int (*rw_chunk)
 	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size))

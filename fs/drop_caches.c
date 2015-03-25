@@ -43,7 +43,6 @@ void drop_pagecache(void)
 {
 	iterate_supers(drop_pagecache_sb, NULL);
 }
-EXPORT_SYMBOL_GPL(drop_pagecache);
 
 int drop_caches_sysctl_handler(struct ctl_table *table, int write,
 	void __user *buffer, size_t *length, loff_t *ppos)

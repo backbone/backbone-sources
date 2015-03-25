@@ -31,7 +31,6 @@
 #include "tuxonice_alloc.h"
 
 unsigned long toi_bootflags_mask;
-EXPORT_SYMBOL_GPL(toi_bootflags_mask);
 
 /*
  * Highmem related functions (x86 only).
@@ -170,7 +169,6 @@ out_close:
 
 	return key;
 }
-EXPORT_SYMBOL_GPL(toi_wait_for_keypress_dev_console);
 
 struct toi_boot_kernel_data toi_bkd __nosavedata
 		__attribute__((aligned(PAGE_SIZE))) = {
@@ -182,7 +180,6 @@ struct toi_boot_kernel_data toi_bkd __nosavedata
 	(1 << TOI_NO_FLUSHER_THREAD) |
 	(1 << TOI_PAGESET2_FULL),
 };
-EXPORT_SYMBOL_GPL(toi_bkd);
 
 struct block_device *toi_open_by_devnum(dev_t dev)
 {
@@ -192,7 +189,6 @@ struct block_device *toi_open_by_devnum(dev_t dev)
 		err = blkdev_get(bdev, FMODE_READ | FMODE_NDELAY, NULL);
 	return err ? ERR_PTR(err) : bdev;
 }
-EXPORT_SYMBOL_GPL(toi_open_by_devnum);
 
 /**
  * toi_close_bdev: Close a swap bdev.
@@ -203,25 +199,13 @@ void toi_close_bdev(struct block_device *bdev)
 {
 	blkdev_put(bdev, FMODE_READ | FMODE_NDELAY);
 }
-EXPORT_SYMBOL_GPL(toi_close_bdev);
 
 int toi_wait = CONFIG_TOI_DEFAULT_WAIT;
-EXPORT_SYMBOL_GPL(toi_wait);
-
 struct toi_core_fns *toi_core_fns;
-EXPORT_SYMBOL_GPL(toi_core_fns);
-
 unsigned long toi_result;
-EXPORT_SYMBOL_GPL(toi_result);
-
 struct pagedir pagedir1 = {1};
-EXPORT_SYMBOL_GPL(pagedir1);
-
 struct toi_cbw **toi_first_cbw;
-EXPORT_SYMBOL_GPL(toi_first_cbw);
-
 int toi_next_cbw;
-EXPORT_SYMBOL_GPL(toi_next_cbw);
 
 unsigned long toi_get_nonconflicting_page(void)
 {
@@ -249,7 +233,6 @@ static int ignore_late_initcall;
 #endif
 
 int toi_translate_err_default = TOI_CONTINUE_REQ;
-EXPORT_SYMBOL_GPL(toi_translate_err_default);
 
 void try_tuxonice_resume(void)
 {
@@ -289,62 +272,45 @@ int toi_lowlevel_builtin(void)
 	restore_processor_state();
 	return error;
 }
-EXPORT_SYMBOL_GPL(toi_lowlevel_builtin);
 
 unsigned long toi_compress_bytes_in;
-EXPORT_SYMBOL_GPL(toi_compress_bytes_in);
-
 unsigned long toi_compress_bytes_out;
-EXPORT_SYMBOL_GPL(toi_compress_bytes_out);
 
 int toi_in_suspend(void)
 {
   return in_suspend;
 }
-EXPORT_SYMBOL_GPL(toi_in_suspend);
 
 unsigned long toi_state = ((1 << TOI_BOOT_TIME) |
 		(1 << TOI_IGNORE_LOGLEVEL) |
 		(1 << TOI_IO_STOPPED));
-EXPORT_SYMBOL_GPL(toi_state);
 
 /* The number of hibernates we have started (some may have been cancelled) */
 unsigned int nr_hibernates;
-EXPORT_SYMBOL_GPL(nr_hibernates);
-
 int toi_running;
-EXPORT_SYMBOL_GPL(toi_running);
-
 __nosavedata int toi_in_hibernate;
-EXPORT_SYMBOL_GPL(toi_in_hibernate);
-
 __nosavedata struct pbe *restore_highmem_pblist;
-EXPORT_SYMBOL_GPL(restore_highmem_pblist);
 
 int toi_trace_allocs;
-EXPORT_SYMBOL_GPL(toi_trace_allocs);
 
 void toi_read_lock_tasklist(void)
 {
 	read_lock(&tasklist_lock);
 }
-EXPORT_SYMBOL_GPL(toi_read_lock_tasklist);
 
 void toi_read_unlock_tasklist(void)
 {
 	read_unlock(&tasklist_lock);
 }
-EXPORT_SYMBOL_GPL(toi_read_unlock_tasklist);
 
 #ifdef CONFIG_TOI_ZRAM_SUPPORT
 int (*toi_flag_zram_disks) (void);
-EXPORT_SYMBOL_GPL(toi_flag_zram_disks);
 
 int toi_do_flag_zram_disks(void)
 {
 	return toi_flag_zram_disks ? (*toi_flag_zram_disks)() : 0;
 }
-EXPORT_SYMBOL_GPL(toi_do_flag_zram_disks);
+
 #endif
 
 /* toi_generate_free_page_map
@@ -408,7 +374,6 @@ void toi_generate_free_page_map(void)
 		spin_unlock_irqrestore(&zone->lock, flags);
 	}
 }
-EXPORT_SYMBOL_GPL(toi_generate_free_page_map);
 
 /* toi_size_of_free_region
  *
@@ -425,7 +390,6 @@ int toi_size_of_free_region(struct zone *zone, unsigned long start_pfn)
 
 	return this_pfn - start_pfn;
 }
-EXPORT_SYMBOL(toi_size_of_free_region);
 
 static int __init toi_wait_setup(char *str)
 {
@@ -441,7 +405,6 @@ static int __init toi_wait_setup(char *str)
 
 	return 1;
 }
-
 __setup("toi_wait", toi_wait_setup);
 
 static int __init toi_translate_retry_setup(char *str)
@@ -449,7 +412,6 @@ static int __init toi_translate_retry_setup(char *str)
 	toi_translate_err_default = 0;
 	return 1;
 }
-
 __setup("toi_translate_retry", toi_translate_retry_setup);
 
 static int __init toi_debug_setup(char *str)
@@ -460,7 +422,6 @@ static int __init toi_debug_setup(char *str)
 	toi_bkd.toi_default_console_level = 7;
 	return 1;
 }
-
 __setup("toi_debug_setup", toi_debug_setup);
 
 static int __init toi_pause_setup(char *str)
@@ -469,7 +430,6 @@ static int __init toi_pause_setup(char *str)
 	toi_bootflags_mask |= (1 << TOI_PAUSE);
 	return 1;
 }
-
 __setup("toi_pause", toi_pause_setup);
 
 #ifdef CONFIG_PM_DEBUG
@@ -494,7 +454,6 @@ static int __init toi_ignore_late_initcall_setup(char *str)
 
 	return 1;
 }
-
 __setup("toi_initramfs_resume_only", toi_ignore_late_initcall_setup);
 
 static int __init toi_force_no_multithreaded_setup(char *str)
@@ -509,7 +468,6 @@ static int __init toi_force_no_multithreaded_setup(char *str)
 
 	return 1;
 }
-
 __setup("toi_no_multithreaded", toi_force_no_multithreaded_setup);
 
 #ifdef CONFIG_KGDB
@@ -524,7 +482,6 @@ static int __init toi_post_resume_breakpoint_setup(char *str)
 
 	return 1;
 }
-
 __setup("toi_post_resume_break", toi_post_resume_breakpoint_setup);
 #endif
 
@@ -539,5 +496,4 @@ static int __init toi_disable_readahead_setup(char *str)
 
 	return 1;
 }
-
 __setup("toi_no_readahead", toi_disable_readahead_setup);

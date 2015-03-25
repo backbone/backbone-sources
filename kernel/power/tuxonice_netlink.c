@@ -8,9 +8,9 @@
  * Functions for communicating with a userspace helper via netlink.
  */
 
-
 #include <linux/suspend.h>
 #include <linux/sched.h>
+#include <linux/kmod.h>
 #include "tuxonice_netlink.h"
 #include "tuxonice.h"
 #include "tuxonice_modules.h"
@@ -104,7 +104,6 @@ void toi_send_netlink_message(struct user_helper_data *uhd,
 
 	yield();
 }
-EXPORT_SYMBOL_GPL(toi_send_netlink_message);
 
 static void send_whether_debugging(struct user_helper_data *uhd)
 {
@@ -179,7 +178,6 @@ void toi_netlink_close_complete(struct user_helper_data *uhd)
 
 	uhd->pid = -1;
 }
-EXPORT_SYMBOL_GPL(toi_netlink_close_complete);
 
 static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
 		struct sk_buff *skb, struct nlmsghdr *nlh)
@@ -295,8 +293,6 @@ void toi_netlink_close(struct user_helper_data *uhd)
 
 	toi_send_netlink_message(uhd, NETLINK_MSG_CLEANUP, NULL, 0);
 }
-EXPORT_SYMBOL_GPL(toi_netlink_close);
-
 int toi_netlink_setup(struct user_helper_data *uhd)
 {
 	/* In case userui didn't cleanup properly on us */
@@ -326,4 +322,3 @@ int toi_netlink_setup(struct user_helper_data *uhd)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(toi_netlink_setup);

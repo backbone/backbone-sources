@@ -471,17 +471,4 @@ static __init int toi_swap_load(void)
 	return toi_register_module(&toi_swapops);
 }
 
-#ifdef MODULE
-static __exit void toi_swap_unload(void)
-{
-	toi_unregister_module(&toi_swapops);
-}
-
-module_init(toi_swap_load);
-module_exit(toi_swap_unload);
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Nigel Cunningham");
-MODULE_DESCRIPTION("TuxOnIce SwapAllocator");
-#else
 late_initcall(toi_swap_load);
-#endif

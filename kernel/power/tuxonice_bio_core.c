@@ -404,7 +404,6 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 			max_outstanding_reads = cur_outstanding_io;
 	}
 
-
 	/* Still read the header! */
 	if (unlikely(test_action_state(TOI_TEST_BIO) && writing)) {
 		/* Fake having done the hard work */
@@ -1792,7 +1791,6 @@ struct toi_bio_ops toi_bio_ops = {
 	.register_storage = toi_register_storage_chain,
 	.free_storage = toi_bio_release_storage,
 };
-EXPORT_SYMBOL_GPL(toi_bio_ops);
 
 static struct toi_sysfs_data sysfs_params[] = {
 	SYSFS_INT("target_outstanding_io", SYSFS_RW, &target_outstanding_io,
@@ -1854,17 +1852,4 @@ static __init int toi_block_io_load(void)
 	return toi_register_module(&toi_blockwriter_ops);
 }
 
-#ifdef MODULE
-static __exit void toi_block_io_unload(void)
-{
-	toi_unregister_module(&toi_blockwriter_ops);
-}
-
-module_init(toi_block_io_load);
-module_exit(toi_block_io_unload);
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Nigel Cunningham");
-MODULE_DESCRIPTION("TuxOnIce block io functions");
-#else
 late_initcall(toi_block_io_load);
-#endif
