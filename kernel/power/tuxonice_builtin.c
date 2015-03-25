@@ -217,6 +217,12 @@ EXPORT_SYMBOL_GPL(toi_result);
 struct pagedir pagedir1 = {1};
 EXPORT_SYMBOL_GPL(pagedir1);
 
+struct toi_cbw **toi_first_cbw;
+EXPORT_SYMBOL_GPL(toi_first_cbw);
+
+int toi_next_cbw;
+EXPORT_SYMBOL_GPL(toi_next_cbw);
+
 unsigned long toi_get_nonconflicting_page(void)
 {
 	return toi_core_fns->get_nonconflicting_page();

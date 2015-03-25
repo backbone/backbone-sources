@@ -57,9 +57,6 @@ static struct attention_list *attention_list;
 #define PAGESET1 0
 #define PAGESET2 1
 
-struct toi_cbw **toi_first_cbw;
-int toi_next_cbw;
-
 /* Copy before write support */
 void toi_free_cbw_data(void)
 {
