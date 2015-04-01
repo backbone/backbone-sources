@@ -994,7 +994,6 @@ int toi_make_writable(unsigned long address)
 
     return _toi_make_writable(pte);
 }
-NOKPROBE_SYMBOL(toi_make_writable);
 #endif
 
 static int spurious_fault_check(unsigned long error_code, pte_t *pte)
