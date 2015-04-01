@@ -365,13 +365,6 @@ config TOI
 	depends on TOI_CORE!=n
 	default y
 
-config TOI_EXPORTS
-	bool
-	depends on TOI_SWAP=m || TOI_FILE=m || \
-		TOI_CRYPTO=m || TOI_CLUSTER=m || \
-		TOI_USERUI=m || TOI_CORE=m
-	default y
-
 config TOI_ZRAM_SUPPORT
 	def_bool y
 	depends on TOI && ZRAM!=n
