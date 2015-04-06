@@ -242,9 +242,7 @@ extern int toi_trace_index;
 
 #ifdef CONFIG_TOI_INCREMENTAL
 extern void toi_reset_dirtiness(void);
-extern int toi_writing_incremental_image;
 #else
 #define toi_reset_dirtiness() do { } while(0)
-#define toi_writing_incremental_image (0)
 #endif
 #endif

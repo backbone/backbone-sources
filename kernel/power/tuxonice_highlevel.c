@@ -100,7 +100,6 @@ static DEFINE_MUTEX(tuxonice_in_use);
 static int block_dump_save;
 
 int toi_trace_index;
-int toi_writing_incremental_image;
 
 /* Binary signature if an image is present */
 char tuxonice_signature[9] = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
@@ -184,7 +183,6 @@ int toi_start_anything(int hibernate_or_resume)
 	set_fs(KERNEL_DS);
 
         toi_trace_index = 0;
-        toi_writing_incremental_image = 0;
 
 	if (hibernate_or_resume) {
     lock_system_sleep();
@@ -594,8 +592,11 @@ static int check_still_keeping_image(void)
             do_toi_step(STEP_HIBERNATE_POWERDOWN);
             return 1;
         }
-        /* Incremental image - need to write new part */
-        toi_writing_incremental_image = 1;
+        /**
+         * Incremental image - need to write new part.
+         * We detect that we're writing an incremental image by looking
+         * at test_result_state(TOI_KEPT_IMAGE)
+         **/
         return 0;
     }
 

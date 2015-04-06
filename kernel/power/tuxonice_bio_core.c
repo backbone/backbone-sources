@@ -611,7 +611,7 @@ static int toi_rw_init(int writing, int stream_number)
             toi_rw_buffer(WRITE, (char *) &toi_inc_ptr[0], sizeof(toi_inc_ptr[0]), 0);
 
             // Serialise extent chains if this is an incremental pageset
-            if (toi_writing_incremental_image)
+            if (toi_result_state(TOI_KEPT_IMAGE))
                 toi_serialise_extent_chains();
         } else {
             // Read the start of the next incremental pageset (if any)
