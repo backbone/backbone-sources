@@ -86,9 +86,16 @@ int toi_bio_get_header_version(void);
 void close_resume_dev_t(int force);
 int open_resume_dev_t(int force, int quiet);
 
-struct toi_incremental_image_pointer {
+struct toi_incremental_image_pointer_saved_data {
     unsigned long block;
     int chain;
 };
 
+struct toi_incremental_image_pointer {
+    struct toi_incremental_image_pointer_saved_data save;
+    struct block_device *bdev;
+    unsigned long block;
+};
+
 void toi_bio_store_inc_image_ptr(struct toi_incremental_image_pointer *ptr);
+void toi_bio_restore_inc_image_ptr(struct toi_incremental_image_pointer *ptr);

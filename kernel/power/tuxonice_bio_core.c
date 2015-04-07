@@ -84,7 +84,7 @@ static int toi_bio_queue_flush_pages(int dedicated_thread);
 
 struct toi_module_ops toi_blockwriter_ops;
 
-struct toi_incremental_image_pointer toi_inc_ptr[2];
+struct toi_incremental_image_pointer toi_inc_ptr[2][2];
 
 #define TOTAL_OUTSTANDING_IO (atomic_read(&toi_io_in_progress) + \
 	       atomic_read(&toi_bio_queue_size))
@@ -570,6 +570,86 @@ void debug_broken_header(void)
 	abort_hibernate(TOI_HEADER_TOO_BIG, "Header reservation too small.");
 }
 
+static int toi_bio_update_previous_inc_img_ptr(int stream)
+{
+    int result;
+    char * buffer = (char *) toi_get_zeroed_page(12, TOI_ATOMIC_GFP);
+    struct page *page;
+    struct toi_incremental_image_pointer *prev, *this;
+
+    prev = &toi_inc_ptr[stream][0];
+    this = &toi_inc_ptr[stream][1];
+
+    if (!buffer) {
+        // We're at the start of writing a pageset. Memory should not be that scarce.
+        return -ENOMEM;
+    }
+
+    page = virt_to_page(buffer);
+    result = toi_do_io(READ, prev->bdev, prev->block, page, 0, 1, 0);
+
+    if (result)
+        goto out;
+
+    memcpy(buffer, (char *) this, sizeof(this->save));
+
+    result = toi_do_io(WRITE, prev->bdev, prev->block, page, 0, 0, 12);
+
+    // If the IO is successfully submitted (!result), the page will be freed
+    // asynchronously on completion.
+out:
+    if (result)
+        toi__free_page(12, virt_to_page(buffer));
+    return result;
+}
+
+/**
+ * toi_rw_init_incremental - incremental image part of setting up to write new section
+ */
+static int toi_write_init_incremental(int stream)
+{
+    int result = 0;
+
+    // Remember the location of this block so we can link to it.
+    toi_bio_store_inc_image_ptr(&toi_inc_ptr[stream][1]);
+
+    // Update the pointer at the start of the last pageset with the same stream number.
+    result = toi_bio_update_previous_inc_img_ptr(stream);
+    if (result)
+        return result;
+
+    // Move the current to the previous slot.
+    memcpy(&toi_inc_ptr[stream][0], &toi_inc_ptr[stream][1], sizeof(toi_inc_ptr[stream][1]));
+
+    // Store a blank pointer at the start of this incremental pageset
+    memset(&toi_inc_ptr[stream][1], 0, sizeof(toi_inc_ptr[stream][1]));
+    result = toi_rw_buffer(WRITE, (char *) &toi_inc_ptr[stream][1], sizeof(toi_inc_ptr[stream][1]), 0);
+    if (result)
+        return result;
+
+    // Serialise extent chains if this is an incremental pageset
+    return toi_serialise_extent_chains();
+}
+
+/**
+ * toi_read_init_incremental - incremental image part of setting up to read new section
+ */
+static int toi_read_init_incremental(int stream)
+{
+    int result;
+
+    // Set our position to the start of the next pageset
+    toi_bio_restore_inc_image_ptr(&toi_inc_ptr[stream][1]);
+
+    // Read the start of the next incremental pageset (if any)
+    result = toi_rw_buffer(READ, (char *) &toi_inc_ptr[stream][1], sizeof(toi_inc_ptr[stream][1]), 0);
+
+    if (!result)
+        result = toi_load_extent_chains();
+
+    return result;
+}
+
 /**
  * toi_rw_init - prepare to read or write a stream in the image
  * @writing: Whether reading or writing.
@@ -602,20 +682,17 @@ static int toi_rw_init(int writing, int stream_number)
 
 	more_readahead = 1;
 
-        if (writing) {
-            // Remember the location of this block so we can link to it.
-            toi_bio_store_inc_image_ptr(&toi_inc_ptr[1]);
+        if (test_result_state(TOI_KEPT_IMAGE)) {
+            int result;
 
-            // Store a blank pointer to the start of this incremental pageset
-            memset(&toi_inc_ptr[0], 0, sizeof(toi_inc_ptr[0]));
-            toi_rw_buffer(WRITE, (char *) &toi_inc_ptr[0], sizeof(toi_inc_ptr[0]), 0);
+            if (writing) {
+                result = toi_write_init_incremental(stream_number);
+            } else {
+                result = toi_read_init_incremental(stream_number);
+            }
 
-            // Serialise extent chains if this is an incremental pageset
-            if (toi_result_state(TOI_KEPT_IMAGE))
-                toi_serialise_extent_chains();
-        } else {
-            // Read the start of the next incremental pageset (if any)
-            toi_rw_buffer(READ, (char *) &toi_inc_ptr[1], sizeof(toi_inc_ptr[1]), 0);
+            if (result)
+                return result;
         }
 
 	return toi_writer_buffer ? 0 : -ENOMEM;

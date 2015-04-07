@@ -1086,17 +1086,21 @@ void toi_bio_store_inc_image_ptr(struct toi_incremental_image_pointer *ptr)
     struct toi_bdev_info *this = toi_writer_posn.current_chain,
                          *cmp = prio_chain_head;
 
-    ptr->chain = 1;
+    ptr->save.chain = 1;
     while (this != cmp) {
-        ptr->chain++;
+        ptr->save.chain++;
         cmp = cmp->next;
     }
-    ptr->block = this->blocks.current_offset;
+    ptr->save.block = this->blocks.current_offset;
+
+    /* Save the raw info internally for quicker access when updating pointers */
+    ptr->bdev = this->bdev;
+    ptr->block = this->blocks.current_offset << this->bmap_shift;
 }
 
 void toi_bio_restore_inc_image_ptr(struct toi_incremental_image_pointer *ptr)
 {
-    int i = ptr->chain - 1;
+    int i = ptr->save.chain - 1;
     struct toi_bdev_info *this;
     struct hibernate_extent *hib;
 
@@ -1109,12 +1113,12 @@ void toi_bio_restore_inc_image_ptr(struct toi_incremental_image_pointer *ptr)
     toi_writer_posn.current_chain = this;
 
     /* Restore block */
-    this->blocks.current_offset = ptr->block;
+    this->blocks.current_offset = ptr->save.block;
 
     /* Find current offset from block number */
     hib = this->blocks.first;
 
-    while (hib->start > ptr->block) {
+    while (hib->start > ptr->save.block) {
         hib = hib->next;
     }
 
