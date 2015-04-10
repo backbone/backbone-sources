@@ -1,7 +1,7 @@
 /*
  * kernel/power/tuxonice_file.c
  *
- * Copyright (C) 2005-2014 Nigel Cunningham (nigel at tuxonice net)
+ * Copyright (C) 2005-2015 Nigel Cunningham (nigel at nigelcunningham com au)
  *
  * Distributed under GPLv2.
  *

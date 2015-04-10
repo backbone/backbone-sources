@@ -1,7 +1,7 @@
 /*
  * kernel/power/tuxonice_bio_signature.c
  *
- * Copyright (C) 2004-2014 Nigel Cunningham (nigel at tuxonice net)
+ * Copyright (C) 2004-2015 Nigel Cunningham (nigel at nigelcunningham com au)
  *
  * Distributed under GPLv2.
  *
