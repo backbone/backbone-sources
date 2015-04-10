@@ -493,6 +493,9 @@ static void do_cleanup(int get_debug_info, int restarting)
 
 	free_checksum_pages();
 
+        toi_cbw_restore();
+        toi_free_cbw_data();
+
 	if (get_debug_info)
 		buffer = (char *) toi_get_zeroed_page(20, TOI_ATOMIC_GFP);
 
@@ -662,6 +665,8 @@ static int toi_init(int restarting)
 		set_result_state(TOI_OUT_OF_MEMORY);
 		return 1;
 	}
+
+        toi_allocate_cbw_data();
 
 	return 0;
 }

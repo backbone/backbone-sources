@@ -242,7 +242,15 @@ extern int toi_trace_index;
 
 #ifdef CONFIG_TOI_INCREMENTAL
 extern void toi_reset_dirtiness(void);
+extern void toi_cbw_write(void);
+extern void toi_cbw_restore(void);
+extern int toi_allocate_cbw_data(void);
+extern void toi_free_cbw_data(void);
 #else
 #define toi_reset_dirtiness() do { } while(0)
+#define toi_cbw_write() do { } while(0)
+#define toi_cbw_restore() do { } while(0)
+#define toi_allocate_cbw_data() do { } while(0)
+#define toi_free_cbw_data() do { } while(0)
 #endif
 #endif
