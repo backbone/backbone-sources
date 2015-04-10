@@ -916,12 +916,18 @@ mm_fault_error(struct pt_regs *regs, unsigned long error_code,
  */
 static void _toi_do_cbw(struct page *page)
 {
-    if (!toi_first_cbw || !PageTOI_CBW(page))
-        return;
+    struct toi_cbw_state *state = this_cpu_ptr(toi_cbw_state);
 
-    memcpy(toi_first_cbw[toi_next_cbw]->virt, page_address(page), PAGE_SIZE);
-    toi_first_cbw[toi_next_cbw]->pfn = page_to_pfn(page);
-    toi_next_cbw++;
+    state->active = 1;
+    wmb();
+
+    if (state->enabled && state->next && PageTOI_CBW(page)) {
+        memcpy(state->next->virt, page_address(page), PAGE_SIZE);
+        state->next->pfn = page_to_pfn(page);
+        state->next++;
+    }
+
+    state->active = 0;
 }
 
 /**

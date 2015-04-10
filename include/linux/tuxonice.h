@@ -17,15 +17,22 @@ static inline int toi_incremental_support(void)
     return 1;
 }
 
+/* Copy Before Write */
 struct toi_cbw {
     unsigned long pfn;
     void *virt;
+    struct toi_cbw *next;
+};
+
+struct toi_cbw_state {
+    bool active;            /* Is a fault handler running? */
+    bool enabled;           /* Are we doing copy before write? */
+    int size;               /* The number of pages allocated */
+    struct toi_cbw *first, *next, *last;  /* Pointers to the data structure */
 };
 
 #define CBWS_PER_PAGE (PAGE_SIZE / sizeof(struct toi_cbw))
-
-extern struct toi_cbw **toi_first_cbw;
-extern int toi_next_cbw;
+DECLARE_PER_CPU(struct toi_cbw_state *, toi_cbw_state);
 #else
 #define toi_set_logbuf_untracked() do { } while(0)
 #define toi_make_writable(addr) (0)

@@ -58,40 +58,98 @@ static struct attention_list *attention_list;
 #define PAGESET2 1
 
 /* Copy before write support */
-void toi_free_cbw_data(void)
-{
-    int i;
+DEFINE_PER_CPU(struct toi_cbw_state *, toi_cbw_state);
+#define CBWS_PER_PAGE (PAGE_SIZE / sizeof(struct toi_cbw))
+#define toi_cbw_pool_size 100
 
-    if (!toi_first_cbw)
+static void _toi_free_cbw_data(struct toi_cbw_state *state)
+{
+    if (!state->first)
         return;
 
-    for (i = 0; i < CBWS_PER_PAGE; i++) {
-        if (toi_first_cbw[i]) {
-            toi_free_page(40, (unsigned long)toi_first_cbw[i]->virt);
+    while(state->first) {
+        toi_free_page(41, (unsigned long) state->first->virt);
+        if (state->first == state->last) {
+            state->first = state->next = state->last = NULL;
+        } else {
+            state->first++;
         }
     }
-
-    toi_free_page(40, (unsigned long) toi_first_cbw);
-    toi_first_cbw = 0;
 }
+
+void toi_free_cbw_data(void)
+{
+    int i, result;
+
+    for (i = 0; i < NR_CPUS; i++) {
+        struct toi_cbw_state *state = per_cpu_ptr(toi_cbw_state, i);
+
+        if (!cpu_online(i))
+            continue;
+
+        state->enabled = 0;
+
+        while (state->active) {
+            schedule();
+        }
+
+        _toi_free_cbw_data(state);
+    }
+}
+
+static int _toi_allocate_cbw_data(struct toi_cbw_state *state)
+{
+    while(state->size < toi_cbw_pool_size) {
+        int i;
+        struct toi_cbw *ptr;
+
+        ptr = (struct toi_cbw *) toi_get_zeroed_page(41, GFP_KERNEL);
+
+        if (!ptr) {
+            return -ENOMEM;
+        }
+
+        if (!state->first) {
+            state->first = state->next = state->last = ptr;
+        }
+
+        for (i = 0; i < CBWS_PER_PAGE; i++) {
+            struct toi_cbw *cbw = &ptr[i];
+
+            if (cbw == state->first)
+                continue;
+
+            cbw->virt = toi_alloc_page(41, GFP_KERNEL);
+            if (!cbw->virt) {
+                state->size += i;
+                return -ENOMEM;
+            }
+
+            state->last->next = cbw;
+            state->last = cbw;
+        }
+
+        state->size += CBWS_PER_PAGE;
+    }
+
+    return 0;
+}
+
 
 int toi_allocate_cbw_data(void)
 {
-    int i;
+    int i, result;
 
-    toi_first_cbw = (struct toi_cbw **) toi_get_zeroed_page(40, GFP_KERNEL);
+    for (i = 0; i < NR_CPUS; i++) {
+        struct toi_cbw_state *state = per_cpu_ptr(toi_cbw_state, i);
 
-    if (!toi_first_cbw) {
-        return -ENOMEM;
-    }
+        if (!cpu_online(i))
+            continue;
 
-    for (i = 0; i < CBWS_PER_PAGE; i++) {
-        toi_first_cbw[i]->virt = (struct toi_cbw *) toi_alloc_page(40, GFP_KERNEL);
+        result = _toi_allocate_cbw_data(state);
 
-        if (!toi_first_cbw[i]->virt) {
-            toi_free_cbw_data();
-            return -ENOMEM;
-        }
+        if (result)
+            return result;
     }
 
     return 0;
