@@ -916,7 +916,7 @@ mm_fault_error(struct pt_regs *regs, unsigned long error_code,
  */
 static void _toi_do_cbw(struct page *page)
 {
-    struct toi_cbw_state *state = this_cpu_ptr(toi_cbw_state);
+    struct toi_cbw_state *state = this_cpu_ptr(&toi_cbw_states);
 
     state->active = 1;
     wmb();

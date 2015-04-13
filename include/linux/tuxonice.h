@@ -32,7 +32,7 @@ struct toi_cbw_state {
 };
 
 #define CBWS_PER_PAGE (PAGE_SIZE / sizeof(struct toi_cbw))
-DECLARE_PER_CPU(struct toi_cbw_state *, toi_cbw_state);
+DECLARE_PER_CPU(struct toi_cbw_state, toi_cbw_states);
 #else
 #define toi_set_logbuf_untracked() do { } while(0)
 #define toi_make_writable(addr) (0)

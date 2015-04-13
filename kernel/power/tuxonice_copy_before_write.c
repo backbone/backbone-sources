@@ -16,7 +16,7 @@
 #include "tuxonice_alloc.h"
 #include "tuxonice.h"
 
-DEFINE_PER_CPU(struct toi_cbw_state *, toi_cbw_state);
+DEFINE_PER_CPU(struct toi_cbw_state, toi_cbw_states);
 #define CBWS_PER_PAGE (PAGE_SIZE / sizeof(struct toi_cbw))
 #define toi_cbw_pool_size 100
 
@@ -40,7 +40,7 @@ void toi_free_cbw_data(void)
     int i;
 
     for (i = 0; i < NR_CPUS; i++) {
-        struct toi_cbw_state *state = per_cpu_ptr(toi_cbw_state, i);
+        struct toi_cbw_state *state = &per_cpu(toi_cbw_states, i);
 
         if (!cpu_online(i))
             continue;
@@ -102,7 +102,7 @@ int toi_allocate_cbw_data(void)
         return 0;
 
     for (i = 0; i < NR_CPUS; i++) {
-        struct toi_cbw_state *state = per_cpu_ptr(toi_cbw_state, i);
+        struct toi_cbw_state *state = &per_cpu(toi_cbw_states, i);
 
         if (!cpu_online(i))
             continue;
