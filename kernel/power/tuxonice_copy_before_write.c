@@ -22,9 +22,6 @@ DEFINE_PER_CPU(struct toi_cbw_state, toi_cbw_states);
 
 static void _toi_free_cbw_data(struct toi_cbw_state *state)
 {
-    if (!state->first)
-        return;
-
     while(state->first) {
         toi_free_page(41, (unsigned long) state->first->virt);
         if (state->first == state->last) {
@@ -42,7 +39,7 @@ void toi_free_cbw_data(void)
     for (i = 0; i < NR_CPUS; i++) {
         struct toi_cbw_state *state = &per_cpu(toi_cbw_states, i);
 
-        if (!cpu_online(i))
+        if (!cpu_online(i) || !state->first)
             continue;
 
         state->enabled = 0;
