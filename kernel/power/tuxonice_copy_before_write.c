@@ -83,14 +83,14 @@ static int _toi_allocate_cbw_data(struct toi_cbw_state *state)
         for (i = 0; i < CBWS_PER_PAGE; i++) {
             struct toi_cbw *cbw = &ptr[i];
 
-            if (cbw == state->first)
-                continue;
-
             cbw->virt = toi_alloc_page(40, GFP_KERNEL);
             if (!cbw->virt) {
                 state->size += i;
                 return -ENOMEM;
             }
+
+            if (cbw == state->first)
+                continue;
 
             state->last->next = cbw;
             state->last = cbw;
