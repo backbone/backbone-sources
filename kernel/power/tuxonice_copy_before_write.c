@@ -22,14 +22,26 @@ DEFINE_PER_CPU(struct toi_cbw_state, toi_cbw_states);
 
 static void _toi_free_cbw_data(struct toi_cbw_state *state)
 {
+    struct toi_cbw *page_ptr, *ptr;
+
+    page_ptr = ptr = state->first;
+
     while(state->first) {
         toi_free_page(40, (unsigned long) ptr->virt);
-        if (state->first == state->last) {
+        if (!(((unsigned long) ptr) & PAGE_MASK)) {
+            /* Must be on a new page - free the previous one. */
+            toi_free_page(40, (unsigned long) page_ptr);
+            page_ptr = ptr;
+        }
+        if (ptr == state->last) {
             state->first = state->next = state->last = NULL;
         } else {
-            state->first++;
+            ptr++;
         }
     }
+
+    if (page_ptr)
+        toi_free_page(40, (unsigned long) page_ptr);
 }
 
 void toi_free_cbw_data(void)
