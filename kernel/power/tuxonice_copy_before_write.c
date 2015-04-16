@@ -23,7 +23,7 @@ DEFINE_PER_CPU(struct toi_cbw_state, toi_cbw_states);
 static void _toi_free_cbw_data(struct toi_cbw_state *state)
 {
     while(state->first) {
-        toi_free_page(41, (unsigned long) state->first->virt);
+        toi_free_page(40, (unsigned long) ptr->virt);
         if (state->first == state->last) {
             state->first = state->next = state->last = NULL;
         } else {
@@ -58,7 +58,7 @@ static int _toi_allocate_cbw_data(struct toi_cbw_state *state)
         int i;
         struct toi_cbw *ptr;
 
-        ptr = (struct toi_cbw *) toi_get_zeroed_page(41, GFP_KERNEL);
+        ptr = (struct toi_cbw *) toi_get_zeroed_page(40, GFP_KERNEL);
 
         if (!ptr) {
             return -ENOMEM;
@@ -74,7 +74,7 @@ static int _toi_allocate_cbw_data(struct toi_cbw_state *state)
             if (cbw == state->first)
                 continue;
 
-            cbw->virt = toi_alloc_page(41, GFP_KERNEL);
+            cbw->virt = toi_alloc_page(40, GFP_KERNEL);
             if (!cbw->virt) {
                 state->size += i;
                 return -ENOMEM;
