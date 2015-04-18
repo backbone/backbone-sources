@@ -113,7 +113,8 @@ void copyback_post(void)
 	 */
 	toi_check_resleep();
 
-        toi_reset_dirtiness();
+        if (test_action_state(TOI_INCREMENTAL_IMAGE))
+            toi_reset_dirtiness(1);
 }
 
 /**
