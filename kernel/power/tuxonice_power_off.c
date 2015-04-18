@@ -104,7 +104,8 @@ static void __toi_power_down(int method)
 	if (test_result_state(TOI_ABORTED))
 		goto out;
 
-	kernel_power_off();
+        if (pm_power_off)
+            kernel_power_off();
 	kernel_halt();
 	toi_cond_pause(1, "Powerdown failed.");
 	while (1)
