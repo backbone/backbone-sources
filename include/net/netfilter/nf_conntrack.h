@@ -115,6 +115,22 @@ struct nf_conn {
 	/* Extensions */
 	struct nf_ct_ext *ext;
 
+#if defined(CONFIG_NETFILTER_XT_MATCH_LAYER7) || \
+    defined(CONFIG_NETFILTER_XT_MATCH_LAYER7_MODULE)
+	struct {
+		/*
+		 * e.g. "http". NULL before decision. "unknown" after decision
+		 * if no match.
+		 */
+		char *app_proto;
+		/*
+		 * application layer data so far. NULL after match decision.
+		 */
+		char *app_data;
+		unsigned int app_data_len;
+	} layer7;
+#endif
+
 	/* Storage reserved for other modules, must be the last member */
 	union nf_conntrack_proto proto;
 };
