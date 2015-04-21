@@ -1,8 +1,8 @@
 VERSION = 3
 PATCHLEVEL = 19
 SUBLEVEL = 5
-EXTRAVERSION = -zen
-NAME = Nucleum eorum libertate
+EXTRAVERSION = -backbone
+NAME = Diseased Newt
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
