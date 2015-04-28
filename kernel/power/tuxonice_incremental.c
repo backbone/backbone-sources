@@ -34,8 +34,6 @@
 #include "tuxonice_pageflags.h"
 #include "tuxonice_builtin.h"
 
-int toi_disable_memory_ro;
-unsigned int toi_search;
 int toi_do_incremental_initcall;
 
 extern void kdb_init(int level);
@@ -360,29 +358,6 @@ extern void toi_generate_untracked_map(void);
 
 // Leave early_initcall for pages to register untracked sections.
 early_initcall(toi_reset_dirtiness_initcall);
-
-static int __init toi_search_setup(char *str)
-{
-	int value;
-
-	if (sscanf(str, "=%d", &value) && value)
-		toi_search = value;
-
-	return 1;
-}
-
-__setup("toi_max", toi_search_setup);
-
-static int __init toi_disable_memory_ro_setup(char *str)
-{
-	int value;
-
-	if (sscanf(str, "=%d", &value) && value)
-		toi_disable_memory_ro = value;
-
-	return 1;
-}
-__setup("toi_no_ro", toi_disable_memory_ro_setup);
 
 static int __init toi_incremental_initcall_setup(char *str)
 {
