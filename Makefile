@@ -1,6 +1,6 @@
 VERSION = 3
 PATCHLEVEL = 14
-SUBLEVEL = 39
+SUBLEVEL = 40
 EXTRAVERSION = -backbone
 NAME = Remembering Coco
 
