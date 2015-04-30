@@ -914,7 +914,7 @@ mm_fault_error(struct pt_regs *regs, unsigned long error_code,
 /**
  * _toi_do_cbw - Do a copy-before-write before letting the faulting process continue
  */
-static void _toi_do_cbw(struct page *page)
+static void toi_do_cbw(struct page *page)
 {
     struct toi_cbw_state *state = this_cpu_ptr(&toi_cbw_states);
 
@@ -922,9 +922,10 @@ static void _toi_do_cbw(struct page *page)
     wmb();
 
     if (state->enabled && state->next && PageTOI_CBW(page)) {
-        memcpy(state->next->virt, page_address(page), PAGE_SIZE);
-        state->next->pfn = page_to_pfn(page);
-        state->next++;
+        struct toi_cbw *this = state->next;
+        memcpy(this->virt, page_address(page), PAGE_SIZE);
+        this->pfn = page_to_pfn(page);
+        state->next = this->next;
     }
 
     state->active = 0;
@@ -949,8 +950,7 @@ int _toi_make_writable(pte_t *pte)
         SetPageTOI_Dirty(page);
         ClearPageTOI_RO(page);
 
-        if (PageTOI_CBW(page))
-            _toi_do_cbw(page);
+        toi_do_cbw(page);
 
         load_cr3(pgd);
         return 1;

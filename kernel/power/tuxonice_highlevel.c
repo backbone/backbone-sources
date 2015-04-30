@@ -1404,6 +1404,8 @@ static __init int core_load(void)
 		return 1;
 	if (toi_cluster_init())
 		return 1;
+	if (toi_cbw_init())
+		return 1;
 
 	return 0;
 }

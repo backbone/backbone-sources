@@ -247,11 +247,13 @@ extern void toi_cbw_write(void);
 extern void toi_cbw_restore(void);
 extern int toi_allocate_cbw_data(void);
 extern void toi_free_cbw_data(void);
+extern int toi_cbw_init(void);
 #else
 #define toi_reset_dirtiness(a) do { } while(0)
 #define toi_cbw_write() do { } while(0)
 #define toi_cbw_restore() do { } while(0)
 #define toi_allocate_cbw_data() do { } while(0)
 #define toi_free_cbw_data() do { } while(0)
+#define toi_cbw_init() do { } while(0)
 #endif
 #endif
