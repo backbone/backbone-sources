@@ -33,6 +33,7 @@
 #include <asm/page.h>
 #include "tuxonice_pageflags.h"
 #include "tuxonice_builtin.h"
+#include "power.h"
 
 int toi_do_incremental_initcall;
 
@@ -266,6 +267,32 @@ void toi_generate_untracked_map(void)
 }
 
 /**
+ * toi_reset_dirtiness_one
+ */
+
+void toi_reset_dirtiness_one(unsigned long pfn, int verbose)
+{
+    struct page *page = pfn_to_page(pfn);
+
+    /**
+     * Don't worry about whether the Dirty flag is
+     * already set. If this is our first call, it
+     * won't be.
+     */
+
+    preempt_disable();
+
+    ClearPageTOI_Dirty(page);
+    SetPageTOI_RO(page);
+    if (verbose)
+        printk(KERN_EMERG "Making page %ld (%p|%p) read only.\n", pfn, page, page_address(page));
+
+    set_memory_ro((unsigned long) page_address(page), 1);
+
+    preempt_enable();
+}
+
+/**
  * TuxOnIce's incremental image support works by marking all memory apart from
  * the page tables read-only, then in the page-faults that result enabling
  * writing if appropriate and flagging the page as dirty. Free pages are also
@@ -283,12 +310,21 @@ void toi_generate_untracked_map(void)
  * TODO: Consider Xen paravirt guest boot issues. See arch/x86/mm/pageattr.c.
  **/
 
-int toi_reset_dirtiness(void)
+int toi_reset_dirtiness(int verbose)
 {
 	struct zone *zone;
 	unsigned long loop;
+        int allocated_map = 0;
 
         toi_generate_untracked_map();
+
+        if (!free_map) {
+            if (!toi_alloc_bitmap(&free_map))
+                return -ENOMEM;
+            allocated_map = 1;
+        }
+
+	toi_generate_free_page_map();
 
         pr_debug(KERN_EMERG "Reset dirtiness.\n");
         for_each_populated_zone(zone) {
@@ -296,15 +332,21 @@ int toi_reset_dirtiness(void)
             for (loop = 0; loop < zone->spanned_pages; loop++) {
                 unsigned long pfn = zone->zone_start_pfn + loop;
                 struct page *page;
+                int chunk_size;
 
                 if (!pfn_valid(pfn)) {
                     continue;
                 }
 
+                chunk_size = toi_size_of_free_region(zone, pfn);
+                if (chunk_size) {
+                    loop += chunk_size - 1;
+                    continue;
+                }
+
                 page = pfn_to_page(pfn);
 
-                if (PageNosave(page)) {
-                    SetPageTOI_Untracked(page);
+                if (PageNosave(page) || !saveable_page(zone, pfn)) {
                     continue;
                 }
 
@@ -322,35 +364,24 @@ int toi_reset_dirtiness(void)
                  * and (re)apply the protection.
                  */
                 if (!PageTOI_RO(page)) {
-                    int enforce = !toi_disable_memory_ro && (!toi_search || pfn < toi_search);
-                    /**
-                     * Don't worry about whether the Dirty flag is
-                     * already set. If this is our first call, it
-                     * won't be.
-                     */
-
-                    preempt_disable();
-
-                    ClearPageTOI_Dirty(page);
-                    SetPageTOI_RO(page);
-                    //pr_debug(KERN_EMERG "%saking page %ld (%p|%p) read only.\n", enforce ? "M" : "Not m", pfn, page, page_address(page));
-
-                    if (enforce)
-                        set_memory_ro((unsigned long) page_address(page), 1);
-
-                    preempt_enable();
+                    toi_reset_dirtiness_one(pfn, verbose);
                 }
             }
         }
 
         pr_debug(KERN_EMERG "Done resetting dirtiness.\n");
+
+        if (allocated_map) {
+            toi_free_bitmap(&free_map);
+        }
         return 0;
 }
 
 static int toi_reset_dirtiness_initcall(void)
 {
     if (toi_do_incremental_initcall) {
-        toi_reset_dirtiness();
+        pr_info("TuxOnIce: Enabling dirty page tracking.\n");
+        toi_reset_dirtiness(0);
     }
     return 1;
 }
