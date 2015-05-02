@@ -10,7 +10,7 @@
 #define INCLUDE_LINUX_TUXONICE_H
 #ifdef CONFIG_TOI_INCREMENTAL
 extern void toi_set_logbuf_untracked(void);
-extern int toi_make_writable(unsigned long address);
+extern int toi_make_writable(pgd_t *pgd, unsigned long address);
 
 static inline int toi_incremental_support(void)
 {
@@ -35,7 +35,11 @@ struct toi_cbw_state {
 DECLARE_PER_CPU(struct toi_cbw_state, toi_cbw_states);
 #else
 #define toi_set_logbuf_untracked() do { } while(0)
-#define toi_make_writable(addr) (0)
+static inline int toi_make_writable(pgd_t *pgd, unsigned long addr)
+{
+    return 0;
+}
+
 static inline int toi_incremental_support(void)
 {
     return 0;
