@@ -652,7 +652,7 @@ no_context(struct pt_regs *regs, unsigned long error_code,
 	unsigned long flags;
 	int sig;
 
-        if (toi_make_writable(address)) {
+        if (toi_make_writable(init_mm.pgd, address)) {
             return;
         }
 
@@ -969,14 +969,13 @@ int _toi_make_writable(pte_t *pte)
  * see if the page was made RO by TOI, and mark it dirty/release the protection
  * if it was.
  */
-int toi_make_writable(unsigned long address)
+int toi_make_writable(pgd_t *pgd, unsigned long address)
 {
-    pgd_t *pgd;
     pud_t *pud;
     pmd_t *pmd;
     pte_t *pte;
 
-    pgd = init_mm.pgd + pgd_index(address);
+    pgd = pgd + pgd_index(address);
     if (!pgd_present(*pgd))
         return 0;
 
@@ -1174,7 +1173,7 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
          *
          * Do it early to avoid double faults.
          */
-        if (unlikely(toi_make_writable(address)))
+        if (unlikely(toi_make_writable(init_mm.pgd, address)))
             return;
 
 	if (unlikely(kmmio_fault(regs, address)))
