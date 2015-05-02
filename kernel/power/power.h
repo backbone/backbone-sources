@@ -331,5 +331,5 @@ extern int pm_wake_unlock(const char *buf);
 unsigned long toi_get_nonconflicting_page(void);
 #define BM_END_OF_MAP	(~0UL)
 #else
-#define toi_get_nonconflicting_page() { do { } while(0); }
+#define toi_get_nonconflicting_page() (0)
 #endif
