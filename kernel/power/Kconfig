@@ -219,7 +219,7 @@ menuconfig TOI_CORE
 		  greater chance of disk corruption than normal.
 
 	comment "No incremental image support available without Keep Image support."
-		depends on TOI_CORE && !TOI_KEEP_IMAGE
+		depends on TOI_CORE && !TOI_KEEP_IMAGE && 64BIT
 
 	config TOI_REPLACE_SWSUSP
 		bool "Replace swsusp by default"
