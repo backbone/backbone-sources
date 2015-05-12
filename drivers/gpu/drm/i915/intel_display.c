@@ -12258,6 +12258,7 @@ intel_commit_cursor_plane(struct drm_plane *plane,
 	struct intel_crtc *intel_crtc;
 	struct intel_plane *intel_plane = to_intel_plane(plane);
 	struct drm_i915_gem_object *obj = intel_fb_obj(state->base.fb);
+	unsigned old_width;
 	uint32_t addr;
 
 	crtc = crtc ? crtc : plane->crtc;
@@ -12282,11 +12283,15 @@ intel_commit_cursor_plane(struct drm_plane *plane,
 	intel_crtc->cursor_addr = addr;
 	intel_crtc->cursor_bo = obj;
 update:
+	old_width = intel_crtc->cursor_width;
 	intel_crtc->cursor_width = state->base.crtc_w;
 	intel_crtc->cursor_height = state->base.crtc_h;
 
-	if (intel_crtc->active)
+	if (intel_crtc->active) {
+		if (old_width != intel_crtc->cursor_width)
+			intel_update_watermarks(crtc);
 		intel_crtc_update_cursor(crtc, state->visible);
+	}
 }
 
 static struct drm_plane *intel_cursor_plane_create(struct drm_device *dev,
