@@ -673,6 +673,7 @@ int open_check_o_direct(struct file *f)
 	}
 	return 0;
 }
+EXPORT_SYMBOL(open_check_o_direct);
 
 static int do_dentry_open(struct file *f,
 			  int (*open)(struct inode *, struct file *),
