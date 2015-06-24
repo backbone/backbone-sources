@@ -114,8 +114,7 @@ int kdbus_sysfs_set_parameter_mask(const char *path, uint64_t mask)
 }
 
 int kdbus_create_bus(int control_fd, const char *name,
-		     uint64_t req_meta, uint64_t owner_meta,
-		     char **path)
+		     uint64_t owner_meta, char **path)
 {
 	struct {
 		struct kdbus_cmd cmd;
@@ -127,12 +126,12 @@ int kdbus_create_bus(int control_fd, const char *name,
 			struct kdbus_bloom_parameter bloom;
 		} bp;
 
-		/* required and owner metadata items */
+		/* owner metadata items */
 		struct {
 			uint64_t size;
 			uint64_t type;
 			uint64_t flags;
-		} attach[2];
+		} attach;
 
 		/* name item */
 		struct {
@@ -152,13 +151,9 @@ int kdbus_create_bus(int control_fd, const char *name,
 	snprintf(bus_make.name.str, sizeof(bus_make.name.str),
 		 "%u-%s", getuid(), name);
 
-	bus_make.attach[0].type = KDBUS_ITEM_ATTACH_FLAGS_RECV;
-	bus_make.attach[0].size = sizeof(bus_make.attach[0]);
-	bus_make.attach[0].flags = req_meta;
-
-	bus_make.attach[1].type = KDBUS_ITEM_ATTACH_FLAGS_SEND;
-	bus_make.attach[1].size = sizeof(bus_make.attach[0]);
-	bus_make.attach[1].flags = owner_meta;
+	bus_make.attach.type = KDBUS_ITEM_ATTACH_FLAGS_SEND;
+	bus_make.attach.size = sizeof(bus_make.attach);
+	bus_make.attach.flags = owner_meta;
 
 	bus_make.name.type = KDBUS_ITEM_MAKE_NAME;
 	bus_make.name.size = KDBUS_ITEM_HEADER_SIZE +
@@ -167,8 +162,7 @@ int kdbus_create_bus(int control_fd, const char *name,
 	bus_make.cmd.flags = KDBUS_MAKE_ACCESS_WORLD;
 	bus_make.cmd.size = sizeof(bus_make.cmd) +
 			     bus_make.bp.size +
-			     bus_make.attach[0].size +
-			     bus_make.attach[1].size +
+			     bus_make.attach.size +
 			     bus_make.name.size;
 
 	kdbus_printf("Creating bus with name >%s< on control fd %d ...\n",
@@ -408,11 +402,9 @@ int sys_memfd_create(const char *name, __u64 size)
 {
 	int ret, fd;
 
-	ret = syscall(__NR_memfd_create, name, MFD_ALLOW_SEALING);
-	if (ret < 0)
-		return ret;
-
-	fd = ret;
+	fd = syscall(__NR_memfd_create, name, MFD_ALLOW_SEALING);
+	if (fd < 0)
+		return fd;
 
 	ret = ftruncate(fd, size);
 	if (ret < 0) {
@@ -454,8 +446,8 @@ static int __kdbus_msg_send(const struct kdbus_conn *conn,
 			    uint64_t cmd_flags,
 			    int cancel_fd)
 {
-	struct kdbus_cmd_send *cmd;
-	struct kdbus_msg *msg;
+	struct kdbus_cmd_send *cmd = NULL;
+	struct kdbus_msg *msg = NULL;
 	const char ref1[1024 * 128 + 3] = "0123456789_0";
 	const char ref2[] = "0123456789_1";
 	struct kdbus_item *item;
@@ -464,10 +456,7 @@ static int __kdbus_msg_send(const struct kdbus_conn *conn,
 	int memfd = -1;
 	int ret;
 
-	size = sizeof(*msg);
-	size += KDBUS_ITEM_SIZE(sizeof(struct kdbus_vec));
-	size += KDBUS_ITEM_SIZE(sizeof(struct kdbus_vec));
-	size += KDBUS_ITEM_SIZE(sizeof(struct kdbus_vec));
+	size = sizeof(*msg) + 3 * KDBUS_ITEM_SIZE(sizeof(struct kdbus_vec));
 
 	if (dst_id == KDBUS_DST_ID_BROADCAST)
 		size += KDBUS_ITEM_SIZE(sizeof(struct kdbus_bloom_filter)) + 64;
@@ -481,14 +470,14 @@ static int __kdbus_msg_send(const struct kdbus_conn *conn,
 		if (write(memfd, "kdbus memfd 1234567", 19) != 19) {
 			ret = -errno;
 			kdbus_printf("writing to memfd failed: %m\n");
-			return ret;
+			goto out;
 		}
 
 		ret = sys_memfd_seal_set(memfd);
 		if (ret < 0) {
 			ret = -errno;
 			kdbus_printf("memfd sealing failed: %m\n");
-			return ret;
+			goto out;
 		}
 
 		size += KDBUS_ITEM_SIZE(sizeof(struct kdbus_memfd));
@@ -501,7 +490,7 @@ static int __kdbus_msg_send(const struct kdbus_conn *conn,
 	if (!msg) {
 		ret = -errno;
 		kdbus_printf("unable to malloc()!?\n");
-		return ret;
+		goto out;
 	}
 
 	if (dst_id == KDBUS_DST_ID_BROADCAST)
@@ -519,7 +508,7 @@ static int __kdbus_msg_send(const struct kdbus_conn *conn,
 	if (timeout) {
 		ret = clock_gettime(CLOCK_MONOTONIC_COARSE, &now);
 		if (ret < 0)
-			return ret;
+			goto out;
 
 		msg->timeout_ns = now.tv_sec * 1000000000ULL +
 				  now.tv_nsec + timeout;
@@ -570,6 +559,12 @@ static int __kdbus_msg_send(const struct kdbus_conn *conn,
 		size += KDBUS_ITEM_SIZE(sizeof(cancel_fd));
 
 	cmd = malloc(size);
+	if (!cmd) {
+		ret = -errno;
+		kdbus_printf("unable to malloc()!?\n");
+		goto out;
+	}
+
 	cmd->size = size;
 	cmd->flags = cmd_flags;
 	cmd->msg_address = (uintptr_t)msg;
@@ -584,12 +579,9 @@ static int __kdbus_msg_send(const struct kdbus_conn *conn,
 	}
 
 	ret = kdbus_cmd_send(conn->fd, cmd);
-	if (memfd >= 0)
-		close(memfd);
-
 	if (ret < 0) {
 		kdbus_printf("error sending message: %d (%m)\n", ret);
-		return ret;
+		goto out;
 	}
 
 	if (cmd_flags & KDBUS_SEND_SYNC_REPLY) {
@@ -603,13 +595,17 @@ static int __kdbus_msg_send(const struct kdbus_conn *conn,
 
 		ret = kdbus_free(conn, cmd->reply.offset);
 		if (ret < 0)
-			return ret;
+			goto out;
 	}
 
+out:
 	free(msg);
 	free(cmd);
 
-	return 0;
+	if (memfd >= 0)
+		close(memfd);
+
+	return ret < 0 ? ret : 0;
 }
 
 int kdbus_msg_send(const struct kdbus_conn *conn, const char *name,
@@ -1353,7 +1349,7 @@ static int all_ids_are_mapped(const char *path)
 	return 0;
 }
 
-int all_uids_gids_are_mapped()
+int all_uids_gids_are_mapped(void)
 {
 	int ret;
 
@@ -1547,7 +1543,7 @@ int test_is_capable(int cap, ...)
 	cap_t caps;
 
 	caps = cap_get_proc();
-	if (!cap) {
+	if (!caps) {
 		ret = -errno;
 		kdbus_printf("error cap_get_proc(): %d (%m)\n", ret);
 		return ret;
