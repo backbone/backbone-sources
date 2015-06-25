@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 0
 SUBLEVEL = 6
-EXTRAVERSION = -zen
-NAME = The grass is always greener on the other side of the force
+EXTRAVERSION = -backbone
+NAME = Hurr durr I'ma sheep
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
