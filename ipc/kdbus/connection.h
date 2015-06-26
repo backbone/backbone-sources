@@ -31,7 +31,7 @@
 					 KDBUS_HELLO_MONITOR)
 
 struct kdbus_quota;
-struct kdbus_kmsg;
+struct kdbus_staging;
 
 /**
  * struct kdbus_conn - connection to a bus
@@ -134,8 +134,9 @@ void kdbus_conn_quota_dec(struct kdbus_conn *c, struct kdbus_user *u,
 void kdbus_conn_lost_message(struct kdbus_conn *c);
 int kdbus_conn_entry_insert(struct kdbus_conn *conn_src,
 			    struct kdbus_conn *conn_dst,
-			    const struct kdbus_kmsg *kmsg,
-			    struct kdbus_reply *reply);
+			    struct kdbus_staging *staging,
+			    struct kdbus_reply *reply,
+			    const struct kdbus_name_entry *name);
 void kdbus_conn_move_messages(struct kdbus_conn *conn_dst,
 			      struct kdbus_conn *conn_src,
 			      u64 name_id);
@@ -152,7 +153,7 @@ bool kdbus_conn_policy_see_name_unlocked(struct kdbus_conn *conn,
 					 const char *name);
 bool kdbus_conn_policy_see_notification(struct kdbus_conn *conn,
 					const struct cred *curr_creds,
-					const struct kdbus_kmsg *kmsg);
+					const struct kdbus_msg *msg);
 
 /* command dispatcher */
 struct kdbus_conn *kdbus_cmd_hello(struct kdbus_ep *ep, bool privileged,
