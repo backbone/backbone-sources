@@ -7,6 +7,7 @@
  * Free Software Foundation; either version 2.1 of the License, or (at
  * your option) any later version.
  */
+
 #pragma once
 
 #define BIT(X) (1 << (X))
@@ -26,27 +27,25 @@
 #define KDBUS_ITEM_SIZE(s) KDBUS_ALIGN8((s) + KDBUS_ITEM_HEADER_SIZE)
 
 #define KDBUS_ITEM_NEXT(item) \
-	(typeof(item))(((uint8_t *)item) + KDBUS_ALIGN8((item)->size))
+	(typeof(item))((uint8_t *)(item) + KDBUS_ALIGN8((item)->size))
 #define KDBUS_ITEM_FOREACH(item, head, first)				\
-	for (item = (head)->first;					\
+	for ((item) = (head)->first;					\
 	     ((uint8_t *)(item) < (uint8_t *)(head) + (head)->size) &&	\
-	       ((uint8_t *)(item) >= (uint8_t *)(head));	\
-	     item = KDBUS_ITEM_NEXT(item))
+	       ((uint8_t *)(item) >= (uint8_t *)(head));		\
+	     (item) = KDBUS_ITEM_NEXT(item))
 #define KDBUS_FOREACH(iter, first, _size)				\
-	for (iter = (first);						\
+	for ((iter) = (first);						\
 	     ((uint8_t *)(iter) < (uint8_t *)(first) + (_size)) &&	\
 	       ((uint8_t *)(iter) >= (uint8_t *)(first));		\
-	     iter = (void*)(((uint8_t *)iter) + KDBUS_ALIGN8((iter)->size)))
+	     (iter) = (void *)((uint8_t *)(iter) + KDBUS_ALIGN8((iter)->size)))
 
-
-#define _KDBUS_ATTACH_BITS_SET_NR  (__builtin_popcountll(_KDBUS_ATTACH_ALL))
+#define _KDBUS_ATTACH_BITS_SET_NR (__builtin_popcountll(_KDBUS_ATTACH_ALL))
 
 /* Sum of KDBUS_ITEM_* that reflects _KDBUS_ATTACH_ALL */
-#define KDBUS_ATTACH_ITEMS_TYPE_SUM \
-	((((_KDBUS_ATTACH_BITS_SET_NR - 1) * \
-	((_KDBUS_ATTACH_BITS_SET_NR - 1) + 1)) / 2 ) + \
+#define KDBUS_ATTACH_ITEMS_TYPE_SUM					\
+	((((_KDBUS_ATTACH_BITS_SET_NR - 1) *				\
+	((_KDBUS_ATTACH_BITS_SET_NR - 1) + 1)) / 2) +			\
 	(_KDBUS_ITEM_ATTACH_BASE * _KDBUS_ATTACH_BITS_SET_NR))
-
 
 #define POOL_SIZE (16 * 1024LU * 1024LU)
 
@@ -105,7 +104,7 @@ extern int kdbus_util_verbose;
 	_setup_;							\
 	efd = eventfd(0, EFD_CLOEXEC);					\
 	ASSERT_RETURN(efd >= 0);					\
-	*clone_ret = 0;							\
+	*(clone_ret) = 0;						\
 	pid = syscall(__NR_clone, flags, NULL);				\
 	if (pid == 0) {							\
 		eventfd_t event_status = 0;				\
@@ -130,7 +129,7 @@ extern int kdbus_util_verbose;
 		ret = TEST_OK;						\
 	} else {							\
 		ret = -errno;						\
-		*clone_ret = -errno;					\
+		*(clone_ret) = -errno;					\
 	}								\
 	close(efd);							\
 	ret;								\
@@ -169,8 +168,7 @@ int kdbus_free(const struct kdbus_conn *conn, uint64_t offset);
 int kdbus_msg_dump(const struct kdbus_conn *conn,
 		   const struct kdbus_msg *msg);
 int kdbus_create_bus(int control_fd, const char *name,
-		     uint64_t req_meta, uint64_t owner_meta,
-		     char **path);
+		     uint64_t owner_meta, char **path);
 int kdbus_msg_send(const struct kdbus_conn *conn, const char *name,
 		   uint64_t cookie, uint64_t flags, uint64_t timeout,
 		   int64_t priority, uint64_t dst_id);
@@ -207,14 +205,12 @@ int kdbus_add_match_id(struct kdbus_conn *conn, uint64_t cookie,
 		       uint64_t type, uint64_t id);
 int kdbus_add_match_empty(struct kdbus_conn *conn);
 
-int all_uids_gids_are_mapped();
+int all_uids_gids_are_mapped(void);
 int drop_privileges(uid_t uid, gid_t gid);
 uint64_t now(clockid_t clock);
 char *unique_name(const char *prefix);
 
-int userns_map_uid_gid(pid_t pid,
-		       const char *map_uid,
-		       const char *map_gid);
+int userns_map_uid_gid(pid_t pid, const char *map_uid, const char *map_gid);
 int test_is_capable(int cap, ...);
 int config_user_ns_is_enabled(void);
 int config_auditsyscall_is_enabled(void);
