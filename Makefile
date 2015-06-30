@@ -1,6 +1,6 @@
 VERSION = 4
 PATCHLEVEL = 0
-SUBLEVEL = 6
+SUBLEVEL = 7
 EXTRAVERSION = -zen
 NAME = The grass is always greener on the other side of the force
 
