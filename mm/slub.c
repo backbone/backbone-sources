@@ -1315,7 +1315,7 @@ static inline struct page *alloc_slab_page(struct kmem_cache *s,
 	struct page *page;
 	int order = oo_order(oo);
 
-	flags |= __GFP_NOTRACK;
+	flags |= (__GFP_NOTRACK | ___GFP_TOI_NOTRACK);
 
 	if (memcg_charge_slab(s, flags, order))
 		return NULL;
@@ -3331,7 +3331,7 @@ static void *kmalloc_large_node(size_t size, gfp_t flags, int node)
 	struct page *page;
 	void *ptr = NULL;
 
-	flags |= __GFP_COMP | __GFP_NOTRACK;
+	flags |= __GFP_COMP | __GFP_NOTRACK | __GFP_TOI_NOTRACK;
 	page = alloc_kmem_pages_node(node, flags, get_order(size));
 	if (page)
 		ptr = page_address(page);
@@ -3700,6 +3700,7 @@ void __init kmem_cache_init(void)
 	kmem_cache_node = bootstrap(&boot_kmem_cache_node);
 
 	/* Now we can use the kmem_cache to allocate kmalloc slabs */
+	setup_kmalloc_cache_index_table();
 	create_kmalloc_caches(0);
 
 #ifdef CONFIG_SMP
