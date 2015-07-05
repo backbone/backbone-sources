@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 1
 SUBLEVEL = 1
-EXTRAVERSION = -zen
-NAME = Not the beeees
+EXTRAVERSION = -backbone
+NAME = Series 4800
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
