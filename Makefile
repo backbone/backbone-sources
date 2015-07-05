@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 1
 SUBLEVEL = 1
-EXTRAVERSION =
-NAME = Series 4800
+EXTRAVERSION = -zen
+NAME = Not the beeees
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -1342,6 +1342,7 @@ $(help-board-dirs): help-%:
 %docs: scripts_basic FORCE
 	$(Q)$(MAKE) $(build)=scripts build_docproc
 	$(Q)$(MAKE) $(build)=Documentation/DocBook $@
+	$(Q)$(MAKE) $(build)=Documentation/kdbus $@
 
 else # KBUILD_EXTMOD
 
