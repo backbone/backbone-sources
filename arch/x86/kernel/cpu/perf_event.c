@@ -272,7 +272,6 @@ msr_fail:
 static void hw_perf_event_destroy(struct perf_event *event)
 {
 	x86_release_hardware();
-	atomic_dec(&active_events);
 }
 
 void hw_perf_lbr_event_destroy(struct perf_event *event)
@@ -326,16 +325,16 @@ int x86_reserve_hardware(void)
 {
 	int err = 0;
 
-	if (!atomic_inc_not_zero(&pmc_refcount)) {
+	if (!atomic_inc_not_zero(&active_events)) {
 		mutex_lock(&pmc_reserve_mutex);
-		if (atomic_read(&pmc_refcount) == 0) {
+		if (atomic_read(&active_events) == 0) {
 			if (!reserve_pmc_hardware())
 				err = -EBUSY;
 			else
 				reserve_ds_buffers();
 		}
 		if (!err)
-			atomic_inc(&pmc_refcount);
+			atomic_inc(&active_events);
 		mutex_unlock(&pmc_reserve_mutex);
 	}
 
@@ -344,7 +343,7 @@ int x86_reserve_hardware(void)
 
 void x86_release_hardware(void)
 {
-	if (atomic_dec_and_mutex_lock(&pmc_refcount, &pmc_reserve_mutex)) {
+	if (atomic_dec_and_mutex_lock(&active_events, &pmc_reserve_mutex)) {
 		release_pmc_hardware();
 		release_ds_buffers();
 		mutex_unlock(&pmc_reserve_mutex);
