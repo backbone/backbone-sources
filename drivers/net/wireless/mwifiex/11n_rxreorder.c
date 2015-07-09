@@ -51,8 +51,8 @@ static int mwifiex_11n_dispatch_amsdu_pkt(struct mwifiex_private *priv,
 			rx_skb = __skb_dequeue(&list);
 			ret = mwifiex_recv_packet(priv, rx_skb);
 			if (ret == -1)
-				mwifiex_dbg(priv->adapter, ERROR,
-					    "Rx of A-MSDU failed");
+				dev_err(priv->adapter->dev,
+					"Rx of A-MSDU failed");
 		}
 		return 0;
 	}
@@ -304,7 +304,7 @@ mwifiex_flush_data(unsigned long context)
 	if (seq_num < 0)
 		return;
 
-	mwifiex_dbg(ctx->priv->adapter, INFO, "info: flush data %d\n", seq_num);
+	dev_dbg(ctx->priv->adapter->dev, "info: flush data %d\n", seq_num);
 	start_win = (ctx->ptr->start_win + seq_num + 1) & (MAX_TID_VALUE - 1);
 	mwifiex_11n_dispatch_pkt_until_start_win(ctx->priv, ctx->ptr,
 						 start_win);
@@ -367,9 +367,8 @@ mwifiex_11n_create_rx_reorder_tbl(struct mwifiex_private *priv, u8 *ta,
 	}
 	spin_unlock_irqrestore(&priv->sta_list_spinlock, flags);
 
-	mwifiex_dbg(priv->adapter, INFO,
-		    "info: last_seq=%d start_win=%d\n",
-		    last_seq, new_node->start_win);
+	dev_dbg(priv->adapter->dev, "info: last_seq=%d start_win=%d\n",
+		last_seq, new_node->start_win);
 
 	if (last_seq != MWIFIEX_DEF_11N_RX_SEQ_NUM &&
 	    last_seq >= new_node->start_win) {
@@ -383,8 +382,8 @@ mwifiex_11n_create_rx_reorder_tbl(struct mwifiex_private *priv, u8 *ta,
 					GFP_KERNEL);
 	if (!new_node->rx_reorder_ptr) {
 		kfree((u8 *) new_node);
-		mwifiex_dbg(priv->adapter, ERROR,
-			    "%s: failed to alloc reorder_ptr\n", __func__);
+		dev_err(priv->adapter->dev,
+			"%s: failed to alloc reorder_ptr\n", __func__);
 		return;
 	}
 
@@ -468,9 +467,9 @@ int mwifiex_cmd_11n_addba_rsp_gen(struct mwifiex_private *priv,
 						cmd_addba_req->peer_mac_addr);
 		if (!sta_ptr) {
 			spin_unlock_irqrestore(&priv->sta_list_spinlock, flags);
-			mwifiex_dbg(priv->adapter, ERROR,
-				    "BA setup with unknown TDLS peer %pM!\n",
-				    cmd_addba_req->peer_mac_addr);
+			dev_warn(priv->adapter->dev,
+				 "BA setup with unknown TDLS peer %pM!\n",
+				 cmd_addba_req->peer_mac_addr);
 			return -1;
 		}
 		if (sta_ptr->is_11ac_enabled)
@@ -574,14 +573,14 @@ int mwifiex_11n_rx_reorder_pkt(struct mwifiex_private *priv,
 	}
 
 	if (tbl->flags & RXREOR_FORCE_NO_DROP) {
-		mwifiex_dbg(priv->adapter, INFO,
-			    "RXREOR_FORCE_NO_DROP when HS is activated\n");
+		dev_dbg(priv->adapter->dev,
+			"RXREOR_FORCE_NO_DROP when HS is activated\n");
 		tbl->flags &= ~RXREOR_FORCE_NO_DROP;
 	} else if (init_window_shift && seq_num < start_win &&
 		   seq_num >= tbl->init_win) {
-		mwifiex_dbg(priv->adapter, INFO,
-			    "Sender TID sequence number reset %d->%d for SSN %d\n",
-			    start_win, seq_num, tbl->init_win);
+		dev_dbg(priv->adapter->dev,
+			"Sender TID sequence number reset %d->%d for SSN %d\n",
+			start_win, seq_num, tbl->init_win);
 		tbl->start_win = start_win = seq_num;
 		end_win = ((start_win + win_size) - 1) & (MAX_TID_VALUE - 1);
 	} else {
@@ -663,35 +662,32 @@ mwifiex_del_ba_tbl(struct mwifiex_private *priv, int tid, u8 *peer_mac,
 	struct mwifiex_ra_list_tbl *ra_list;
 	u8 cleanup_rx_reorder_tbl;
 	unsigned long flags;
-	int tid_down;
 
 	if (type == TYPE_DELBA_RECEIVE)
 		cleanup_rx_reorder_tbl = (initiator) ? true : false;
 	else
 		cleanup_rx_reorder_tbl = (initiator) ? false : true;
 
-	mwifiex_dbg(priv->adapter, EVENT, "event: DELBA: %pM tid=%d initiator=%d\n",
-		    peer_mac, tid, initiator);
+	dev_dbg(priv->adapter->dev, "event: DELBA: %pM tid=%d initiator=%d\n",
+		peer_mac, tid, initiator);
 
 	if (cleanup_rx_reorder_tbl) {
 		tbl = mwifiex_11n_get_rx_reorder_tbl(priv, tid,
 								 peer_mac);
 		if (!tbl) {
-			mwifiex_dbg(priv->adapter, EVENT,
-				    "event: TID, TA not found in table\n");
+			dev_dbg(priv->adapter->dev,
+				"event: TID, TA not found in table\n");
 			return;
 		}
 		mwifiex_del_rx_reorder_entry(priv, tbl);
 	} else {
 		ptx_tbl = mwifiex_get_ba_tbl(priv, tid, peer_mac);
 		if (!ptx_tbl) {
-			mwifiex_dbg(priv->adapter, EVENT,
-				    "event: TID, RA not found in table\n");
+			dev_dbg(priv->adapter->dev,
+				"event: TID, RA not found in table\n");
 			return;
 		}
-
-		tid_down = mwifiex_wmm_downgrade_tid(priv, tid);
-		ra_list = mwifiex_wmm_get_ralist_node(priv, tid_down, peer_mac);
+		ra_list = mwifiex_wmm_get_ralist_node(priv, tid, peer_mac);
 		if (ra_list) {
 			ra_list->amsdu_in_ampdu = false;
 			ra_list->ba_status = BA_SETUP_NONE;
@@ -725,8 +721,8 @@ int mwifiex_ret_11n_addba_resp(struct mwifiex_private *priv,
 	 * the stream
 	 */
 	if (le16_to_cpu(add_ba_rsp->status_code) != BA_RESULT_SUCCESS) {
-		mwifiex_dbg(priv->adapter, ERROR, "ADDBA RSP: failed %pM tid=%d)\n",
-			    add_ba_rsp->peer_mac_addr, tid);
+		dev_err(priv->adapter->dev, "ADDBA RSP: failed %pM tid=%d)\n",
+			add_ba_rsp->peer_mac_addr, tid);
 
 		tbl = mwifiex_11n_get_rx_reorder_tbl(priv, tid,
 						     add_ba_rsp->peer_mac_addr);
@@ -750,8 +746,8 @@ int mwifiex_ret_11n_addba_resp(struct mwifiex_private *priv,
 			tbl->amsdu = false;
 	}
 
-	mwifiex_dbg(priv->adapter, CMD,
-		    "cmd: ADDBA RSP: %pM tid=%d ssn=%d win_size=%d\n",
+	dev_dbg(priv->adapter->dev,
+		"cmd: ADDBA RSP: %pM tid=%d ssn=%d win_size=%d\n",
 		add_ba_rsp->peer_mac_addr, tid, add_ba_rsp->ssn, win_size);
 
 	return 0;
@@ -827,84 +823,4 @@ void mwifiex_update_rxreor_flags(struct mwifiex_adapter *adapter, u8 flags)
 	}
 
 	return;
-}
-
-/* This function update all the rx_win_size based on coex flag
- */
-static void mwifiex_update_ampdu_rxwinsize(struct mwifiex_adapter *adapter,
-					   bool coex_flag)
-{
-	u8 i;
-	u32 rx_win_size;
-	struct mwifiex_private *priv;
-
-	dev_dbg(adapter->dev, "Update rxwinsize %d\n", coex_flag);
-
-	for (i = 0; i < adapter->priv_num; i++) {
-		if (!adapter->priv[i])
-			continue;
-		priv = adapter->priv[i];
-		rx_win_size = priv->add_ba_param.rx_win_size;
-		if (coex_flag) {
-			if (priv->bss_type == MWIFIEX_BSS_TYPE_STA)
-				priv->add_ba_param.rx_win_size =
-					MWIFIEX_STA_COEX_AMPDU_DEF_RXWINSIZE;
-			if (priv->bss_type == MWIFIEX_BSS_TYPE_P2P)
-				priv->add_ba_param.rx_win_size =
-					MWIFIEX_STA_COEX_AMPDU_DEF_RXWINSIZE;
-			if (priv->bss_type == MWIFIEX_BSS_TYPE_UAP)
-				priv->add_ba_param.rx_win_size =
-					MWIFIEX_UAP_COEX_AMPDU_DEF_RXWINSIZE;
-		} else {
-			if (priv->bss_type == MWIFIEX_BSS_TYPE_STA)
-				priv->add_ba_param.rx_win_size =
-					MWIFIEX_STA_AMPDU_DEF_RXWINSIZE;
-			if (priv->bss_type == MWIFIEX_BSS_TYPE_P2P)
-				priv->add_ba_param.rx_win_size =
-					MWIFIEX_STA_AMPDU_DEF_RXWINSIZE;
-			if (priv->bss_type == MWIFIEX_BSS_TYPE_UAP)
-				priv->add_ba_param.rx_win_size =
-					MWIFIEX_UAP_AMPDU_DEF_RXWINSIZE;
-		}
-
-		if (adapter->coex_win_size && adapter->coex_rx_win_size)
-			priv->add_ba_param.rx_win_size =
-					adapter->coex_rx_win_size;
-
-		if (rx_win_size != priv->add_ba_param.rx_win_size) {
-			if (!priv->media_connected)
-				continue;
-			for (i = 0; i < MAX_NUM_TID; i++)
-				mwifiex_11n_delba(priv, i);
-		}
-	}
-}
-
-/* This function check coex for RX BA
- */
-void mwifiex_coex_ampdu_rxwinsize(struct mwifiex_adapter *adapter)
-{
-	u8 i;
-	struct mwifiex_private *priv;
-	u8 count = 0;
-
-	for (i = 0; i < adapter->priv_num; i++) {
-		if (adapter->priv[i]) {
-			priv = adapter->priv[i];
-			if (GET_BSS_ROLE(priv) == MWIFIEX_BSS_ROLE_STA) {
-				if (priv->media_connected)
-					count++;
-			}
-			if (GET_BSS_ROLE(priv) == MWIFIEX_BSS_ROLE_UAP) {
-				if (priv->bss_started)
-					count++;
-			}
-		}
-		if (count >= MWIFIEX_BSS_COEX_COUNT)
-			break;
-	}
-	if (count >= MWIFIEX_BSS_COEX_COUNT)
-		mwifiex_update_ampdu_rxwinsize(adapter, true);
-	else
-		mwifiex_update_ampdu_rxwinsize(adapter, false);
 }

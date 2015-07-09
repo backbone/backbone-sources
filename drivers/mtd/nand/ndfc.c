@@ -1,4 +1,6 @@
 /*
+ *  drivers/mtd/ndfc.c
+ *
  *  Overview:
  *   Platform independent driver for NDFC (NanD Flash Controller)
  *   integrated into EP440 cores

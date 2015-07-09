@@ -259,8 +259,7 @@ static int elan_i2c_get_version(struct i2c_client *client,
 	return 0;
 }
 
-static int elan_i2c_get_sm_version(struct i2c_client *client,
-				   u8 *ic_type, u8 *version)
+static int elan_i2c_get_sm_version(struct i2c_client *client, u8 *version)
 {
 	int error;
 	u8 val[3];
@@ -272,7 +271,6 @@ static int elan_i2c_get_sm_version(struct i2c_client *client,
 	}
 
 	*version = val[0];
-	*ic_type = val[1];
 	return 0;
 }
 

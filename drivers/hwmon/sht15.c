@@ -1074,7 +1074,7 @@ static int sht15_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct platform_device_id sht15_device_ids[] = {
+static struct platform_device_id sht15_device_ids[] = {
 	{ "sht10", sht10 },
 	{ "sht11", sht11 },
 	{ "sht15", sht15 },

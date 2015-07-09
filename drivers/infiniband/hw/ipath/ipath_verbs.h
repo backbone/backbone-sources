@@ -701,11 +701,9 @@ static inline void ipath_schedule_send(struct ipath_qp *qp)
 int ipath_process_mad(struct ib_device *ibdev,
 		      int mad_flags,
 		      u8 port_num,
-		      const struct ib_wc *in_wc,
-		      const struct ib_grh *in_grh,
-		      const struct ib_mad_hdr *in, size_t in_mad_size,
-		      struct ib_mad_hdr *out, size_t *out_mad_size,
-		      u16 *out_mad_pkey_index);
+		      struct ib_wc *in_wc,
+		      struct ib_grh *in_grh,
+		      struct ib_mad *in_mad, struct ib_mad *out_mad);
 
 /*
  * Compare the lower 24 bits of the two values.
@@ -809,8 +807,7 @@ void ipath_cq_enter(struct ipath_cq *cq, struct ib_wc *entry, int sig);
 
 int ipath_poll_cq(struct ib_cq *ibcq, int num_entries, struct ib_wc *entry);
 
-struct ib_cq *ipath_create_cq(struct ib_device *ibdev,
-			      const struct ib_cq_init_attr *attr,
+struct ib_cq *ipath_create_cq(struct ib_device *ibdev, int entries, int comp_vector,
 			      struct ib_ucontext *context,
 			      struct ib_udata *udata);
 

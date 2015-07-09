@@ -73,9 +73,9 @@ ieee802154_set_channel(struct wpan_phy *wpan_phy, u8 page, u8 channel)
 
 	ASSERT_RTNL();
 
-	if (wpan_phy->current_page == page &&
-	    wpan_phy->current_channel == channel)
-		return 0;
+	/* check if phy support this setting */
+	if (!(wpan_phy->channels_supported[page] & BIT(channel)))
+		return -EINVAL;
 
 	ret = drv_set_channel(local, page, channel);
 	if (!ret) {
@@ -95,48 +95,13 @@ ieee802154_set_cca_mode(struct wpan_phy *wpan_phy,
 
 	ASSERT_RTNL();
 
-	if (wpan_phy_cca_cmp(&wpan_phy->cca, cca))
-		return 0;
+	/* check if phy support this setting */
+	if (!(local->hw.flags & IEEE802154_HW_CCA_MODE))
+		return -EOPNOTSUPP;
 
 	ret = drv_set_cca_mode(local, cca);
 	if (!ret)
 		wpan_phy->cca = *cca;
-
-	return ret;
-}
-
-static int
-ieee802154_set_cca_ed_level(struct wpan_phy *wpan_phy, s32 ed_level)
-{
-	struct ieee802154_local *local = wpan_phy_priv(wpan_phy);
-	int ret;
-
-	ASSERT_RTNL();
-
-	if (wpan_phy->cca_ed_level == ed_level)
-		return 0;
-
-	ret = drv_set_cca_ed_level(local, ed_level);
-	if (!ret)
-		wpan_phy->cca_ed_level = ed_level;
-
-	return ret;
-}
-
-static int
-ieee802154_set_tx_power(struct wpan_phy *wpan_phy, s32 power)
-{
-	struct ieee802154_local *local = wpan_phy_priv(wpan_phy);
-	int ret;
-
-	ASSERT_RTNL();
-
-	if (wpan_phy->transmit_power == power)
-		return 0;
-
-	ret = drv_set_tx_power(local, power);
-	if (!ret)
-		wpan_phy->transmit_power = power;
 
 	return ret;
 }
@@ -147,8 +112,15 @@ ieee802154_set_pan_id(struct wpan_phy *wpan_phy, struct wpan_dev *wpan_dev,
 {
 	ASSERT_RTNL();
 
-	if (wpan_dev->pan_id == pan_id)
-		return 0;
+	/* TODO
+	 * I am not sure about to check here on broadcast pan_id.
+	 * Broadcast is a valid setting, comment from 802.15.4:
+	 * If this value is 0xffff, the device is not associated.
+	 *
+	 * This could useful to simple deassociate an device.
+	 */
+	if (pan_id == cpu_to_le16(IEEE802154_PAN_ID_BROADCAST))
+		return -EINVAL;
 
 	wpan_dev->pan_id = pan_id;
 	return 0;
@@ -159,11 +131,12 @@ ieee802154_set_backoff_exponent(struct wpan_phy *wpan_phy,
 				struct wpan_dev *wpan_dev,
 				u8 min_be, u8 max_be)
 {
+	struct ieee802154_local *local = wpan_phy_priv(wpan_phy);
+
 	ASSERT_RTNL();
 
-	if (wpan_dev->min_be == min_be &&
-	    wpan_dev->max_be == max_be)
-		return 0;
+	if (!(local->hw.flags & IEEE802154_HW_CSMA_PARAMS))
+		return -EOPNOTSUPP;
 
 	wpan_dev->min_be = min_be;
 	wpan_dev->max_be = max_be;
@@ -176,8 +149,20 @@ ieee802154_set_short_addr(struct wpan_phy *wpan_phy, struct wpan_dev *wpan_dev,
 {
 	ASSERT_RTNL();
 
-	if (wpan_dev->short_addr == short_addr)
-		return 0;
+	/* TODO
+	 * I am not sure about to check here on broadcast short_addr.
+	 * Broadcast is a valid setting, comment from 802.15.4:
+	 * A value of 0xfffe indicates that the device has
+	 * associated but has not been allocated an address. A
+	 * value of 0xffff indicates that the device does not
+	 * have a short address.
+	 *
+	 * I think we should allow to set these settings but
+	 * don't allow to allow socket communication with it.
+	 */
+	if (short_addr == cpu_to_le16(IEEE802154_ADDR_SHORT_UNSPEC) ||
+	    short_addr == cpu_to_le16(IEEE802154_ADDR_SHORT_BROADCAST))
+		return -EINVAL;
 
 	wpan_dev->short_addr = short_addr;
 	return 0;
@@ -188,10 +173,12 @@ ieee802154_set_max_csma_backoffs(struct wpan_phy *wpan_phy,
 				 struct wpan_dev *wpan_dev,
 				 u8 max_csma_backoffs)
 {
+	struct ieee802154_local *local = wpan_phy_priv(wpan_phy);
+
 	ASSERT_RTNL();
 
-	if (wpan_dev->csma_retries == max_csma_backoffs)
-		return 0;
+	if (!(local->hw.flags & IEEE802154_HW_CSMA_PARAMS))
+		return -EOPNOTSUPP;
 
 	wpan_dev->csma_retries = max_csma_backoffs;
 	return 0;
@@ -202,10 +189,12 @@ ieee802154_set_max_frame_retries(struct wpan_phy *wpan_phy,
 				 struct wpan_dev *wpan_dev,
 				 s8 max_frame_retries)
 {
+	struct ieee802154_local *local = wpan_phy_priv(wpan_phy);
+
 	ASSERT_RTNL();
 
-	if (wpan_dev->frame_retries == max_frame_retries)
-		return 0;
+	if (!(local->hw.flags & IEEE802154_HW_FRAME_RETRIES))
+		return -EOPNOTSUPP;
 
 	wpan_dev->frame_retries = max_frame_retries;
 	return 0;
@@ -215,10 +204,12 @@ static int
 ieee802154_set_lbt_mode(struct wpan_phy *wpan_phy, struct wpan_dev *wpan_dev,
 			bool mode)
 {
+	struct ieee802154_local *local = wpan_phy_priv(wpan_phy);
+
 	ASSERT_RTNL();
 
-	if (wpan_dev->lbt == mode)
-		return 0;
+	if (!(local->hw.flags & IEEE802154_HW_LBT))
+		return -EOPNOTSUPP;
 
 	wpan_dev->lbt = mode;
 	return 0;
@@ -231,8 +222,6 @@ const struct cfg802154_ops mac802154_config_ops = {
 	.del_virtual_intf = ieee802154_del_iface,
 	.set_channel = ieee802154_set_channel,
 	.set_cca_mode = ieee802154_set_cca_mode,
-	.set_cca_ed_level = ieee802154_set_cca_ed_level,
-	.set_tx_power = ieee802154_set_tx_power,
 	.set_pan_id = ieee802154_set_pan_id,
 	.set_short_addr = ieee802154_set_short_addr,
 	.set_backoff_exponent = ieee802154_set_backoff_exponent,

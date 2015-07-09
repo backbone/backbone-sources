@@ -807,9 +807,9 @@ static int tb10x_pinctrl_probe(struct platform_device *pdev)
 	}
 
 	state->pctl = pinctrl_register(&tb10x_pindesc, dev, state);
-	if (IS_ERR(state->pctl)) {
+	if (!state->pctl) {
 		dev_err(dev, "could not register TB10x pin driver\n");
-		ret = PTR_ERR(state->pctl);
+		ret = -EINVAL;
 		goto fail;
 	}
 

@@ -22,7 +22,6 @@
 #include <linux/module.h>
 #include <linux/io.h>
 #include <linux/seq_file.h>
-#include <linux/vmalloc.h>
 
 #include "mic_x100_dma.h"
 

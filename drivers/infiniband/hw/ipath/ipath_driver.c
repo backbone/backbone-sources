@@ -42,9 +42,6 @@
 #include <linux/bitmap.h>
 #include <linux/slab.h>
 #include <linux/module.h>
-#ifdef CONFIG_X86_64
-#include <asm/pat.h>
-#endif
 
 #include "ipath_kernel.h"
 #include "ipath_verbs.h"
@@ -398,14 +395,6 @@ static int ipath_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	unsigned long long addr;
 	u32 bar0 = 0, bar1 = 0;
 
-#ifdef CONFIG_X86_64
-	if (WARN(pat_enabled(),
-		 "ipath needs PAT disabled, boot with nopat kernel parameter\n")) {
-		ret = -ENODEV;
-		goto bail;
-	}
-#endif
-
 	dd = ipath_alloc_devdata(pdev);
 	if (IS_ERR(dd)) {
 		ret = PTR_ERR(dd);
@@ -553,7 +542,6 @@ static int ipath_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dd->ipath_kregbase = __ioremap(addr, len,
 		(_PAGE_NO_CACHE|_PAGE_WRITETHRU));
 #else
-	/* XXX: split this properly to enable on PAT */
 	dd->ipath_kregbase = ioremap_nocache(addr, len);
 #endif
 
@@ -599,8 +587,12 @@ static int ipath_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	ret = ipath_enable_wc(dd);
 
-	if (ret)
+	if (ret) {
+		ipath_dev_err(dd, "Write combining not enabled "
+			      "(err %d): performance may be poor\n",
+			      -ret);
 		ret = 0;
+	}
 
 	ipath_verify_pioperf(dd);
 

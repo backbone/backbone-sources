@@ -9,7 +9,6 @@
 #include <linux/random.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/vmalloc.h>
 
 #include <asm/cacheflush.h>
 #include <asm/pgtable.h>

@@ -868,7 +868,7 @@ static int wm8978_set_bias_level(struct snd_soc_codec *codec,
 		/* bit 3: enable bias, bit 2: enable I/O tie off buffer */
 		power1 |= 0xc;
 
-		if (snd_soc_codec_get_bias_level(codec) == SND_SOC_BIAS_OFF) {
+		if (codec->dapm.bias_level == SND_SOC_BIAS_OFF) {
 			/* Initial cap charge at VMID 5k */
 			snd_soc_write(codec, WM8978_POWER_MANAGEMENT_1,
 				      power1 | 0x3);
@@ -888,6 +888,7 @@ static int wm8978_set_bias_level(struct snd_soc_codec *codec,
 
 	dev_dbg(codec->dev, "%s: %d, %x\n", __func__, level, power1);
 
+	codec->dapm.bias_level = level;
 	return 0;
 }
 
@@ -927,7 +928,7 @@ static int wm8978_suspend(struct snd_soc_codec *codec)
 {
 	struct wm8978_priv *wm8978 = snd_soc_codec_get_drvdata(codec);
 
-	snd_soc_codec_force_bias_level(codec, SND_SOC_BIAS_OFF);
+	wm8978_set_bias_level(codec, SND_SOC_BIAS_OFF);
 	/* Also switch PLL off */
 	snd_soc_write(codec, WM8978_POWER_MANAGEMENT_1, 0);
 
@@ -943,7 +944,7 @@ static int wm8978_resume(struct snd_soc_codec *codec)
 	/* Sync reg_cache with the hardware */
 	regcache_sync(wm8978->regmap);
 
-	snd_soc_codec_force_bias_level(codec, SND_SOC_BIAS_STANDBY);
+	wm8978_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 
 	if (wm8978->f_pllout)
 		/* Switch PLL on */

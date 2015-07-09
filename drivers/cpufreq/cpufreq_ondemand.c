@@ -475,7 +475,7 @@ static struct attribute_group od_attr_group_gov_pol = {
 
 /************************** sysfs end ************************/
 
-static int od_init(struct dbs_data *dbs_data, bool notify)
+static int od_init(struct dbs_data *dbs_data)
 {
 	struct od_dbs_tuners *tuners;
 	u64 idle_time;
@@ -513,10 +513,11 @@ static int od_init(struct dbs_data *dbs_data, bool notify)
 	tuners->io_is_busy = should_io_be_busy();
 
 	dbs_data->tuners = tuners;
+	mutex_init(&dbs_data->mutex);
 	return 0;
 }
 
-static void od_exit(struct dbs_data *dbs_data, bool notify)
+static void od_exit(struct dbs_data *dbs_data)
 {
 	kfree(dbs_data->tuners);
 }
@@ -540,7 +541,6 @@ static struct common_dbs_data od_dbs_cdata = {
 	.gov_ops = &od_ops,
 	.init = od_init,
 	.exit = od_exit,
-	.mutex = __MUTEX_INITIALIZER(od_dbs_cdata.mutex),
 };
 
 static void od_set_powersave_bias(unsigned int powersave_bias)

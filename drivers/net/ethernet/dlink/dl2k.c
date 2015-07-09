@@ -463,8 +463,10 @@ rio_open (struct net_device *dev)
 		dw32(MACCtrl, dr32(MACCtrl) | AutoVLANuntagging);
 	}
 
-	setup_timer(&np->timer, rio_timer, (unsigned long)dev);
+	init_timer (&np->timer);
 	np->timer.expires = jiffies + 1*HZ;
+	np->timer.data = (unsigned long) dev;
+	np->timer.function = rio_timer;
 	add_timer (&np->timer);
 
 	/* Start Tx/Rx */

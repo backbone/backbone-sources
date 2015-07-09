@@ -118,7 +118,7 @@ failed:
 	return rc;
 }
 
-static const char *ll_follow_link(struct dentry *dentry, void **cookie)
+static void *ll_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	struct inode *inode = d_inode(dentry);
 	struct ptlrpc_request *request = NULL;
@@ -126,22 +126,32 @@ static const char *ll_follow_link(struct dentry *dentry, void **cookie)
 	char *symname = NULL;
 
 	CDEBUG(D_VFSTRACE, "VFS Op\n");
-	ll_inode_size_lock(inode);
-	rc = ll_readlink_internal(inode, &request, &symname);
-	ll_inode_size_unlock(inode);
+	/* Limit the recursive symlink depth to 5 instead of default
+	 * 8 links when kernel has 4k stack to prevent stack overflow.
+	 * For 8k stacks we need to limit it to 7 for local servers. */
+	if (THREAD_SIZE < 8192 && current->link_count >= 6) {
+		rc = -ELOOP;
+	} else if (THREAD_SIZE == 8192 && current->link_count >= 8) {
+		rc = -ELOOP;
+	} else {
+		ll_inode_size_lock(inode);
+		rc = ll_readlink_internal(inode, &request, &symname);
+		ll_inode_size_unlock(inode);
+	}
 	if (rc) {
 		ptlrpc_req_finished(request);
-		return ERR_PTR(rc);
+		request = NULL;
+		symname = ERR_PTR(rc);
 	}
 
+	nd_set_link(nd, symname);
 	/* symname may contain a pointer to the request message buffer,
 	 * we delay request releasing until ll_put_link then.
 	 */
-	*cookie = request;
-	return symname;
+	return request;
 }
 
-static void ll_put_link(struct inode *unused, void *cookie)
+static void ll_put_link(struct dentry *dentry, struct nameidata *nd, void *cookie)
 {
 	ptlrpc_req_finished(cookie);
 }

@@ -47,12 +47,11 @@ struct fib4_rule {
 #endif
 };
 
-int __fib_lookup(struct net *net, struct flowi4 *flp,
-		 struct fib_result *res, unsigned int flags)
+int __fib_lookup(struct net *net, struct flowi4 *flp, struct fib_result *res)
 {
 	struct fib_lookup_arg arg = {
 		.result = res,
-		.flags = flags,
+		.flags = FIB_LOOKUP_NOREF,
 	};
 	int err;
 

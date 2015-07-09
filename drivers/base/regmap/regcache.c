@@ -249,22 +249,6 @@ int regcache_write(struct regmap *map,
 	return 0;
 }
 
-static bool regcache_reg_needs_sync(struct regmap *map, unsigned int reg,
-				    unsigned int val)
-{
-	int ret;
-
-	/* If we don't know the chip just got reset, then sync everything. */
-	if (!map->no_sync_defaults)
-		return true;
-
-	/* Is this the hardware default?  If so skip. */
-	ret = regcache_lookup_reg(map, reg);
-	if (ret >= 0 && val == map->reg_defaults[ret].def)
-		return false;
-	return true;
-}
-
 static int regcache_default_sync(struct regmap *map, unsigned int min,
 				 unsigned int max)
 {
@@ -282,7 +266,9 @@ static int regcache_default_sync(struct regmap *map, unsigned int min,
 		if (ret)
 			return ret;
 
-		if (!regcache_reg_needs_sync(map, reg, val))
+		/* Is this the hardware default?  If so skip. */
+		ret = regcache_lookup_reg(map, reg);
+		if (ret >= 0 && val == map->reg_defaults[ret].def)
 			continue;
 
 		map->cache_bypass = 1;
@@ -356,7 +342,6 @@ out:
 	/* Restore the bypass state */
 	map->async = false;
 	map->cache_bypass = bypass;
-	map->no_sync_defaults = false;
 	map->unlock(map->lock_arg);
 
 	regmap_async_complete(map);
@@ -412,7 +397,6 @@ out:
 	/* Restore the bypass state */
 	map->cache_bypass = bypass;
 	map->async = false;
-	map->no_sync_defaults = false;
 	map->unlock(map->lock_arg);
 
 	regmap_async_complete(map);
@@ -477,23 +461,18 @@ void regcache_cache_only(struct regmap *map, bool enable)
 EXPORT_SYMBOL_GPL(regcache_cache_only);
 
 /**
- * regcache_mark_dirty: Indicate that HW registers were reset to default values
+ * regcache_mark_dirty: Mark the register cache as dirty
  *
  * @map: map to mark
  *
- * Inform regcache that the device has been powered down or reset, so that
- * on resume, regcache_sync() knows to write out all non-default values
- * stored in the cache.
- *
- * If this function is not called, regcache_sync() will assume that
- * the hardware state still matches the cache state, modulo any writes that
- * happened when cache_only was true.
+ * Mark the register cache as dirty, for example due to the device
+ * having been powered down for suspend.  If the cache is not marked
+ * as dirty then the cache sync will be suppressed.
  */
 void regcache_mark_dirty(struct regmap *map)
 {
 	map->lock(map->lock_arg);
 	map->cache_dirty = true;
-	map->no_sync_defaults = true;
 	map->unlock(map->lock_arg);
 }
 EXPORT_SYMBOL_GPL(regcache_mark_dirty);
@@ -634,7 +613,10 @@ static int regcache_sync_block_single(struct regmap *map, void *block,
 			continue;
 
 		val = regcache_get_val(map, block, i);
-		if (!regcache_reg_needs_sync(map, regtmp, val))
+
+		/* Is this the hardware default?  If so skip. */
+		ret = regcache_lookup_reg(map, regtmp);
+		if (ret >= 0 && val == map->reg_defaults[ret].def)
 			continue;
 
 		map->cache_bypass = 1;
@@ -706,7 +688,10 @@ static int regcache_sync_block_raw(struct regmap *map, void *block,
 		}
 
 		val = regcache_get_val(map, block, i);
-		if (!regcache_reg_needs_sync(map, regtmp, val)) {
+
+		/* Is this the hardware default?  If so skip. */
+		ret = regcache_lookup_reg(map, regtmp);
+		if (ret >= 0 && val == map->reg_defaults[ret].def) {
 			ret = regcache_sync_block_raw_flush(map, &data,
 							    base, regtmp);
 			if (ret != 0)

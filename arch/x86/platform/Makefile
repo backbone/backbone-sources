@@ -1,5 +1,4 @@
 # Platform specific code goes here
-obj-y	+= atom/
 obj-y	+= ce4100/
 obj-y	+= efi/
 obj-y	+= geode/

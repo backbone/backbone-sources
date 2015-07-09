@@ -27,7 +27,15 @@ static int hda_codec_match(struct hdac_device *dev, struct hdac_driver *drv)
 	u32 id = codec->probe_id ? codec->probe_id : codec->core.vendor_id;
 
 	for (preset = driver->preset; preset->id; preset++) {
-		if (preset->id == id &&
+		u32 mask = preset->mask;
+
+		if (preset->afg && preset->afg != codec->core.afg)
+			continue;
+		if (preset->mfg && preset->mfg != codec->core.mfg)
+			continue;
+		if (!mask)
+			mask = ~0;
+		if (preset->id == (id & mask) &&
 		    (!preset->rev || preset->rev == codec->core.revision_id)) {
 			codec->preset = preset;
 			return 1;

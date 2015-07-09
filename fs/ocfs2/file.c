@@ -37,7 +37,6 @@
 #include <linux/falloc.h>
 #include <linux/quotaops.h>
 #include <linux/blkdev.h>
-#include <linux/backing-dev.h>
 
 #include <cluster/masklog.h>
 
@@ -2251,7 +2250,7 @@ out:
 static ssize_t ocfs2_file_write_iter(struct kiocb *iocb,
 				    struct iov_iter *from)
 {
-	int direct_io, appending, rw_level;
+	int direct_io, appending, rw_level, have_alloc_sem  = 0;
 	int can_do_direct, has_refcount = 0;
 	ssize_t written = 0;
 	ssize_t ret;
@@ -2280,7 +2279,16 @@ static ssize_t ocfs2_file_write_iter(struct kiocb *iocb,
 
 	mutex_lock(&inode->i_mutex);
 
+	ocfs2_iocb_clear_sem_locked(iocb);
+
 relock:
+	/* to match setattr's i_mutex -> rw_lock ordering */
+	if (direct_io) {
+		have_alloc_sem = 1;
+		/* communicate with ocfs2_dio_end_io */
+		ocfs2_iocb_set_sem_locked(iocb);
+	}
+
 	/*
 	 * Concurrent O_DIRECT writes are allowed with
 	 * mount_option "coherency=buffered".
@@ -2290,7 +2298,7 @@ relock:
 	ret = ocfs2_rw_lock(inode, rw_level);
 	if (ret < 0) {
 		mlog_errno(ret);
-		goto out_mutex;
+		goto out_sems;
 	}
 
 	/*
@@ -2339,6 +2347,7 @@ relock:
 	if (direct_io && !can_do_direct) {
 		ocfs2_rw_unlock(inode, rw_level);
 
+		have_alloc_sem = 0;
 		rw_level = -1;
 
 		direct_io = 0;
@@ -2407,6 +2416,7 @@ no_sync:
 	 */
 	if ((ret == -EIOCBQUEUED) || (!ocfs2_iocb_is_rw_locked(iocb))) {
 		rw_level = -1;
+		have_alloc_sem = 0;
 		unaligned_dio = 0;
 	}
 
@@ -2419,7 +2429,10 @@ out:
 	if (rw_level != -1)
 		ocfs2_rw_unlock(inode, rw_level);
 
-out_mutex:
+out_sems:
+	if (have_alloc_sem)
+		ocfs2_iocb_clear_sem_locked(iocb);
+
 	mutex_unlock(&inode->i_mutex);
 
 	if (written)
@@ -2460,7 +2473,7 @@ bail:
 static ssize_t ocfs2_file_read_iter(struct kiocb *iocb,
 				   struct iov_iter *to)
 {
-	int ret = 0, rw_level = -1, lock_level = 0;
+	int ret = 0, rw_level = -1, have_alloc_sem = 0, lock_level = 0;
 	struct file *filp = iocb->ki_filp;
 	struct inode *inode = file_inode(filp);
 
@@ -2477,11 +2490,16 @@ static ssize_t ocfs2_file_read_iter(struct kiocb *iocb,
 		goto bail;
 	}
 
+	ocfs2_iocb_clear_sem_locked(iocb);
+
 	/*
 	 * buffered reads protect themselves in ->readpage().  O_DIRECT reads
 	 * need locks to protect pending reads from racing with truncate.
 	 */
 	if (iocb->ki_flags & IOCB_DIRECT) {
+		have_alloc_sem = 1;
+		ocfs2_iocb_set_sem_locked(iocb);
+
 		ret = ocfs2_rw_lock(inode, 0);
 		if (ret < 0) {
 			mlog_errno(ret);
@@ -2517,9 +2535,13 @@ static ssize_t ocfs2_file_read_iter(struct kiocb *iocb,
 	/* see ocfs2_file_write_iter */
 	if (ret == -EIOCBQUEUED || !ocfs2_iocb_is_rw_locked(iocb)) {
 		rw_level = -1;
+		have_alloc_sem = 0;
 	}
 
 bail:
+	if (have_alloc_sem)
+		ocfs2_iocb_clear_sem_locked(iocb);
+
 	if (rw_level != -1)
 		ocfs2_rw_unlock(inode, rw_level);
 

@@ -244,8 +244,7 @@ static inline u32 reciprocal_scale(u32 val, u32 ep_ro)
 
 #if defined(CONFIG_MMU) && \
 	(defined(CONFIG_PROVE_LOCKING) || defined(CONFIG_DEBUG_ATOMIC_SLEEP))
-#define might_fault() __might_fault(__FILE__, __LINE__)
-void __might_fault(const char *file, int line);
+void might_fault(void);
 #else
 static inline void might_fault(void) { }
 #endif

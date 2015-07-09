@@ -208,9 +208,8 @@ static int xgbe_init_ring(struct xgbe_prv_data *pdata,
 	if (!ring->rdata)
 		return -ENOMEM;
 
-	netif_dbg(pdata, drv, pdata->netdev,
-		  "rdesc=%p, rdesc_dma=%pad, rdata=%p\n",
-		  ring->rdesc, &ring->rdesc_dma, ring->rdata);
+	DBGPR("    rdesc=0x%p, rdesc_dma=0x%llx, rdata=0x%p\n",
+	      ring->rdesc, ring->rdesc_dma, ring->rdata);
 
 	DBGPR("<--xgbe_init_ring\n");
 
@@ -227,9 +226,7 @@ static int xgbe_alloc_ring_resources(struct xgbe_prv_data *pdata)
 
 	channel = pdata->channel;
 	for (i = 0; i < pdata->channel_count; i++, channel++) {
-		netif_dbg(pdata, drv, pdata->netdev, "%s - Tx ring:\n",
-			  channel->name);
-
+		DBGPR("  %s - tx_ring:\n", channel->name);
 		ret = xgbe_init_ring(pdata, channel->tx_ring,
 				     pdata->tx_desc_count);
 		if (ret) {
@@ -238,14 +235,12 @@ static int xgbe_alloc_ring_resources(struct xgbe_prv_data *pdata)
 			goto err_ring;
 		}
 
-		netif_dbg(pdata, drv, pdata->netdev, "%s - Rx ring:\n",
-			  channel->name);
-
+		DBGPR("  %s - rx_ring:\n", channel->name);
 		ret = xgbe_init_ring(pdata, channel->rx_ring,
 				     pdata->rx_desc_count);
 		if (ret) {
 			netdev_alert(pdata->netdev,
-				     "error initializing Rx ring\n");
+				     "error initializing Tx ring\n");
 			goto err_ring;
 		}
 	}
@@ -481,6 +476,8 @@ static void xgbe_unmap_rdata(struct xgbe_prv_data *pdata,
 
 	if (rdata->state_saved) {
 		rdata->state_saved = 0;
+		rdata->state.incomplete = 0;
+		rdata->state.context_next = 0;
 		rdata->state.skb = NULL;
 		rdata->state.len = 0;
 		rdata->state.error = 0;
@@ -521,6 +518,8 @@ static int xgbe_map_tx_skb(struct xgbe_channel *channel, struct sk_buff *skb)
 	rdata = XGBE_GET_DESC_DATA(ring, cur_index);
 
 	if (tso) {
+		DBGPR("  TSO packet\n");
+
 		/* Map the TSO header */
 		skb_dma = dma_map_single(pdata->dev, skb->data,
 					 packet->header_len, DMA_TO_DEVICE);
@@ -530,9 +529,6 @@ static int xgbe_map_tx_skb(struct xgbe_channel *channel, struct sk_buff *skb)
 		}
 		rdata->skb_dma = skb_dma;
 		rdata->skb_dma_len = packet->header_len;
-		netif_dbg(pdata, tx_queued, pdata->netdev,
-			  "skb header: index=%u, dma=%pad, len=%u\n",
-			  cur_index, &skb_dma, packet->header_len);
 
 		offset = packet->header_len;
 
@@ -554,9 +550,8 @@ static int xgbe_map_tx_skb(struct xgbe_channel *channel, struct sk_buff *skb)
 		}
 		rdata->skb_dma = skb_dma;
 		rdata->skb_dma_len = len;
-		netif_dbg(pdata, tx_queued, pdata->netdev,
-			  "skb data: index=%u, dma=%pad, len=%u\n",
-			  cur_index, &skb_dma, len);
+		DBGPR("  skb data: index=%u, dma=0x%llx, len=%u\n",
+		      cur_index, skb_dma, len);
 
 		datalen -= len;
 		offset += len;
@@ -568,8 +563,7 @@ static int xgbe_map_tx_skb(struct xgbe_channel *channel, struct sk_buff *skb)
 	}
 
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
-		netif_dbg(pdata, tx_queued, pdata->netdev,
-			  "mapping frag %u\n", i);
+		DBGPR("  mapping frag %u\n", i);
 
 		frag = &skb_shinfo(skb)->frags[i];
 		offset = 0;
@@ -588,9 +582,8 @@ static int xgbe_map_tx_skb(struct xgbe_channel *channel, struct sk_buff *skb)
 			rdata->skb_dma = skb_dma;
 			rdata->skb_dma_len = len;
 			rdata->mapped_as_page = 1;
-			netif_dbg(pdata, tx_queued, pdata->netdev,
-				  "skb frag: index=%u, dma=%pad, len=%u\n",
-				  cur_index, &skb_dma, len);
+			DBGPR("  skb data: index=%u, dma=0x%llx, len=%u\n",
+			      cur_index, skb_dma, len);
 
 			datalen -= len;
 			offset += len;

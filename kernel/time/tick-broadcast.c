@@ -255,18 +255,18 @@ int tick_receive_broadcast(void)
 /*
  * Broadcast the event to the cpus, which are set in the mask (mangled).
  */
-static bool tick_do_broadcast(struct cpumask *mask)
+static void tick_do_broadcast(struct cpumask *mask)
 {
 	int cpu = smp_processor_id();
 	struct tick_device *td;
-	bool local = false;
 
 	/*
 	 * Check, if the current cpu is in the mask
 	 */
 	if (cpumask_test_cpu(cpu, mask)) {
 		cpumask_clear_cpu(cpu, mask);
-		local = true;
+		td = &per_cpu(tick_cpu_device, cpu);
+		td->evtdev->event_handler(td->evtdev);
 	}
 
 	if (!cpumask_empty(mask)) {
@@ -279,17 +279,16 @@ static bool tick_do_broadcast(struct cpumask *mask)
 		td = &per_cpu(tick_cpu_device, cpumask_first(mask));
 		td->evtdev->broadcast(mask);
 	}
-	return local;
 }
 
 /*
  * Periodic broadcast:
  * - invoke the broadcast handlers
  */
-static bool tick_do_periodic_broadcast(void)
+static void tick_do_periodic_broadcast(void)
 {
 	cpumask_and(tmpmask, cpu_online_mask, tick_broadcast_mask);
-	return tick_do_broadcast(tmpmask);
+	tick_do_broadcast(tmpmask);
 }
 
 /*
@@ -297,26 +296,34 @@ static bool tick_do_periodic_broadcast(void)
  */
 static void tick_handle_periodic_broadcast(struct clock_event_device *dev)
 {
-	struct tick_device *td = this_cpu_ptr(&tick_cpu_device);
-	bool bc_local;
+	ktime_t next;
 
 	raw_spin_lock(&tick_broadcast_lock);
-	bc_local = tick_do_periodic_broadcast();
 
-	if (clockevent_state_oneshot(dev)) {
-		ktime_t next = ktime_add(dev->next_event, tick_period);
-
-		clockevents_program_event(dev, next, true);
-	}
-	raw_spin_unlock(&tick_broadcast_lock);
+	tick_do_periodic_broadcast();
 
 	/*
-	 * We run the handler of the local cpu after dropping
-	 * tick_broadcast_lock because the handler might deadlock when
-	 * trying to switch to oneshot mode.
+	 * The device is in periodic mode. No reprogramming necessary:
 	 */
-	if (bc_local)
-		td->evtdev->event_handler(td->evtdev);
+	if (dev->state == CLOCK_EVT_STATE_PERIODIC)
+		goto unlock;
+
+	/*
+	 * Setup the next period for devices, which do not have
+	 * periodic mode. We read dev->next_event first and add to it
+	 * when the event already expired. clockevents_program_event()
+	 * sets dev->next_event only when the event is really
+	 * programmed to the device.
+	 */
+	for (next = dev->next_event; ;) {
+		next = ktime_add(next, tick_period);
+
+		if (!clockevents_program_event(dev, next, false))
+			goto unlock;
+		tick_do_periodic_broadcast();
+	}
+unlock:
+	raw_spin_unlock(&tick_broadcast_lock);
 }
 
 /**
@@ -525,19 +532,23 @@ static void tick_broadcast_set_affinity(struct clock_event_device *bc,
 	irq_set_affinity(bc->irq, bc->cpumask);
 }
 
-static void tick_broadcast_set_event(struct clock_event_device *bc, int cpu,
-				     ktime_t expires)
+static int tick_broadcast_set_event(struct clock_event_device *bc, int cpu,
+				    ktime_t expires, int force)
 {
-	if (!clockevent_state_oneshot(bc))
-		clockevents_switch_state(bc, CLOCK_EVT_STATE_ONESHOT);
+	int ret;
 
-	clockevents_program_event(bc, expires, 1);
-	tick_broadcast_set_affinity(bc, cpumask_of(cpu));
+	if (bc->state != CLOCK_EVT_STATE_ONESHOT)
+		clockevents_set_state(bc, CLOCK_EVT_STATE_ONESHOT);
+
+	ret = clockevents_program_event(bc, expires, force);
+	if (!ret)
+		tick_broadcast_set_affinity(bc, cpumask_of(cpu));
+	return ret;
 }
 
 static void tick_resume_broadcast_oneshot(struct clock_event_device *bc)
 {
-	clockevents_switch_state(bc, CLOCK_EVT_STATE_ONESHOT);
+	clockevents_set_state(bc, CLOCK_EVT_STATE_ONESHOT);
 }
 
 /*
@@ -555,7 +566,7 @@ void tick_check_oneshot_broadcast_this_cpu(void)
 		 * switched over, leave the device alone.
 		 */
 		if (td->mode == TICKDEV_MODE_ONESHOT) {
-			clockevents_switch_state(td->evtdev,
+			clockevents_set_state(td->evtdev,
 					      CLOCK_EVT_STATE_ONESHOT);
 		}
 	}
@@ -569,9 +580,9 @@ static void tick_handle_oneshot_broadcast(struct clock_event_device *dev)
 	struct tick_device *td;
 	ktime_t now, next_event;
 	int cpu, next_cpu = 0;
-	bool bc_local;
 
 	raw_spin_lock(&tick_broadcast_lock);
+again:
 	dev->next_event.tv64 = KTIME_MAX;
 	next_event.tv64 = KTIME_MAX;
 	cpumask_clear(tmpmask);
@@ -613,7 +624,7 @@ static void tick_handle_oneshot_broadcast(struct clock_event_device *dev)
 	/*
 	 * Wakeup the cpus which have an expired event.
 	 */
-	bc_local = tick_do_broadcast(tmpmask);
+	tick_do_broadcast(tmpmask);
 
 	/*
 	 * Two reasons for reprogram:
@@ -625,15 +636,15 @@ static void tick_handle_oneshot_broadcast(struct clock_event_device *dev)
 	 * - There are pending events on sleeping CPUs which were not
 	 * in the event mask
 	 */
-	if (next_event.tv64 != KTIME_MAX)
-		tick_broadcast_set_event(dev, next_cpu, next_event);
-
-	raw_spin_unlock(&tick_broadcast_lock);
-
-	if (bc_local) {
-		td = this_cpu_ptr(&tick_cpu_device);
-		td->evtdev->event_handler(td->evtdev);
+	if (next_event.tv64 != KTIME_MAX) {
+		/*
+		 * Rearm the broadcast device. If event expired,
+		 * repeat the above
+		 */
+		if (tick_broadcast_set_event(dev, next_cpu, next_event, 0))
+			goto again;
 	}
+	raw_spin_unlock(&tick_broadcast_lock);
 }
 
 static int broadcast_needs_cpu(struct clock_event_device *bc, int cpu)
@@ -659,7 +670,7 @@ static void broadcast_shutdown_local(struct clock_event_device *bc,
 		if (dev->next_event.tv64 < bc->next_event.tv64)
 			return;
 	}
-	clockevents_switch_state(dev, CLOCK_EVT_STATE_SHUTDOWN);
+	clockevents_set_state(dev, CLOCK_EVT_STATE_SHUTDOWN);
 }
 
 /**
@@ -715,7 +726,7 @@ int tick_broadcast_oneshot_control(enum tick_broadcast_state state)
 			 */
 			if (!cpumask_test_cpu(cpu, tick_broadcast_force_mask) &&
 			    dev->next_event.tv64 < bc->next_event.tv64)
-				tick_broadcast_set_event(bc, cpu, dev->next_event);
+				tick_broadcast_set_event(bc, cpu, dev->next_event, 1);
 		}
 		/*
 		 * If the current CPU owns the hrtimer broadcast
@@ -729,7 +740,7 @@ int tick_broadcast_oneshot_control(enum tick_broadcast_state state)
 			cpumask_clear_cpu(cpu, tick_broadcast_oneshot_mask);
 	} else {
 		if (cpumask_test_and_clear_cpu(cpu, tick_broadcast_oneshot_mask)) {
-			clockevents_switch_state(dev, CLOCK_EVT_STATE_ONESHOT);
+			clockevents_set_state(dev, CLOCK_EVT_STATE_ONESHOT);
 			/*
 			 * The cpu which was handling the broadcast
 			 * timer marked this cpu in the broadcast
@@ -831,7 +842,7 @@ void tick_broadcast_setup_oneshot(struct clock_event_device *bc)
 
 	/* Set it up only once ! */
 	if (bc->event_handler != tick_handle_oneshot_broadcast) {
-		int was_periodic = clockevent_state_periodic(bc);
+		int was_periodic = bc->state == CLOCK_EVT_STATE_PERIODIC;
 
 		bc->event_handler = tick_handle_oneshot_broadcast;
 
@@ -847,10 +858,10 @@ void tick_broadcast_setup_oneshot(struct clock_event_device *bc)
 			   tick_broadcast_oneshot_mask, tmpmask);
 
 		if (was_periodic && !cpumask_empty(tmpmask)) {
-			clockevents_switch_state(bc, CLOCK_EVT_STATE_ONESHOT);
+			clockevents_set_state(bc, CLOCK_EVT_STATE_ONESHOT);
 			tick_broadcast_init_next_event(tmpmask,
 						       tick_next_period);
-			tick_broadcast_set_event(bc, cpu, tick_next_period);
+			tick_broadcast_set_event(bc, cpu, tick_next_period, 1);
 		} else
 			bc->next_event.tv64 = KTIME_MAX;
 	} else {

@@ -205,7 +205,6 @@ static bool
 socket_match(const struct sk_buff *skb, struct xt_action_param *par,
 	     const struct xt_socket_mtinfo1 *info)
 {
-	struct sk_buff *pskb = (struct sk_buff *)skb;
 	struct sock *sk = skb->sk;
 
 	if (!sk)
@@ -226,10 +225,6 @@ socket_match(const struct sk_buff *skb, struct xt_action_param *par,
 		 */
 		if (info->flags & XT_SOCKET_TRANSPARENT)
 			transparent = xt_socket_sk_is_transparent(sk);
-
-		if (info->flags & XT_SOCKET_RESTORESKMARK && !wildcard &&
-		    transparent)
-			pskb->mark = sk->sk_mark;
 
 		if (sk != skb->sk)
 			sock_gen_put(sk);
@@ -252,7 +247,7 @@ socket_mt4_v0(const struct sk_buff *skb, struct xt_action_param *par)
 }
 
 static bool
-socket_mt4_v1_v2_v3(const struct sk_buff *skb, struct xt_action_param *par)
+socket_mt4_v1_v2(const struct sk_buff *skb, struct xt_action_param *par)
 {
 	return socket_match(skb, par, par->matchinfo);
 }
@@ -376,10 +371,9 @@ static struct sock *xt_socket_lookup_slow_v6(const struct sk_buff *skb,
 }
 
 static bool
-socket_mt6_v1_v2_v3(const struct sk_buff *skb, struct xt_action_param *par)
+socket_mt6_v1_v2(const struct sk_buff *skb, struct xt_action_param *par)
 {
 	const struct xt_socket_mtinfo1 *info = (struct xt_socket_mtinfo1 *) par->matchinfo;
-	struct sk_buff *pskb = (struct sk_buff *)skb;
 	struct sock *sk = skb->sk;
 
 	if (!sk)
@@ -400,10 +394,6 @@ socket_mt6_v1_v2_v3(const struct sk_buff *skb, struct xt_action_param *par)
 		 */
 		if (info->flags & XT_SOCKET_TRANSPARENT)
 			transparent = xt_socket_sk_is_transparent(sk);
-
-		if (info->flags & XT_SOCKET_RESTORESKMARK && !wildcard &&
-		    transparent)
-			pskb->mark = sk->sk_mark;
 
 		if (sk != skb->sk)
 			sock_gen_put(sk);
@@ -438,19 +428,6 @@ static int socket_mt_v2_check(const struct xt_mtchk_param *par)
 	return 0;
 }
 
-static int socket_mt_v3_check(const struct xt_mtchk_param *par)
-{
-	const struct xt_socket_mtinfo3 *info =
-				    (struct xt_socket_mtinfo3 *)par->matchinfo;
-
-	if (info->flags & ~XT_SOCKET_FLAGS_V3) {
-		pr_info("unknown flags 0x%x\n",
-			info->flags & ~XT_SOCKET_FLAGS_V3);
-		return -EINVAL;
-	}
-	return 0;
-}
-
 static struct xt_match socket_mt_reg[] __read_mostly = {
 	{
 		.name		= "socket",
@@ -465,7 +442,7 @@ static struct xt_match socket_mt_reg[] __read_mostly = {
 		.name		= "socket",
 		.revision	= 1,
 		.family		= NFPROTO_IPV4,
-		.match		= socket_mt4_v1_v2_v3,
+		.match		= socket_mt4_v1_v2,
 		.checkentry	= socket_mt_v1_check,
 		.matchsize	= sizeof(struct xt_socket_mtinfo1),
 		.hooks		= (1 << NF_INET_PRE_ROUTING) |
@@ -477,7 +454,7 @@ static struct xt_match socket_mt_reg[] __read_mostly = {
 		.name		= "socket",
 		.revision	= 1,
 		.family		= NFPROTO_IPV6,
-		.match		= socket_mt6_v1_v2_v3,
+		.match		= socket_mt6_v1_v2,
 		.checkentry	= socket_mt_v1_check,
 		.matchsize	= sizeof(struct xt_socket_mtinfo1),
 		.hooks		= (1 << NF_INET_PRE_ROUTING) |
@@ -489,7 +466,7 @@ static struct xt_match socket_mt_reg[] __read_mostly = {
 		.name		= "socket",
 		.revision	= 2,
 		.family		= NFPROTO_IPV4,
-		.match		= socket_mt4_v1_v2_v3,
+		.match		= socket_mt4_v1_v2,
 		.checkentry	= socket_mt_v2_check,
 		.matchsize	= sizeof(struct xt_socket_mtinfo1),
 		.hooks		= (1 << NF_INET_PRE_ROUTING) |
@@ -501,32 +478,8 @@ static struct xt_match socket_mt_reg[] __read_mostly = {
 		.name		= "socket",
 		.revision	= 2,
 		.family		= NFPROTO_IPV6,
-		.match		= socket_mt6_v1_v2_v3,
+		.match		= socket_mt6_v1_v2,
 		.checkentry	= socket_mt_v2_check,
-		.matchsize	= sizeof(struct xt_socket_mtinfo1),
-		.hooks		= (1 << NF_INET_PRE_ROUTING) |
-				  (1 << NF_INET_LOCAL_IN),
-		.me		= THIS_MODULE,
-	},
-#endif
-	{
-		.name		= "socket",
-		.revision	= 3,
-		.family		= NFPROTO_IPV4,
-		.match		= socket_mt4_v1_v2_v3,
-		.checkentry	= socket_mt_v3_check,
-		.matchsize	= sizeof(struct xt_socket_mtinfo1),
-		.hooks		= (1 << NF_INET_PRE_ROUTING) |
-				  (1 << NF_INET_LOCAL_IN),
-		.me		= THIS_MODULE,
-	},
-#ifdef XT_SOCKET_HAVE_IPV6
-	{
-		.name		= "socket",
-		.revision	= 3,
-		.family		= NFPROTO_IPV6,
-		.match		= socket_mt6_v1_v2_v3,
-		.checkentry	= socket_mt_v3_check,
 		.matchsize	= sizeof(struct xt_socket_mtinfo1),
 		.hooks		= (1 << NF_INET_PRE_ROUTING) |
 				  (1 << NF_INET_LOCAL_IN),

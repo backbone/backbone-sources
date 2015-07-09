@@ -39,7 +39,7 @@ struct af9013_state {
 	u32 ucblocks;
 	u16 snr;
 	u32 bandwidth_hz;
-	enum fe_status fe_status;
+	fe_status_t fe_status;
 	unsigned long set_frontend_jiffies;
 	unsigned long read_status_jiffies;
 	bool first_tune;
@@ -605,10 +605,6 @@ static int af9013_set_frontend(struct dvb_frontend *fe)
 			}
 		}
 
-		/* Return an error if can't find bandwidth or the right clock */
-		if (i == ARRAY_SIZE(coeff_lut))
-			return -EINVAL;
-
 		ret = af9013_wr_regs(state, 0xae00, coeff_lut[i].val,
 			sizeof(coeff_lut[i].val));
 	}
@@ -983,7 +979,7 @@ err:
 	return ret;
 }
 
-static int af9013_read_status(struct dvb_frontend *fe, enum fe_status *status)
+static int af9013_read_status(struct dvb_frontend *fe, fe_status_t *status)
 {
 	struct af9013_state *state = fe->demodulator_priv;
 	int ret;

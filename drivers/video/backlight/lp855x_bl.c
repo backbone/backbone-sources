@@ -257,15 +257,21 @@ static void lp855x_pwm_ctrl(struct lp855x *lp, int br, int max_br)
 static int lp855x_bl_update_status(struct backlight_device *bl)
 {
 	struct lp855x *lp = bl_get_data(bl);
-	int brightness = bl->props.brightness;
 
 	if (bl->props.state & (BL_CORE_SUSPENDED | BL_CORE_FBBLANK))
-		brightness = 0;
+		bl->props.brightness = 0;
 
-	if (lp->mode == PWM_BASED)
-		lp855x_pwm_ctrl(lp, brightness, bl->props.max_brightness);
-	else if (lp->mode == REGISTER_BASED)
-		lp855x_write_byte(lp, lp->cfg->reg_brightness, (u8)brightness);
+	if (lp->mode == PWM_BASED) {
+		int br = bl->props.brightness;
+		int max_br = bl->props.max_brightness;
+
+		lp855x_pwm_ctrl(lp, br, max_br);
+
+	} else if (lp->mode == REGISTER_BASED) {
+		u8 val = bl->props.brightness;
+
+		lp855x_write_byte(lp, lp->cfg->reg_brightness, val);
+	}
 
 	return 0;
 }

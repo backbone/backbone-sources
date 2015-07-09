@@ -59,13 +59,14 @@ END_FTR_SECTION_IFSET(CPU_FTR_REAL_LE)				\
 
 #if defined(CONFIG_RELOCATABLE)
 	/*
-	 * We can't branch directly so we do it via the CTR which
-	 * is volatile across system calls.
+	 * We can't branch directly; in the direct case we use LR
+	 * and system_call_entry restores LR.  (We thus need to move
+	 * LR to r10 in the RFID case too.)
 	 */
 #define SYSCALL_PSERIES_2_DIRECT				\
 	mflr	r10 ;						\
 	ld	r12,PACAKBASE(r13) ; 				\
-	LOAD_HANDLER(r12, system_call_entry) ;			\
+	LOAD_HANDLER(r12, system_call_entry_direct) ;		\
 	mtctr	r12 ;						\
 	mfspr	r12,SPRN_SRR1 ;					\
 	/* Re-use of r13... No spare regs to do this */	\
@@ -79,7 +80,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_REAL_LE)				\
 	mfspr	r12,SPRN_SRR1 ;					\
 	li	r10,MSR_RI ;					\
 	mtmsrd 	r10,1 ;			/* Set RI (EE=0) */	\
-	b	system_call_common ;
+	b	system_call_entry_direct ;
 #endif
 
 /*
@@ -968,6 +969,13 @@ hv_facility_unavailable_relon_trampoline:
 __end_interrupts:
 
 	.align	7
+system_call_entry_direct:
+#if defined(CONFIG_RELOCATABLE)
+	/* The first level prologue may have used LR to get here, saving
+	 * orig in r10.  To save hacking/ifdeffing common code, restore here.
+	 */
+	mtlr	r10
+#endif
 system_call_entry:
 	b	system_call_common
 

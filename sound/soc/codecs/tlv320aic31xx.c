@@ -646,7 +646,7 @@ static int aic31xx_add_controls(struct snd_soc_codec *codec)
 
 static int aic31xx_add_widgets(struct snd_soc_codec *codec)
 {
-	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
+	struct snd_soc_dapm_context *dapm = &codec->dapm;
 	struct aic31xx_priv *aic31xx = snd_soc_codec_get_drvdata(codec);
 	int ret = 0;
 
@@ -1027,17 +1027,17 @@ static int aic31xx_set_bias_level(struct snd_soc_codec *codec,
 				  enum snd_soc_bias_level level)
 {
 	dev_dbg(codec->dev, "## %s: %d -> %d\n", __func__,
-		snd_soc_codec_get_bias_level(codec), level);
+		codec->dapm.bias_level, level);
 
 	switch (level) {
 	case SND_SOC_BIAS_ON:
 		break;
 	case SND_SOC_BIAS_PREPARE:
-		if (snd_soc_codec_get_bias_level(codec) == SND_SOC_BIAS_STANDBY)
+		if (codec->dapm.bias_level == SND_SOC_BIAS_STANDBY)
 			aic31xx_clk_on(codec);
 		break;
 	case SND_SOC_BIAS_STANDBY:
-		switch (snd_soc_codec_get_bias_level(codec)) {
+		switch (codec->dapm.bias_level) {
 		case SND_SOC_BIAS_OFF:
 			aic31xx_power_on(codec);
 			break;
@@ -1049,10 +1049,11 @@ static int aic31xx_set_bias_level(struct snd_soc_codec *codec,
 		}
 		break;
 	case SND_SOC_BIAS_OFF:
-		if (snd_soc_codec_get_bias_level(codec) == SND_SOC_BIAS_STANDBY)
+		if (codec->dapm.bias_level == SND_SOC_BIAS_STANDBY)
 			aic31xx_power_off(codec);
 		break;
 	}
+	codec->dapm.bias_level = level;
 
 	return 0;
 }

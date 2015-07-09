@@ -327,7 +327,8 @@ static int neponset_probe(struct platform_device *dev)
 	irq_set_chip(d->irq_base + NEP_IRQ_SA1111, &nochip);
 
 	irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
-	irq_set_chained_handler_and_data(irq, neponset_irq_handler, d);
+	irq_set_handler_data(irq, d);
+	irq_set_chained_handler(irq, neponset_irq_handler);
 
 	/*
 	 * We would set IRQ_GPIO25 to be a wake-up IRQ, but unfortunately

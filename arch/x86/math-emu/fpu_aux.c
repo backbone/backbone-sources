@@ -30,7 +30,7 @@ static void fclex(void)
 }
 
 /* Needs to be externally visible */
-void fpstate_init_soft(struct swregs_state *soft)
+void finit_soft_fpu(struct i387_soft_struct *soft)
 {
 	struct address *oaddr, *iaddr;
 	memset(soft, 0, sizeof(*soft));
@@ -52,7 +52,7 @@ void fpstate_init_soft(struct swregs_state *soft)
 
 void finit(void)
 {
-	fpstate_init_soft(&current->thread.fpu.state.soft);
+	finit_soft_fpu(&current->thread.fpu.state->soft);
 }
 
 /*

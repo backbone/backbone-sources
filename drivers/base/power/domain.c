@@ -181,7 +181,7 @@ static void genpd_recalc_cpu_exit_latency(struct generic_pm_domain *genpd)
 	genpd->cpuidle_data->idle_state->exit_latency = usecs64;
 }
 
-static int genpd_power_on(struct generic_pm_domain *genpd, bool timed)
+static int genpd_power_on(struct generic_pm_domain *genpd)
 {
 	ktime_t time_start;
 	s64 elapsed_ns;
@@ -189,9 +189,6 @@ static int genpd_power_on(struct generic_pm_domain *genpd, bool timed)
 
 	if (!genpd->power_on)
 		return 0;
-
-	if (!timed)
-		return genpd->power_on(genpd);
 
 	time_start = ktime_get();
 	ret = genpd->power_on(genpd);
@@ -211,7 +208,7 @@ static int genpd_power_on(struct generic_pm_domain *genpd, bool timed)
 	return ret;
 }
 
-static int genpd_power_off(struct generic_pm_domain *genpd, bool timed)
+static int genpd_power_off(struct generic_pm_domain *genpd)
 {
 	ktime_t time_start;
 	s64 elapsed_ns;
@@ -219,9 +216,6 @@ static int genpd_power_off(struct generic_pm_domain *genpd, bool timed)
 
 	if (!genpd->power_off)
 		return 0;
-
-	if (!timed)
-		return genpd->power_off(genpd);
 
 	time_start = ktime_get();
 	ret = genpd->power_off(genpd);
@@ -311,7 +305,7 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
 		}
 	}
 
-	ret = genpd_power_on(genpd, true);
+	ret = genpd_power_on(genpd);
 	if (ret)
 		goto err;
 
@@ -621,7 +615,7 @@ static int pm_genpd_poweroff(struct generic_pm_domain *genpd)
 		 * the pm_genpd_poweron() restore power for us (this shouldn't
 		 * happen very often).
 		 */
-		ret = genpd_power_off(genpd, true);
+		ret = genpd_power_off(genpd);
 		if (ret == -EBUSY) {
 			genpd_set_active(genpd);
 			goto out;
@@ -833,7 +827,6 @@ static bool genpd_dev_active_wakeup(struct generic_pm_domain *genpd,
 /**
  * pm_genpd_sync_poweroff - Synchronously power off a PM domain and its masters.
  * @genpd: PM domain to power off, if possible.
- * @timed: True if latency measurements are allowed.
  *
  * Check if the given PM domain can be powered off (during system suspend or
  * hibernation) and do that if so.  Also, in that case propagate to its masters.
@@ -843,8 +836,7 @@ static bool genpd_dev_active_wakeup(struct generic_pm_domain *genpd,
  * executed sequentially, so it is guaranteed that it will never run twice in
  * parallel).
  */
-static void pm_genpd_sync_poweroff(struct generic_pm_domain *genpd,
-				   bool timed)
+static void pm_genpd_sync_poweroff(struct generic_pm_domain *genpd)
 {
 	struct gpd_link *link;
 
@@ -855,28 +847,26 @@ static void pm_genpd_sync_poweroff(struct generic_pm_domain *genpd,
 	    || atomic_read(&genpd->sd_count) > 0)
 		return;
 
-	genpd_power_off(genpd, timed);
+	genpd_power_off(genpd);
 
 	genpd->status = GPD_STATE_POWER_OFF;
 
 	list_for_each_entry(link, &genpd->slave_links, slave_node) {
 		genpd_sd_counter_dec(link->master);
-		pm_genpd_sync_poweroff(link->master, timed);
+		pm_genpd_sync_poweroff(link->master);
 	}
 }
 
 /**
  * pm_genpd_sync_poweron - Synchronously power on a PM domain and its masters.
  * @genpd: PM domain to power on.
- * @timed: True if latency measurements are allowed.
  *
  * This function is only called in "noirq" and "syscore" stages of system power
  * transitions, so it need not acquire locks (all of the "noirq" callbacks are
  * executed sequentially, so it is guaranteed that it will never run twice in
  * parallel).
  */
-static void pm_genpd_sync_poweron(struct generic_pm_domain *genpd,
-				  bool timed)
+static void pm_genpd_sync_poweron(struct generic_pm_domain *genpd)
 {
 	struct gpd_link *link;
 
@@ -884,11 +874,11 @@ static void pm_genpd_sync_poweron(struct generic_pm_domain *genpd,
 		return;
 
 	list_for_each_entry(link, &genpd->slave_links, slave_node) {
-		pm_genpd_sync_poweron(link->master, timed);
+		pm_genpd_sync_poweron(link->master);
 		genpd_sd_counter_inc(link->master);
 	}
 
-	genpd_power_on(genpd, timed);
+	genpd_power_on(genpd);
 
 	genpd->status = GPD_STATE_ACTIVE;
 }
@@ -1066,7 +1056,7 @@ static int pm_genpd_suspend_noirq(struct device *dev)
 	 * the same PM domain, so it is not necessary to use locking here.
 	 */
 	genpd->suspended_count++;
-	pm_genpd_sync_poweroff(genpd, true);
+	pm_genpd_sync_poweroff(genpd);
 
 	return 0;
 }
@@ -1096,7 +1086,7 @@ static int pm_genpd_resume_noirq(struct device *dev)
 	 * guaranteed that this function will never run twice in parallel for
 	 * the same PM domain, so it is not necessary to use locking here.
 	 */
-	pm_genpd_sync_poweron(genpd, true);
+	pm_genpd_sync_poweron(genpd);
 	genpd->suspended_count--;
 
 	return genpd_start_dev(genpd, dev);
@@ -1310,7 +1300,7 @@ static int pm_genpd_restore_noirq(struct device *dev)
 			 * If the domain was off before the hibernation, make
 			 * sure it will be off going forward.
 			 */
-			genpd_power_off(genpd, true);
+			genpd_power_off(genpd);
 
 			return 0;
 		}
@@ -1319,7 +1309,7 @@ static int pm_genpd_restore_noirq(struct device *dev)
 	if (genpd->suspend_power_off)
 		return 0;
 
-	pm_genpd_sync_poweron(genpd, true);
+	pm_genpd_sync_poweron(genpd);
 
 	return genpd_start_dev(genpd, dev);
 }
@@ -1377,9 +1367,9 @@ static void genpd_syscore_switch(struct device *dev, bool suspend)
 
 	if (suspend) {
 		genpd->suspended_count++;
-		pm_genpd_sync_poweroff(genpd, false);
+		pm_genpd_sync_poweroff(genpd);
 	} else {
-		pm_genpd_sync_poweron(genpd, false);
+		pm_genpd_sync_poweron(genpd);
 		genpd->suspended_count--;
 	}
 }

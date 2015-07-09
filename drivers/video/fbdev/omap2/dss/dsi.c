@@ -40,7 +40,6 @@
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
-#include <linux/component.h>
 
 #include <video/omapdss.h>
 #include <video/mipi_display.h>
@@ -5275,9 +5274,8 @@ static int dsi_init_pll_data(struct platform_device *dsidev)
 }
 
 /* DSI1 HW IP initialisation */
-static int dsi_bind(struct device *dev, struct device *master, void *data)
+static int omap_dsihw_probe(struct platform_device *dsidev)
 {
-	struct platform_device *dsidev = to_platform_device(dev);
 	u32 rev;
 	int r, i;
 	struct dsi_data *dsi;
@@ -5486,9 +5484,8 @@ err_runtime_get:
 	return r;
 }
 
-static void dsi_unbind(struct device *dev, struct device *master, void *data)
+static int __exit omap_dsihw_remove(struct platform_device *dsidev)
 {
-	struct platform_device *dsidev = to_platform_device(dev);
 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
 
 	of_platform_depopulate(&dsidev->dev);
@@ -5505,21 +5502,7 @@ static void dsi_unbind(struct device *dev, struct device *master, void *data)
 		regulator_disable(dsi->vdds_dsi_reg);
 		dsi->vdds_dsi_enabled = false;
 	}
-}
 
-static const struct component_ops dsi_component_ops = {
-	.bind	= dsi_bind,
-	.unbind	= dsi_unbind,
-};
-
-static int dsi_probe(struct platform_device *pdev)
-{
-	return component_add(&pdev->dev, &dsi_component_ops);
-}
-
-static int dsi_remove(struct platform_device *pdev)
-{
-	component_del(&pdev->dev, &dsi_component_ops);
 	return 0;
 }
 
@@ -5586,8 +5569,8 @@ static const struct of_device_id dsi_of_match[] = {
 };
 
 static struct platform_driver omap_dsihw_driver = {
-	.probe		= dsi_probe,
-	.remove		= dsi_remove,
+	.probe		= omap_dsihw_probe,
+	.remove         = __exit_p(omap_dsihw_remove),
 	.driver         = {
 		.name   = "omapdss_dsi",
 		.pm	= &dsi_pm_ops,
@@ -5601,7 +5584,7 @@ int __init dsi_init_platform_driver(void)
 	return platform_driver_register(&omap_dsihw_driver);
 }
 
-void dsi_uninit_platform_driver(void)
+void __exit dsi_uninit_platform_driver(void)
 {
 	platform_driver_unregister(&omap_dsihw_driver);
 }

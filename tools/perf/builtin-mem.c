@@ -74,7 +74,7 @@ dump_raw_samples(struct perf_tool *tool,
 	}
 
 	if (al.filtered || (mem->hide_unresolved && al.sym == NULL))
-		goto out_put;
+		return 0;
 
 	if (al.map != NULL)
 		al.map->dso->hit = 1;
@@ -103,8 +103,7 @@ dump_raw_samples(struct perf_tool *tool,
 		symbol_conf.field_sep,
 		al.map ? (al.map->dso ? al.map->dso->long_name : "???") : "???",
 		al.sym ? al.sym->name : "???");
-out_put:
-	addr_location__put(&al);
+
 	return 0;
 }
 

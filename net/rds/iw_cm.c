@@ -179,7 +179,6 @@ static int rds_iw_init_qp_attrs(struct ib_qp_init_attr *attr,
 		void *context)
 {
 	struct ib_device *dev = rds_iwdev->dev;
-	struct ib_cq_init_attr cq_attr = {};
 	unsigned int send_size, recv_size;
 	int ret;
 
@@ -199,10 +198,9 @@ static int rds_iw_init_qp_attrs(struct ib_qp_init_attr *attr,
 	attr->sq_sig_type = IB_SIGNAL_REQ_WR;
 	attr->qp_type = IB_QPT_RC;
 
-	cq_attr.cqe = send_size;
 	attr->send_cq = ib_create_cq(dev, send_cq_handler,
 				     rds_iw_cq_event_handler,
-				     context, &cq_attr);
+				     context, send_size, 0);
 	if (IS_ERR(attr->send_cq)) {
 		ret = PTR_ERR(attr->send_cq);
 		attr->send_cq = NULL;
@@ -210,10 +208,9 @@ static int rds_iw_init_qp_attrs(struct ib_qp_init_attr *attr,
 		goto out;
 	}
 
-	cq_attr.cqe = recv_size;
 	attr->recv_cq = ib_create_cq(dev, recv_cq_handler,
 				     rds_iw_cq_event_handler,
-				     context, &cq_attr);
+				     context, recv_size, 0);
 	if (IS_ERR(attr->recv_cq)) {
 		ret = PTR_ERR(attr->recv_cq);
 		attr->recv_cq = NULL;

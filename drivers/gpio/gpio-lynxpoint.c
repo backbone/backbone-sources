@@ -72,7 +72,7 @@ struct lp_gpio {
  *
  * per gpio specific registers consist of two 32bit registers per gpio
  * (LP_CONFIG1 and LP_CONFIG2), with 94 gpios there's a total of
- * 188 config registers.
+ * 188 config registes.
  *
  * A simplified view of the register layout look like this:
  *

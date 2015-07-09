@@ -172,8 +172,8 @@ void cxl_handle_fault(struct work_struct *fault_work)
 		container_of(fault_work, struct cxl_context, fault_work);
 	u64 dsisr = ctx->dsisr;
 	u64 dar = ctx->dar;
-	struct task_struct *task = NULL;
-	struct mm_struct *mm = NULL;
+	struct task_struct *task;
+	struct mm_struct *mm;
 
 	if (cxl_p2n_read(ctx->afu, CXL_PSL_DSISR_An) != dsisr ||
 	    cxl_p2n_read(ctx->afu, CXL_PSL_DAR_An) != dar ||
@@ -194,19 +194,17 @@ void cxl_handle_fault(struct work_struct *fault_work)
 	pr_devel("CXL BOTTOM HALF handling fault for afu pe: %i. "
 		"DSISR: %#llx DAR: %#llx\n", ctx->pe, dsisr, dar);
 
-	if (!ctx->kernel) {
-		if (!(task = get_pid_task(ctx->pid, PIDTYPE_PID))) {
-			pr_devel("cxl_handle_fault unable to get task %i\n",
-				 pid_nr(ctx->pid));
-			cxl_ack_ae(ctx);
-			return;
-		}
-		if (!(mm = get_task_mm(task))) {
-			pr_devel("cxl_handle_fault unable to get mm %i\n",
-				 pid_nr(ctx->pid));
-			cxl_ack_ae(ctx);
-			goto out;
-		}
+	if (!(task = get_pid_task(ctx->pid, PIDTYPE_PID))) {
+		pr_devel("cxl_handle_fault unable to get task %i\n",
+			 pid_nr(ctx->pid));
+		cxl_ack_ae(ctx);
+		return;
+	}
+	if (!(mm = get_task_mm(task))) {
+		pr_devel("cxl_handle_fault unable to get mm %i\n",
+			 pid_nr(ctx->pid));
+		cxl_ack_ae(ctx);
+		goto out;
 	}
 
 	if (dsisr & CXL_PSL_DSISR_An_DS)
@@ -216,11 +214,9 @@ void cxl_handle_fault(struct work_struct *fault_work)
 	else
 		WARN(1, "cxl_handle_fault has nothing to handle\n");
 
-	if (mm)
-		mmput(mm);
+	mmput(mm);
 out:
-	if (task)
-		put_task_struct(task);
+	put_task_struct(task);
 }
 
 static void cxl_prefault_one(struct cxl_context *ctx, u64 ea)

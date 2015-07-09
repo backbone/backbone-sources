@@ -167,16 +167,23 @@ static void ieee80211_tdls_add_bss_coex_ie(struct sk_buff *skb)
 static u16 ieee80211_get_tdls_sta_capab(struct ieee80211_sub_if_data *sdata,
 					u16 status_code)
 {
+	struct ieee80211_local *local = sdata->local;
+	u16 capab;
+
 	/* The capability will be 0 when sending a failure code */
 	if (status_code != 0)
 		return 0;
 
-	if (ieee80211_get_sdata_band(sdata) == IEEE80211_BAND_2GHZ) {
-		return WLAN_CAPABILITY_SHORT_SLOT_TIME |
-		       WLAN_CAPABILITY_SHORT_PREAMBLE;
-	}
+	capab = 0;
+	if (ieee80211_get_sdata_band(sdata) != IEEE80211_BAND_2GHZ)
+		return capab;
 
-	return 0;
+	if (!(local->hw.flags & IEEE80211_HW_2GHZ_SHORT_SLOT_INCAPABLE))
+		capab |= WLAN_CAPABILITY_SHORT_SLOT_TIME;
+	if (!(local->hw.flags & IEEE80211_HW_2GHZ_SHORT_PREAMBLE_INCAPABLE))
+		capab |= WLAN_CAPABILITY_SHORT_PREAMBLE;
+
+	return capab;
 }
 
 static void ieee80211_tdls_add_link_ie(struct ieee80211_sub_if_data *sdata,
@@ -520,19 +527,30 @@ ieee80211_tdls_add_setup_cfm_ies(struct ieee80211_sub_if_data *sdata,
 
 	/* if HT support is only added in TDLS, we need an HT-operation IE */
 	if (!ap_sta->sta.ht_cap.ht_supported && sta->sta.ht_cap.ht_supported) {
-		pos = skb_put(skb, 2 + sizeof(struct ieee80211_ht_operation));
-		/* send an empty HT operation IE */
-		ieee80211_ie_build_ht_oper(pos, &sta->sta.ht_cap,
-					   &sdata->vif.bss_conf.chandef, 0);
+		struct ieee80211_chanctx_conf *chanctx_conf =
+				rcu_dereference(sdata->vif.chanctx_conf);
+		if (!WARN_ON(!chanctx_conf)) {
+			pos = skb_put(skb, 2 +
+				      sizeof(struct ieee80211_ht_operation));
+			/* send an empty HT operation IE */
+			ieee80211_ie_build_ht_oper(pos, &sta->sta.ht_cap,
+						   &chanctx_conf->def, 0);
+		}
 	}
 
 	ieee80211_tdls_add_link_ie(sdata, skb, peer, initiator);
 
 	/* only include VHT-operation if not on the 2.4GHz band */
-	if (band != IEEE80211_BAND_2GHZ && sta->sta.vht_cap.vht_supported) {
-		pos = skb_put(skb, 2 + sizeof(struct ieee80211_vht_operation));
-		ieee80211_ie_build_vht_oper(pos, &sta->sta.vht_cap,
-					    &sdata->vif.bss_conf.chandef);
+	if (band != IEEE80211_BAND_2GHZ && !ap_sta->sta.vht_cap.vht_supported &&
+	    sta->sta.vht_cap.vht_supported) {
+		struct ieee80211_chanctx_conf *chanctx_conf =
+				rcu_dereference(sdata->vif.chanctx_conf);
+		if (!WARN_ON(!chanctx_conf)) {
+			pos = skb_put(skb, 2 +
+				      sizeof(struct ieee80211_vht_operation));
+			ieee80211_ie_build_vht_oper(pos, &sta->sta.vht_cap,
+						    &chanctx_conf->def);
+		}
 	}
 
 	rcu_read_unlock();
@@ -935,7 +953,7 @@ ieee80211_tdls_prep_mgmt_packet(struct wiphy *wiphy, struct net_device *dev,
 	 * packet through the AP.
 	 */
 	if ((action_code == WLAN_TDLS_TEARDOWN) &&
-	    ieee80211_hw_check(&sdata->local->hw, REPORTS_TX_ACK_STATUS)) {
+	    (sdata->local->hw.flags & IEEE80211_HW_REPORTS_TX_ACK_STATUS)) {
 		bool try_resend; /* Should we keep skb for possible resend */
 
 		/* If not sending directly to peer - no point in keeping skb */
@@ -1176,12 +1194,6 @@ int ieee80211_tdls_oper(struct wiphy *wiphy, struct net_device *dev,
 
 	switch (oper) {
 	case NL80211_TDLS_ENABLE_LINK:
-		if (sdata->vif.csa_active) {
-			tdls_dbg(sdata, "TDLS: disallow link during CSA\n");
-			ret = -EBUSY;
-			break;
-		}
-
 		rcu_read_lock();
 		sta = sta_info_get(sdata, peer);
 		if (!sta) {

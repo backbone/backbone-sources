@@ -36,8 +36,6 @@
 #include "util/data.h"
 #include "arch/common.h"
 
-#include "util/auxtrace.h"
-
 #include <dlfcn.h>
 #include <linux/bitmap.h>
 
@@ -139,12 +137,10 @@ static int process_sample_event(struct perf_tool *tool,
 	struct report *rep = container_of(tool, struct report, tool);
 	struct addr_location al;
 	struct hist_entry_iter iter = {
-		.evsel 			= evsel,
-		.sample 		= sample,
-		.hide_unresolved 	= rep->hide_unresolved,
-		.add_entry_cb 		= hist_iter__report_callback,
+		.hide_unresolved = rep->hide_unresolved,
+		.add_entry_cb = hist_iter__report_callback,
 	};
-	int ret = 0;
+	int ret;
 
 	if (perf_event__preprocess_sample(event, machine, &al, sample) < 0) {
 		pr_debug("problem processing %d event, skipping it.\n",
@@ -153,10 +149,10 @@ static int process_sample_event(struct perf_tool *tool,
 	}
 
 	if (rep->hide_unresolved && al.sym == NULL)
-		goto out_put;
+		return 0;
 
 	if (rep->cpu_list && !test_bit(sample->cpu, rep->cpu_bitmap))
-		goto out_put;
+		return 0;
 
 	if (sort__mode == SORT_MODE__BRANCH)
 		iter.ops = &hist_iter_branch;
@@ -170,11 +166,11 @@ static int process_sample_event(struct perf_tool *tool,
 	if (al.map != NULL)
 		al.map->dso->hit = 1;
 
-	ret = hist_entry_iter__add(&iter, &al, rep->max_stack, rep);
+	ret = hist_entry_iter__add(&iter, &al, evsel, sample, rep->max_stack,
+				   rep);
 	if (ret < 0)
 		pr_debug("problem adding hist entry, skipping event\n");
-out_put:
-	addr_location__put(&al);
+
 	return ret;
 }
 
@@ -320,7 +316,6 @@ static int perf_evlist__tty_browse_hists(struct perf_evlist *evlist,
 {
 	struct perf_evsel *pos;
 
-	fprintf(stdout, "#\n# Total Lost Samples: %" PRIu64 "\n#\n", evlist->stats.total_lost_samples);
 	evlist__for_each(evlist, pos) {
 		struct hists *hists = evsel__hists(pos);
 		const char *evname = perf_evsel__name(pos);
@@ -335,14 +330,15 @@ static int perf_evlist__tty_browse_hists(struct perf_evlist *evlist,
 	}
 
 	if (sort_order == NULL &&
-	    parent_pattern == default_parent_pattern)
+	    parent_pattern == default_parent_pattern) {
 		fprintf(stdout, "#\n# (%s)\n#\n", help);
 
-	if (rep->show_threads) {
-		bool style = !strcmp(rep->pretty_printing_style, "raw");
-		perf_read_values_display(stdout, &rep->show_threads_values,
-					 style);
-		perf_read_values_destroy(&rep->show_threads_values);
+		if (rep->show_threads) {
+			bool style = !strcmp(rep->pretty_printing_style, "raw");
+			perf_read_values_display(stdout, &rep->show_threads_values,
+						 style);
+			perf_read_values_destroy(&rep->show_threads_values);
+		}
 	}
 
 	return 0;
@@ -589,7 +585,6 @@ parse_percent_limit(const struct option *opt, const char *str,
 int cmd_report(int argc, const char **argv, const char *prefix __maybe_unused)
 {
 	struct perf_session *session;
-	struct itrace_synth_opts itrace_synth_opts = { .set = 0, };
 	struct stat st;
 	bool has_br_stack = false;
 	int branch_mode = -1;
@@ -612,9 +607,6 @@ int cmd_report(int argc, const char **argv, const char *prefix __maybe_unused)
 			.attr		 = perf_event__process_attr,
 			.tracing_data	 = perf_event__process_tracing_data,
 			.build_id	 = perf_event__process_build_id,
-			.id_index	 = perf_event__process_id_index,
-			.auxtrace_info	 = perf_event__process_auxtrace_info,
-			.auxtrace	 = perf_event__process_auxtrace,
 			.ordered_events	 = true,
 			.ordering_requires_timestamps = true,
 		},
@@ -725,9 +717,6 @@ int cmd_report(int argc, const char **argv, const char *prefix __maybe_unused)
 		     "Don't show entries under that percent", parse_percent_limit),
 	OPT_CALLBACK(0, "percentage", NULL, "relative|absolute",
 		     "how to display percentage of filtered entries", parse_filter_percentage),
-	OPT_CALLBACK_OPTARG(0, "itrace", &itrace_synth_opts, NULL, "opts",
-			    "Instruction Tracing options",
-			    itrace_parse_synth_opts),
 	OPT_END()
 	};
 	struct perf_data_file file = {
@@ -772,8 +761,6 @@ repeat:
 					       report.queue_size);
 	}
 
-	session->itrace_synth_opts = &itrace_synth_opts;
-
 	report.session = session;
 
 	has_br_stack = perf_header__has_feat(&session->header,
@@ -816,8 +803,8 @@ repeat:
 		goto error;
 	}
 
-	/* Force tty output for header output and per-thread stat. */
-	if (report.header || report.header_only || report.show_threads)
+	/* Force tty output for header output. */
+	if (report.header || report.header_only)
 		use_browser = 0;
 
 	if (strcmp(input_name, "-") != 0)

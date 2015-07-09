@@ -58,7 +58,6 @@
 #include <net/ipv6.h>
 #include <net/ip.h>
 #include <net/dsa.h>
-#include <net/flow_dissector.h>
 #include <linux/uaccess.h>
 
 __setup("ether=", netdev_boot_setup);
@@ -131,9 +130,9 @@ u32 eth_get_headlen(void *data, unsigned int len)
 		return len;
 
 	/* parse any remaining L2/L3 headers, check for L4 */
-	if (!skb_flow_dissect_flow_keys_buf(&keys, data, eth->h_proto,
-					    sizeof(*eth), len))
-		return max_t(u32, keys.control.thoff, sizeof(*eth));
+	if (!__skb_flow_dissect(NULL, &keys, data,
+				eth->h_proto, sizeof(*eth), len))
+		return max_t(u32, keys.thoff, sizeof(*eth));
 
 	/* parse for any L4 headers */
 	return min_t(u32, __skb_get_poff(NULL, data, &keys, len), len);
@@ -157,11 +156,10 @@ __be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 
 	skb->dev = dev;
 	skb_reset_mac_header(skb);
-
-	eth = (struct ethhdr *)skb->data;
 	skb_pull_inline(skb, ETH_HLEN);
+	eth = eth_hdr(skb);
 
-	if (unlikely(is_multicast_ether_addr_64bits(eth->h_dest))) {
+	if (unlikely(is_multicast_ether_addr(eth->h_dest))) {
 		if (ether_addr_equal_64bits(eth->h_dest, dev->broadcast))
 			skb->pkt_type = PACKET_BROADCAST;
 		else
@@ -180,7 +178,7 @@ __be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 	if (unlikely(netdev_uses_dsa(dev)))
 		return htons(ETH_P_XDSA);
 
-	if (likely(eth_proto_is_802_3(eth->h_proto)))
+	if (likely(ntohs(eth->h_proto) >= ETH_P_802_3_MIN))
 		return eth->h_proto;
 
 	/*
@@ -470,7 +468,6 @@ EXPORT_SYMBOL(eth_gro_complete);
 
 static struct packet_offload eth_packet_offload __read_mostly = {
 	.type = cpu_to_be16(ETH_P_TEB),
-	.priority = 10,
 	.callbacks = {
 		.gro_receive = eth_gro_receive,
 		.gro_complete = eth_gro_complete,

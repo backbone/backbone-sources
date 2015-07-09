@@ -70,26 +70,6 @@ static void self_vtbl_check(const struct ubi_device *ubi);
 static struct ubi_vtbl_record empty_vtbl_record;
 
 /**
- * ubi_update_layout_vol - helper for updatting layout volumes on flash
- * @ubi: UBI device description object
- */
-static int ubi_update_layout_vol(struct ubi_device *ubi)
-{
-	struct ubi_volume *layout_vol;
-	int i, err;
-
-	layout_vol = ubi->volumes[vol_id2idx(ubi, UBI_LAYOUT_VOLUME_ID)];
-	for (i = 0; i < UBI_LAYOUT_VOLUME_EBS; i++) {
-		err = ubi_eba_atomic_leb_change(ubi, layout_vol, i, ubi->vtbl,
-						ubi->vtbl_size);
-		if (err)
-			return err;
-	}
-
-	return 0;
-}
-
-/**
  * ubi_change_vtbl_record - change volume table record.
  * @ubi: UBI device description object
  * @idx: table index to change
@@ -103,10 +83,12 @@ static int ubi_update_layout_vol(struct ubi_device *ubi)
 int ubi_change_vtbl_record(struct ubi_device *ubi, int idx,
 			   struct ubi_vtbl_record *vtbl_rec)
 {
-	int err;
+	int i, err;
 	uint32_t crc;
+	struct ubi_volume *layout_vol;
 
 	ubi_assert(idx >= 0 && idx < ubi->vtbl_slots);
+	layout_vol = ubi->volumes[vol_id2idx(ubi, UBI_LAYOUT_VOLUME_ID)];
 
 	if (!vtbl_rec)
 		vtbl_rec = &empty_vtbl_record;
@@ -116,10 +98,15 @@ int ubi_change_vtbl_record(struct ubi_device *ubi, int idx,
 	}
 
 	memcpy(&ubi->vtbl[idx], vtbl_rec, sizeof(struct ubi_vtbl_record));
-	err = ubi_update_layout_vol(ubi);
+	for (i = 0; i < UBI_LAYOUT_VOLUME_EBS; i++) {
+		err = ubi_eba_atomic_leb_change(ubi, layout_vol, i, ubi->vtbl,
+						ubi->vtbl_size);
+		if (err)
+			return err;
+	}
 
 	self_vtbl_check(ubi);
-	return err ? err : 0;
+	return 0;
 }
 
 /**
@@ -134,7 +121,9 @@ int ubi_change_vtbl_record(struct ubi_device *ubi, int idx,
 int ubi_vtbl_rename_volumes(struct ubi_device *ubi,
 			    struct list_head *rename_list)
 {
+	int i, err;
 	struct ubi_rename_entry *re;
+	struct ubi_volume *layout_vol;
 
 	list_for_each_entry(re, rename_list, list) {
 		uint32_t crc;
@@ -156,7 +145,15 @@ int ubi_vtbl_rename_volumes(struct ubi_device *ubi,
 		vtbl_rec->crc = cpu_to_be32(crc);
 	}
 
-	return ubi_update_layout_vol(ubi);
+	layout_vol = ubi->volumes[vol_id2idx(ubi, UBI_LAYOUT_VOLUME_ID)];
+	for (i = 0; i < UBI_LAYOUT_VOLUME_EBS; i++) {
+		err = ubi_eba_atomic_leb_change(ubi, layout_vol, i, ubi->vtbl,
+						ubi->vtbl_size);
+		if (err)
+			return err;
+	}
+
+	return 0;
 }
 
 /**

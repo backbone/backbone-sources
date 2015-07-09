@@ -36,6 +36,9 @@
 
 #include <linux/pci.h>
 #include <linux/export.h>
+#ifdef CONFIG_X86
+#include <asm/mtrr.h>
+#endif
 
 static int drm_version(struct drm_device *dev, void *data,
 		       struct drm_file *file_priv);
@@ -194,7 +197,16 @@ static int drm_getmap(struct drm_device *dev, void *data,
 	map->type = r_list->map->type;
 	map->flags = r_list->map->flags;
 	map->handle = (void *)(unsigned long) r_list->user_token;
-	map->mtrr = arch_phys_wc_index(r_list->map->mtrr);
+
+#ifdef CONFIG_X86
+	/*
+	 * There appears to be exactly one user of the mtrr index: dritest.
+	 * It's easy enough to keep it working on non-PAT systems.
+	 */
+	map->mtrr = phys_wc_to_mtrr_index(r_list->map->mtrr);
+#else
+	map->mtrr = -1;
+#endif
 
 	mutex_unlock(&dev->struct_mutex);
 

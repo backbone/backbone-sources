@@ -92,8 +92,7 @@ static int ib_device_check_mandatory(struct ib_device *device)
 		IB_MANDATORY_FUNC(poll_cq),
 		IB_MANDATORY_FUNC(req_notify_cq),
 		IB_MANDATORY_FUNC(get_dma_mr),
-		IB_MANDATORY_FUNC(dereg_mr),
-		IB_MANDATORY_FUNC(get_port_immutable)
+		IB_MANDATORY_FUNC(dereg_mr)
 	};
 	int i;
 
@@ -150,6 +149,18 @@ static int alloc_name(char *name)
 
 	strlcpy(name, buf, IB_DEVICE_NAME_MAX);
 	return 0;
+}
+
+static int start_port(struct ib_device *device)
+{
+	return (device->node_type == RDMA_NODE_IB_SWITCH) ? 0 : 1;
+}
+
+
+static int end_port(struct ib_device *device)
+{
+	return (device->node_type == RDMA_NODE_IB_SWITCH) ?
+		0 : device->phys_port_cnt;
 }
 
 /**
@@ -211,49 +222,42 @@ static int add_client_context(struct ib_device *device, struct ib_client *client
 	return 0;
 }
 
-static int verify_immutable(const struct ib_device *dev, u8 port)
+static int read_port_table_lengths(struct ib_device *device)
 {
-	return WARN_ON(!rdma_cap_ib_mad(dev, port) &&
-			    rdma_max_mad_size(dev, port) != 0);
-}
+	struct ib_port_attr *tprops = NULL;
+	int num_ports, ret = -ENOMEM;
+	u8 port_index;
 
-static int read_port_immutable(struct ib_device *device)
-{
-	int ret = -ENOMEM;
-	u8 start_port = rdma_start_port(device);
-	u8 end_port = rdma_end_port(device);
-	u8 port;
+	tprops = kmalloc(sizeof *tprops, GFP_KERNEL);
+	if (!tprops)
+		goto out;
 
-	/**
-	 * device->port_immutable is indexed directly by the port number to make
-	 * access to this data as efficient as possible.
-	 *
-	 * Therefore port_immutable is declared as a 1 based array with
-	 * potential empty slots at the beginning.
-	 */
-	device->port_immutable = kzalloc(sizeof(*device->port_immutable)
-					 * (end_port + 1),
-					 GFP_KERNEL);
-	if (!device->port_immutable)
+	num_ports = end_port(device) - start_port(device) + 1;
+
+	device->pkey_tbl_len = kmalloc(sizeof *device->pkey_tbl_len * num_ports,
+				       GFP_KERNEL);
+	device->gid_tbl_len = kmalloc(sizeof *device->gid_tbl_len * num_ports,
+				      GFP_KERNEL);
+	if (!device->pkey_tbl_len || !device->gid_tbl_len)
 		goto err;
 
-	for (port = start_port; port <= end_port; ++port) {
-		ret = device->get_port_immutable(device, port,
-						 &device->port_immutable[port]);
+	for (port_index = 0; port_index < num_ports; ++port_index) {
+		ret = ib_query_port(device, port_index + start_port(device),
+					tprops);
 		if (ret)
 			goto err;
-
-		if (verify_immutable(device, port)) {
-			ret = -EINVAL;
-			goto err;
-		}
+		device->pkey_tbl_len[port_index] = tprops->pkey_tbl_len;
+		device->gid_tbl_len[port_index]  = tprops->gid_tbl_len;
 	}
 
 	ret = 0;
 	goto out;
+
 err:
-	kfree(device->port_immutable);
+	kfree(device->gid_tbl_len);
+	kfree(device->pkey_tbl_len);
 out:
+	kfree(tprops);
 	return ret;
 }
 
@@ -290,9 +294,9 @@ int ib_register_device(struct ib_device *device,
 	spin_lock_init(&device->event_handler_lock);
 	spin_lock_init(&device->client_data_lock);
 
-	ret = read_port_immutable(device);
+	ret = read_port_table_lengths(device);
 	if (ret) {
-		printk(KERN_WARNING "Couldn't create per port immutable data %s\n",
+		printk(KERN_WARNING "Couldn't create table lengths cache for device %s\n",
 		       device->name);
 		goto out;
 	}
@@ -301,7 +305,8 @@ int ib_register_device(struct ib_device *device,
 	if (ret) {
 		printk(KERN_WARNING "Couldn't register device %s with driver model\n",
 		       device->name);
-		kfree(device->port_immutable);
+		kfree(device->gid_tbl_len);
+		kfree(device->pkey_tbl_len);
 		goto out;
 	}
 
@@ -342,6 +347,9 @@ void ib_unregister_device(struct ib_device *device)
 			client->remove(device);
 
 	list_del(&device->core_list);
+
+	kfree(device->gid_tbl_len);
+	kfree(device->pkey_tbl_len);
 
 	mutex_unlock(&device_mutex);
 
@@ -550,11 +558,7 @@ EXPORT_SYMBOL(ib_dispatch_event);
 int ib_query_device(struct ib_device *device,
 		    struct ib_device_attr *device_attr)
 {
-	struct ib_udata uhw = {.outlen = 0, .inlen = 0};
-
-	memset(device_attr, 0, sizeof(*device_attr));
-
-	return device->query_device(device, device_attr, &uhw);
+	return device->query_device(device, device_attr);
 }
 EXPORT_SYMBOL(ib_query_device);
 
@@ -571,7 +575,7 @@ int ib_query_port(struct ib_device *device,
 		  u8 port_num,
 		  struct ib_port_attr *port_attr)
 {
-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
+	if (port_num < start_port(device) || port_num > end_port(device))
 		return -EINVAL;
 
 	return device->query_port(device, port_num, port_attr);
@@ -649,7 +653,7 @@ int ib_modify_port(struct ib_device *device,
 	if (!device->modify_port)
 		return -ENOSYS;
 
-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
+	if (port_num < start_port(device) || port_num > end_port(device))
 		return -EINVAL;
 
 	return device->modify_port(device, port_num, port_modify_mask,
@@ -672,8 +676,8 @@ int ib_find_gid(struct ib_device *device, union ib_gid *gid,
 	union ib_gid tmp_gid;
 	int ret, port, i;
 
-	for (port = rdma_start_port(device); port <= rdma_end_port(device); ++port) {
-		for (i = 0; i < device->port_immutable[port].gid_tbl_len; ++i) {
+	for (port = start_port(device); port <= end_port(device); ++port) {
+		for (i = 0; i < device->gid_tbl_len[port - start_port(device)]; ++i) {
 			ret = ib_query_gid(device, port, i, &tmp_gid);
 			if (ret)
 				return ret;
@@ -705,7 +709,7 @@ int ib_find_pkey(struct ib_device *device,
 	u16 tmp_pkey;
 	int partial_ix = -1;
 
-	for (i = 0; i < device->port_immutable[port_num].pkey_tbl_len; ++i) {
+	for (i = 0; i < device->pkey_tbl_len[port_num - start_port(device)]; ++i) {
 		ret = ib_query_pkey(device, port_num, i, &tmp_pkey);
 		if (ret)
 			return ret;

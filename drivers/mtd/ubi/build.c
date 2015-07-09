@@ -83,6 +83,8 @@ static struct mtd_dev_param __initdata mtd_dev_param[UBI_MAX_DEVICES];
 static bool fm_autoconvert;
 static bool fm_debug;
 #endif
+/* Root UBI "class" object (corresponds to '/<sysfs>/class/ubi/') */
+struct class *ubi_class;
 
 /* Slab cache for wear-leveling entries */
 struct kmem_cache *ubi_wl_entry_slab;
@@ -111,17 +113,8 @@ static ssize_t ubi_version_show(struct class *class,
 }
 
 /* UBI version attribute ('/<sysfs>/class/ubi/version') */
-static struct class_attribute ubi_class_attrs[] = {
-	__ATTR(version, S_IRUGO, ubi_version_show, NULL),
-	__ATTR_NULL
-};
-
-/* Root UBI "class" object (corresponds to '/<sysfs>/class/ubi/') */
-struct class ubi_class = {
-	.name		= UBI_NAME_STR,
-	.owner		= THIS_MODULE,
-	.class_attrs	= ubi_class_attrs,
-};
+static struct class_attribute ubi_version =
+	__ATTR(version, S_IRUGO, ubi_version_show, NULL);
 
 static ssize_t dev_attribute_show(struct device *dev,
 				  struct device_attribute *attr, char *buf);
@@ -392,22 +385,6 @@ static ssize_t dev_attribute_show(struct device *dev,
 	return ret;
 }
 
-static struct attribute *ubi_dev_attrs[] = {
-	&dev_eraseblock_size.attr,
-	&dev_avail_eraseblocks.attr,
-	&dev_total_eraseblocks.attr,
-	&dev_volumes_count.attr,
-	&dev_max_ec.attr,
-	&dev_reserved_for_bad.attr,
-	&dev_bad_peb_count.attr,
-	&dev_max_vol_count.attr,
-	&dev_min_io_size.attr,
-	&dev_bgt_enabled.attr,
-	&dev_mtd_num.attr,
-	NULL
-};
-ATTRIBUTE_GROUPS(ubi_dev);
-
 static void dev_release(struct device *dev)
 {
 	struct ubi_device *ubi = container_of(dev, struct ubi_device, dev);
@@ -430,15 +407,45 @@ static int ubi_sysfs_init(struct ubi_device *ubi, int *ref)
 
 	ubi->dev.release = dev_release;
 	ubi->dev.devt = ubi->cdev.dev;
-	ubi->dev.class = &ubi_class;
-	ubi->dev.groups = ubi_dev_groups;
+	ubi->dev.class = ubi_class;
 	dev_set_name(&ubi->dev, UBI_NAME_STR"%d", ubi->ubi_num);
 	err = device_register(&ubi->dev);
 	if (err)
 		return err;
 
 	*ref = 1;
-	return 0;
+	err = device_create_file(&ubi->dev, &dev_eraseblock_size);
+	if (err)
+		return err;
+	err = device_create_file(&ubi->dev, &dev_avail_eraseblocks);
+	if (err)
+		return err;
+	err = device_create_file(&ubi->dev, &dev_total_eraseblocks);
+	if (err)
+		return err;
+	err = device_create_file(&ubi->dev, &dev_volumes_count);
+	if (err)
+		return err;
+	err = device_create_file(&ubi->dev, &dev_max_ec);
+	if (err)
+		return err;
+	err = device_create_file(&ubi->dev, &dev_reserved_for_bad);
+	if (err)
+		return err;
+	err = device_create_file(&ubi->dev, &dev_bad_peb_count);
+	if (err)
+		return err;
+	err = device_create_file(&ubi->dev, &dev_max_vol_count);
+	if (err)
+		return err;
+	err = device_create_file(&ubi->dev, &dev_min_io_size);
+	if (err)
+		return err;
+	err = device_create_file(&ubi->dev, &dev_bgt_enabled);
+	if (err)
+		return err;
+	err = device_create_file(&ubi->dev, &dev_mtd_num);
+	return err;
 }
 
 /**
@@ -447,6 +454,17 @@ static int ubi_sysfs_init(struct ubi_device *ubi, int *ref)
  */
 static void ubi_sysfs_close(struct ubi_device *ubi)
 {
+	device_remove_file(&ubi->dev, &dev_mtd_num);
+	device_remove_file(&ubi->dev, &dev_bgt_enabled);
+	device_remove_file(&ubi->dev, &dev_min_io_size);
+	device_remove_file(&ubi->dev, &dev_max_vol_count);
+	device_remove_file(&ubi->dev, &dev_bad_peb_count);
+	device_remove_file(&ubi->dev, &dev_reserved_for_bad);
+	device_remove_file(&ubi->dev, &dev_max_ec);
+	device_remove_file(&ubi->dev, &dev_volumes_count);
+	device_remove_file(&ubi->dev, &dev_total_eraseblocks);
+	device_remove_file(&ubi->dev, &dev_avail_eraseblocks);
+	device_remove_file(&ubi->dev, &dev_eraseblock_size);
 	device_unregister(&ubi->dev);
 }
 
@@ -929,8 +947,8 @@ int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
 	 */
 	ubi->fm_pool.max_size = min(((int)mtd_div_by_eb(ubi->mtd->size,
 		ubi->mtd) / 100) * 5, UBI_FM_MAX_POOL_SIZE);
-	ubi->fm_pool.max_size = max(ubi->fm_pool.max_size,
-		UBI_FM_MIN_POOL_SIZE);
+	if (ubi->fm_pool.max_size < UBI_FM_MIN_POOL_SIZE)
+		ubi->fm_pool.max_size = UBI_FM_MIN_POOL_SIZE;
 
 	ubi->fm_wl_pool.max_size = ubi->fm_pool.max_size / 2;
 	ubi->fm_disabled = !fm_autoconvert;
@@ -1215,14 +1233,23 @@ static int __init ubi_init(void)
 	}
 
 	/* Create base sysfs directory and sysfs files */
-	err = class_register(&ubi_class);
-	if (err < 0)
-		return err;
+	ubi_class = class_create(THIS_MODULE, UBI_NAME_STR);
+	if (IS_ERR(ubi_class)) {
+		err = PTR_ERR(ubi_class);
+		pr_err("UBI error: cannot create UBI class");
+		goto out;
+	}
+
+	err = class_create_file(ubi_class, &ubi_version);
+	if (err) {
+		pr_err("UBI error: cannot create sysfs file");
+		goto out_class;
+	}
 
 	err = misc_register(&ubi_ctrl_cdev);
 	if (err) {
 		pr_err("UBI error: cannot register device");
-		goto out;
+		goto out_version;
 	}
 
 	ubi_wl_entry_slab = kmem_cache_create("ubi_wl_entry_slab",
@@ -1306,8 +1333,11 @@ out_slab:
 	kmem_cache_destroy(ubi_wl_entry_slab);
 out_dev_unreg:
 	misc_deregister(&ubi_ctrl_cdev);
+out_version:
+	class_remove_file(ubi_class, &ubi_version);
+out_class:
+	class_destroy(ubi_class);
 out:
-	class_unregister(&ubi_class);
 	pr_err("UBI error: cannot initialize UBI, error %d", err);
 	return err;
 }
@@ -1328,7 +1358,8 @@ static void __exit ubi_exit(void)
 	ubi_debugfs_exit();
 	kmem_cache_destroy(ubi_wl_entry_slab);
 	misc_deregister(&ubi_ctrl_cdev);
-	class_unregister(&ubi_class);
+	class_remove_file(ubi_class, &ubi_version);
+	class_destroy(ubi_class);
 }
 module_exit(ubi_exit);
 

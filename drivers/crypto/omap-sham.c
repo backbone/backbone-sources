@@ -362,13 +362,7 @@ static void omap_sham_copy_ready_hash(struct ahash_request *req)
 
 static int omap_sham_hw_init(struct omap_sham_dev *dd)
 {
-	int err;
-
-	err = pm_runtime_get_sync(dd->dev);
-	if (err < 0) {
-		dev_err(dd->dev, "failed to get sync: %d\n", err);
-		return err;
-	}
+	pm_runtime_get_sync(dd->dev);
 
 	if (!test_bit(FLAGS_INIT, &dd->flags)) {
 		set_bit(FLAGS_INIT, &dd->flags);
@@ -1799,10 +1793,6 @@ static const struct of_device_id omap_sham_of_match[] = {
 		.data		= &omap_sham_pdata_omap2,
 	},
 	{
-		.compatible	= "ti,omap3-sham",
-		.data		= &omap_sham_pdata_omap2,
-	},
-	{
 		.compatible	= "ti,omap4-sham",
 		.data		= &omap_sham_pdata_omap4,
 	},
@@ -1957,13 +1947,7 @@ static int omap_sham_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(dev);
 	pm_runtime_irq_safe(dev);
-
-	err = pm_runtime_get_sync(dev);
-	if (err < 0) {
-		dev_err(dev, "failed to get sync: %d\n", err);
-		goto err_pm;
-	}
-
+	pm_runtime_get_sync(dev);
 	rev = omap_sham_read(dd, SHA_REG_REV(dd));
 	pm_runtime_put_sync(&pdev->dev);
 
@@ -1993,7 +1977,6 @@ err_algs:
 		for (j = dd->pdata->algs_info[i].registered - 1; j >= 0; j--)
 			crypto_unregister_ahash(
 					&dd->pdata->algs_info[i].algs_list[j]);
-err_pm:
 	pm_runtime_disable(dev);
 	if (dd->dma_lch)
 		dma_release_channel(dd->dma_lch);
@@ -2036,11 +2019,7 @@ static int omap_sham_suspend(struct device *dev)
 
 static int omap_sham_resume(struct device *dev)
 {
-	int err = pm_runtime_get_sync(dev);
-	if (err < 0) {
-		dev_err(dev, "failed to get sync: %d\n", err);
-		return err;
-	}
+	pm_runtime_get_sync(dev);
 	return 0;
 }
 #endif

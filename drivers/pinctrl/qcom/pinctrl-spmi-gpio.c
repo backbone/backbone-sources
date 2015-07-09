@@ -778,8 +778,8 @@ static int pmic_gpio_probe(struct platform_device *pdev)
 	state->chip.can_sleep = false;
 
 	state->ctrl = pinctrl_register(pctrldesc, dev, state);
-	if (IS_ERR(state->ctrl))
-		return PTR_ERR(state->ctrl);
+	if (!state->ctrl)
+		return -ENODEV;
 
 	ret = gpiochip_add(&state->chip);
 	if (ret) {

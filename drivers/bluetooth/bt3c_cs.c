@@ -202,8 +202,9 @@ static void bt3c_write_wakeup(struct bt3c_info *info)
 		/* Send frame */
 		len = bt3c_write(iobase, 256, skb->data, skb->len);
 
-		if (len != skb->len)
+		if (len != skb->len) {
 			BT_ERR("Very strange");
+		}
 
 		kfree_skb(skb);
 

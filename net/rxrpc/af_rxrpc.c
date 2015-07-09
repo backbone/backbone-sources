@@ -632,7 +632,7 @@ static int rxrpc_create(struct net *net, struct socket *sock, int protocol,
 	sock->ops = &rxrpc_rpc_ops;
 	sock->state = SS_UNCONNECTED;
 
-	sk = sk_alloc(net, PF_RXRPC, GFP_KERNEL, &rxrpc_proto, kern);
+	sk = sk_alloc(net, PF_RXRPC, GFP_KERNEL, &rxrpc_proto);
 	if (!sk)
 		return -ENOMEM;
 

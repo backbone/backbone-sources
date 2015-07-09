@@ -738,9 +738,9 @@ static int meson_pinctrl_probe(struct platform_device *pdev)
 	pc->desc.npins		= pc->data->num_pins;
 
 	pc->pcdev = pinctrl_register(&pc->desc, pc->dev, pc);
-	if (IS_ERR(pc->pcdev)) {
+	if (!pc->pcdev) {
 		dev_err(pc->dev, "can't register pinctrl device");
-		return PTR_ERR(pc->pcdev);
+		return -EINVAL;
 	}
 
 	ret = meson_gpiolib_register(pc);

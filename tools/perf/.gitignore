@@ -28,4 +28,3 @@ config.mak.autogen
 *-flex.*
 *.pyc
 *.pyo
-.config-detected

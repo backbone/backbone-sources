@@ -4,7 +4,7 @@
  * Copyright (c) 2013 ELAN Microelectronics Corp.
  *
  * Author: 林政維 (Duson Lin) <dusonlin@emc.com.tw>
- * Version: 1.5.9
+ * Version: 1.5.7
  *
  * Based on cyapa driver:
  * copyright (c) 2011-2012 Cypress Semiconductor, Inc.
@@ -40,7 +40,7 @@
 #include "elan_i2c.h"
 
 #define DRIVER_NAME		"elan_i2c"
-#define ELAN_DRIVER_VERSION	"1.5.9"
+#define ELAN_DRIVER_VERSION	"1.5.7"
 #define ETP_MAX_PRESSURE	255
 #define ETP_FWIDTH_REDUCE	90
 #define ETP_FINGER_WIDTH	15
@@ -83,9 +83,6 @@ struct elan_tp_data {
 	u16			fw_checksum;
 	int			pressure_adjustment;
 	u8			mode;
-	u8			ic_type;
-	u16			fw_vaildpage_count;
-	u16			fw_signature_address;
 
 	bool			irq_wake;
 
@@ -93,29 +90,6 @@ struct elan_tp_data {
 	u8			max_baseline;
 	bool			baseline_ready;
 };
-
-static int elan_get_fwinfo(u8 ic_type, u16 *vaildpage_count,
-			   u16 *signature_address)
-{
-	switch(ic_type) {
-	case 0x09:
-		*vaildpage_count = 768;
-		break;
-	case 0x0D:
-		*vaildpage_count = 896;
-		break;
-	default:
-		/* unknown ic type clear value */
-		*vaildpage_count = 0;
-		*signature_address = 0;
-		return -ENXIO;
-	}
-
-	*signature_address =
-		(*vaildpage_count * ETP_FW_PAGE_SIZE) - ETP_FW_SIGNATURE_SIZE;
-
-	return 0;
-}
 
 static int elan_enable_power(struct elan_tp_data *data)
 {
@@ -247,8 +221,7 @@ static int elan_query_device_info(struct elan_tp_data *data)
 	if (error)
 		return error;
 
-	error = data->ops->get_sm_version(data->client, &data->ic_type,
-					  &data->sm_version);
+	error = data->ops->get_sm_version(data->client, &data->sm_version);
 	if (error)
 		return error;
 
@@ -260,14 +233,6 @@ static int elan_query_device_info(struct elan_tp_data *data)
 						   &data->pressure_adjustment);
 	if (error)
 		return error;
-
-	error = elan_get_fwinfo(data->ic_type, &data->fw_vaildpage_count,
-				&data->fw_signature_address);
-	if (error) {
-		dev_err(&data->client->dev,
-			"unknown ic type %d\n", data->ic_type);
-		return error;
-	}
 
 	return 0;
 }
@@ -353,7 +318,7 @@ static int __elan_update_firmware(struct elan_tp_data *data,
 	iap_start_addr = get_unaligned_le16(&fw->data[ETP_IAP_START_ADDR * 2]);
 
 	boot_page_count = (iap_start_addr * 2) / ETP_FW_PAGE_SIZE;
-	for (i = boot_page_count; i < data->fw_vaildpage_count; i++) {
+	for (i = boot_page_count; i < ETP_FW_VAILDPAGE_COUNT; i++) {
 		u16 checksum = 0;
 		const u8 *page = &fw->data[i * ETP_FW_PAGE_SIZE];
 
@@ -438,8 +403,7 @@ static ssize_t elan_sysfs_read_product_id(struct device *dev,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct elan_tp_data *data = i2c_get_clientdata(client);
 
-	return sprintf(buf, ETP_PRODUCT_ID_FORMAT_STRING "\n",
-		       data->product_id);
+	return sprintf(buf, "%d.0\n", data->product_id);
 }
 
 static ssize_t elan_sysfs_read_fw_ver(struct device *dev,
@@ -478,28 +442,19 @@ static ssize_t elan_sysfs_update_fw(struct device *dev,
 {
 	struct elan_tp_data *data = dev_get_drvdata(dev);
 	const struct firmware *fw;
-	char *fw_name;
 	int error;
 	const u8 *fw_signature;
 	static const u8 signature[] = {0xAA, 0x55, 0xCC, 0x33, 0xFF, 0xFF};
 
-	/* Look for a firmware with the product id appended. */
-	fw_name = kasprintf(GFP_KERNEL, ETP_FW_NAME, data->product_id);
-	if (!fw_name) {
-		dev_err(dev, "failed to allocate memory for firmware name\n");
-		return -ENOMEM;
-	}
-
-	dev_info(dev, "requesting fw '%s'\n", fw_name);
-	error = request_firmware(&fw, fw_name, dev);
-	kfree(fw_name);
+	error = request_firmware(&fw, ETP_FW_NAME, dev);
 	if (error) {
-		dev_err(dev, "failed to request firmware: %d\n", error);
+		dev_err(dev, "cannot load firmware %s: %d\n",
+			ETP_FW_NAME, error);
 		return error;
 	}
 
 	/* Firmware file must match signature data */
-	fw_signature = &fw->data[data->fw_signature_address];
+	fw_signature = &fw->data[ETP_FW_SIGNATURE_ADDRESS];
 	if (memcmp(fw_signature, signature, sizeof(signature)) != 0) {
 		dev_err(dev, "signature mismatch (expected %*ph, got %*ph)\n",
 			(int)sizeof(signature), signature,

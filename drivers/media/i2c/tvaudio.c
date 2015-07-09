@@ -272,7 +272,7 @@ static int chip_cmd(struct CHIPSTATE *chip, char *name, audiocmd *cmd)
 		return -EINVAL;
 	}
 
-	/* FIXME: it seems that the shadow bytes are wrong below !*/
+	/* FIXME: it seems that the shadow bytes are wrong bellow !*/
 
 	/* update our shadow register set; print bytes if (debug > 0) */
 	v4l2_dbg(1, debug, sd, "chip_cmd(%s): reg=%d, data:",

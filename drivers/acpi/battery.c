@@ -70,7 +70,6 @@ MODULE_AUTHOR("Alexey Starikovskiy <astarikovskiy@suse.de>");
 MODULE_DESCRIPTION("ACPI Battery Driver");
 MODULE_LICENSE("GPL");
 
-static async_cookie_t async_cookie;
 static int battery_bix_broken_package;
 static int battery_notification_delay_ms;
 static unsigned int cache_time = 1000;
@@ -339,6 +338,14 @@ static enum power_supply_property energy_battery_props[] = {
 	POWER_SUPPLY_PROP_SERIAL_NUMBER,
 };
 
+#ifdef CONFIG_ACPI_PROCFS_POWER
+inline char *acpi_battery_units(struct acpi_battery *battery)
+{
+	return (battery->power_unit == ACPI_BATTERY_POWER_UNIT_MA) ?
+		"mA" : "mW";
+}
+#endif
+
 /* --------------------------------------------------------------------------
                                Battery Management
    -------------------------------------------------------------------------- */
@@ -347,14 +354,14 @@ struct acpi_offsets {
 	u8 mode;		/* int or string? */
 };
 
-static const struct acpi_offsets state_offsets[] = {
+static struct acpi_offsets state_offsets[] = {
 	{offsetof(struct acpi_battery, state), 0},
 	{offsetof(struct acpi_battery, rate_now), 0},
 	{offsetof(struct acpi_battery, capacity_now), 0},
 	{offsetof(struct acpi_battery, voltage_now), 0},
 };
 
-static const struct acpi_offsets info_offsets[] = {
+static struct acpi_offsets info_offsets[] = {
 	{offsetof(struct acpi_battery, power_unit), 0},
 	{offsetof(struct acpi_battery, design_capacity), 0},
 	{offsetof(struct acpi_battery, full_charge_capacity), 0},
@@ -370,7 +377,7 @@ static const struct acpi_offsets info_offsets[] = {
 	{offsetof(struct acpi_battery, oem_info), 1},
 };
 
-static const struct acpi_offsets extended_info_offsets[] = {
+static struct acpi_offsets extended_info_offsets[] = {
 	{offsetof(struct acpi_battery, revision), 0},
 	{offsetof(struct acpi_battery, power_unit), 0},
 	{offsetof(struct acpi_battery, design_capacity), 0},
@@ -395,7 +402,7 @@ static const struct acpi_offsets extended_info_offsets[] = {
 
 static int extract_package(struct acpi_battery *battery,
 			   union acpi_object *package,
-			   const struct acpi_offsets *offsets, int num)
+			   struct acpi_offsets *offsets, int num)
 {
 	int i;
 	union acpi_object *element;
@@ -785,12 +792,6 @@ static void acpi_battery_refresh(struct acpi_battery *battery)
 #ifdef CONFIG_ACPI_PROCFS_POWER
 static struct proc_dir_entry *acpi_battery_dir;
 
-static const char *acpi_battery_units(const struct acpi_battery *battery)
-{
-	return (battery->power_unit == ACPI_BATTERY_POWER_UNIT_MA) ?
-		"mA" : "mW";
-}
-
 static int acpi_battery_print_info(struct seq_file *seq, int result)
 {
 	struct acpi_battery *battery = seq->private;
@@ -1124,21 +1125,19 @@ static int battery_notify(struct notifier_block *nb,
 	return 0;
 }
 
-static int __init
-battery_bix_broken_package_quirk(const struct dmi_system_id *d)
+static int battery_bix_broken_package_quirk(const struct dmi_system_id *d)
 {
 	battery_bix_broken_package = 1;
 	return 0;
 }
 
-static int __init
-battery_notification_delay_quirk(const struct dmi_system_id *d)
+static int battery_notification_delay_quirk(const struct dmi_system_id *d)
 {
 	battery_notification_delay_ms = 1000;
 	return 0;
 }
 
-static const struct dmi_system_id bat_dmi_table[] __initconst = {
+static struct dmi_system_id bat_dmi_table[] = {
 	{
 		.callback = battery_bix_broken_package_quirk,
 		.ident = "NEC LZ750/LS",
@@ -1293,34 +1292,33 @@ static struct acpi_driver acpi_battery_driver = {
 
 static void __init acpi_battery_init_async(void *unused, async_cookie_t cookie)
 {
-	int result;
+	if (acpi_disabled)
+		return;
 
 	dmi_check_system(bat_dmi_table);
-
+	
 #ifdef CONFIG_ACPI_PROCFS_POWER
 	acpi_battery_dir = acpi_lock_battery_dir();
 	if (!acpi_battery_dir)
 		return;
 #endif
-	result = acpi_bus_register_driver(&acpi_battery_driver);
+	if (acpi_bus_register_driver(&acpi_battery_driver) < 0) {
 #ifdef CONFIG_ACPI_PROCFS_POWER
-	if (result < 0)
 		acpi_unlock_battery_dir(acpi_battery_dir);
 #endif
+		return;
+	}
+	return;
 }
 
 static int __init acpi_battery_init(void)
 {
-	if (acpi_disabled)
-		return -ENODEV;
-
-	async_cookie = async_schedule(acpi_battery_init_async, NULL);
+	async_schedule(acpi_battery_init_async, NULL);
 	return 0;
 }
 
 static void __exit acpi_battery_exit(void)
 {
-	async_synchronize_cookie(async_cookie);
 	acpi_bus_unregister_driver(&acpi_battery_driver);
 #ifdef CONFIG_ACPI_PROCFS_POWER
 	acpi_unlock_battery_dir(acpi_battery_dir);

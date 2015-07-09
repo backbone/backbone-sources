@@ -303,7 +303,7 @@ static int max8997_irq_domain_map(struct irq_domain *d, unsigned int irq,
 	return 0;
 }
 
-static const struct irq_domain_ops max8997_irq_domain_ops = {
+static struct irq_domain_ops max8997_irq_domain_ops = {
 	.map = max8997_irq_domain_map,
 };
 

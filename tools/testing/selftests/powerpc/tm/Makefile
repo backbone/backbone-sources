@@ -1,11 +1,11 @@
-TEST_PROGS := tm-resched-dscr tm-syscall
+TEST_PROGS := tm-resched-dscr
 
 all: $(TEST_PROGS)
 
 $(TEST_PROGS): ../harness.c
 
 tm-syscall: tm-syscall-asm.S
-tm-syscall: CFLAGS += -mhtm -I../../../../../usr/include
+tm-syscall: CFLAGS += -mhtm
 
 include ../../lib.mk
 

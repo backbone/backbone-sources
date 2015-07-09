@@ -97,10 +97,8 @@ static int ieee802154_nl_fill_iface(struct sk_buff *msg, u32 portid,
 	BUG_ON(!phy);
 	get_device(&phy->dev);
 
-	rtnl_lock();
-	short_addr = dev->ieee802154_ptr->short_addr;
-	pan_id = dev->ieee802154_ptr->pan_id;
-	rtnl_unlock();
+	short_addr = ops->get_short_addr(dev);
+	pan_id = ops->get_pan_id(dev);
 
 	if (nla_put_string(msg, IEEE802154_ATTR_DEV_NAME, dev->name) ||
 	    nla_put_string(msg, IEEE802154_ATTR_PHY_NAME, wpan_phy_name(phy)) ||
@@ -119,12 +117,12 @@ static int ieee802154_nl_fill_iface(struct sk_buff *msg, u32 portid,
 		rtnl_unlock();
 
 		if (nla_put_s8(msg, IEEE802154_ATTR_TXPOWER,
-			       params.transmit_power / 100) ||
+			       params.transmit_power) ||
 		    nla_put_u8(msg, IEEE802154_ATTR_LBT_ENABLED, params.lbt) ||
 		    nla_put_u8(msg, IEEE802154_ATTR_CCA_MODE,
 			       params.cca.mode) ||
 		    nla_put_s32(msg, IEEE802154_ATTR_CCA_ED_LEVEL,
-				params.cca_ed_level / 100) ||
+				params.cca_ed_level) ||
 		    nla_put_u8(msg, IEEE802154_ATTR_CSMA_RETRIES,
 			       params.csma_retries) ||
 		    nla_put_u8(msg, IEEE802154_ATTR_CSMA_MIN_BE,
@@ -168,7 +166,10 @@ static struct net_device *ieee802154_nl_get_dev(struct genl_info *info)
 	if (!dev)
 		return NULL;
 
-	if (dev->type != ARPHRD_IEEE802154) {
+	/* Check on mtu is currently a hacked solution because lowpan
+	 * and wpan have the same ARPHRD type.
+	 */
+	if (dev->type != ARPHRD_IEEE802154 || dev->mtu != IEEE802154_MTU) {
 		dev_put(dev);
 		return NULL;
 	}
@@ -243,9 +244,7 @@ int ieee802154_associate_resp(struct sk_buff *skb, struct genl_info *info)
 	addr.mode = IEEE802154_ADDR_LONG;
 	addr.extended_addr = nla_get_hwaddr(
 			info->attrs[IEEE802154_ATTR_DEST_HW_ADDR]);
-	rtnl_lock();
-	addr.pan_id = dev->ieee802154_ptr->pan_id;
-	rtnl_unlock();
+	addr.pan_id = ieee802154_mlme_ops(dev)->get_pan_id(dev);
 
 	ret = ieee802154_mlme_ops(dev)->assoc_resp(dev, &addr,
 		nla_get_shortaddr(info->attrs[IEEE802154_ATTR_DEST_SHORT_ADDR]),
@@ -282,9 +281,7 @@ int ieee802154_disassociate_req(struct sk_buff *skb, struct genl_info *info)
 		addr.short_addr = nla_get_shortaddr(
 				info->attrs[IEEE802154_ATTR_DEST_SHORT_ADDR]);
 	}
-	rtnl_lock();
-	addr.pan_id = dev->ieee802154_ptr->pan_id;
-	rtnl_unlock();
+	addr.pan_id = ieee802154_mlme_ops(dev)->get_pan_id(dev);
 
 	ret = ieee802154_mlme_ops(dev)->disassoc_req(dev, &addr,
 			nla_get_u8(info->attrs[IEEE802154_ATTR_REASON]));
@@ -452,7 +449,11 @@ int ieee802154_dump_iface(struct sk_buff *skb, struct netlink_callback *cb)
 
 	idx = 0;
 	for_each_netdev(net, dev) {
-		if (idx < s_idx || dev->type != ARPHRD_IEEE802154)
+		/* Check on mtu is currently a hacked solution because lowpan
+		 * and wpan have the same ARPHRD type.
+		 */
+		if (idx < s_idx || dev->type != ARPHRD_IEEE802154 ||
+		    dev->mtu != IEEE802154_MTU)
 			goto cont;
 
 		if (ieee802154_nl_fill_iface(skb, NETLINK_CB(cb->skb).portid,
@@ -509,7 +510,7 @@ int ieee802154_set_macparams(struct sk_buff *skb, struct genl_info *info)
 	ops->get_mac_params(dev, &params);
 
 	if (info->attrs[IEEE802154_ATTR_TXPOWER])
-		params.transmit_power = nla_get_s8(info->attrs[IEEE802154_ATTR_TXPOWER]) * 100;
+		params.transmit_power = nla_get_s8(info->attrs[IEEE802154_ATTR_TXPOWER]);
 
 	if (info->attrs[IEEE802154_ATTR_LBT_ENABLED])
 		params.lbt = nla_get_u8(info->attrs[IEEE802154_ATTR_LBT_ENABLED]);
@@ -518,7 +519,7 @@ int ieee802154_set_macparams(struct sk_buff *skb, struct genl_info *info)
 		params.cca.mode = nla_get_u8(info->attrs[IEEE802154_ATTR_CCA_MODE]);
 
 	if (info->attrs[IEEE802154_ATTR_CCA_ED_LEVEL])
-		params.cca_ed_level = nla_get_s32(info->attrs[IEEE802154_ATTR_CCA_ED_LEVEL]) * 100;
+		params.cca_ed_level = nla_get_s32(info->attrs[IEEE802154_ATTR_CCA_ED_LEVEL]);
 
 	if (info->attrs[IEEE802154_ATTR_CSMA_RETRIES])
 		params.csma_retries = nla_get_u8(info->attrs[IEEE802154_ATTR_CSMA_RETRIES]);
@@ -782,7 +783,11 @@ ieee802154_llsec_dump_table(struct sk_buff *skb, struct netlink_callback *cb,
 	int rc;
 
 	for_each_netdev(net, dev) {
-		if (idx < first_dev || dev->type != ARPHRD_IEEE802154)
+		/* Check on mtu is currently a hacked solution because lowpan
+		 * and wpan have the same ARPHRD type.
+		 */
+		if (idx < first_dev || dev->type != ARPHRD_IEEE802154 ||
+		    dev->mtu != IEEE802154_MTU)
 			goto skip;
 
 		data.ops = ieee802154_mlme_ops(dev);

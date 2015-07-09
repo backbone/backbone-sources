@@ -1,4 +1,6 @@
 /*
+ *  drivers/mtd/nandids.c
+ *
  *  Copyright (C) 2002 Thomas Gleixner (tglx@linutronix.de)
  *
  * This program is free software; you can redistribute it and/or modify

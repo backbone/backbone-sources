@@ -35,6 +35,20 @@
 
 #define CHGIN_ILIM_STEP_20mA			20000
 
+/* CHARGER regulator ops */
+/* CHARGER regulator uses two bits for enabling */
+static int max77693_chg_is_enabled(struct regulator_dev *rdev)
+{
+	int ret;
+	unsigned int val;
+
+	ret = regmap_read(rdev->regmap, rdev->desc->enable_reg, &val);
+	if (ret)
+		return ret;
+
+	return (val & rdev->desc->enable_mask) == rdev->desc->enable_mask;
+}
+
 /*
  * CHARGER regulator - Min : 20mA, Max : 2580mA, step : 20mA
  * 0x00, 0x01, 0x2, 0x03	= 60 mA
@@ -104,7 +118,7 @@ static struct regulator_ops max77693_safeout_ops = {
 };
 
 static struct regulator_ops max77693_charger_ops = {
-	.is_enabled		= regulator_is_enabled_regmap,
+	.is_enabled		= max77693_chg_is_enabled,
 	.enable			= regulator_enable_regmap,
 	.disable		= regulator_disable_regmap,
 	.get_current_limit	= max77693_chg_get_current_limit,
@@ -141,7 +155,6 @@ static const struct regulator_desc regulators[] = {
 		.enable_reg = MAX77693_CHG_REG_CHG_CNFG_00,
 		.enable_mask = CHG_CNFG_00_CHG_MASK |
 				CHG_CNFG_00_BUCK_MASK,
-		.enable_val = CHG_CNFG_00_CHG_MASK | CHG_CNFG_00_BUCK_MASK,
 	},
 };
 

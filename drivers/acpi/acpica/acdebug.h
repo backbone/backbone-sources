@@ -231,9 +231,7 @@ void acpi_db_open_debug_file(char *name);
 acpi_status acpi_db_load_acpi_table(char *filename);
 
 acpi_status
-acpi_db_get_table_from_file(char *filename,
-			    struct acpi_table_header **table,
-			    u8 must_be_aml_table);
+acpi_db_get_table_from_file(char *filename, struct acpi_table_header **table);
 
 /*
  * dbhistry - debugger HISTORY command

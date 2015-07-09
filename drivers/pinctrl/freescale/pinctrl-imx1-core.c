@@ -633,9 +633,9 @@ int imx1_pinctrl_core_probe(struct platform_device *pdev,
 	ipctl->dev = info->dev;
 	platform_set_drvdata(pdev, ipctl);
 	ipctl->pctl = pinctrl_register(pctl_desc, &pdev->dev, ipctl);
-	if (IS_ERR(ipctl->pctl)) {
+	if (!ipctl->pctl) {
 		dev_err(&pdev->dev, "could not register IMX pinctrl driver\n");
-		return PTR_ERR(ipctl->pctl);
+		return -EINVAL;
 	}
 
 	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);

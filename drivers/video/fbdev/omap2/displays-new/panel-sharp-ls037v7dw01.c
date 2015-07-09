@@ -268,12 +268,17 @@ static  int sharp_ls_get_gpio_of(struct device *dev, int index, int val,
 	const char *desc, struct gpio_desc **gpiod)
 {
 	struct gpio_desc *gd;
+	int r;
 
 	*gpiod = NULL;
 
-	gd = devm_gpiod_get_index(dev, desc, index, GPIOD_OUT_LOW);
+	gd = devm_gpiod_get_index(dev, desc, index);
 	if (IS_ERR(gd))
-		return PTR_ERR(gd);
+		return PTR_ERR(gd) == -ENOENT ? 0 : PTR_ERR(gd);
+
+	r = gpiod_direction_output(gd, val);
+	if (r)
+		return r;
 
 	*gpiod = gd;
 	return 0;

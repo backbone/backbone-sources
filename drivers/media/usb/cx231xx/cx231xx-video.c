@@ -749,7 +749,8 @@ static void free_buffer(struct videobuf_queue *vq, struct cx231xx_buffer *buf)
 	struct cx231xx *dev = fh->dev;
 	unsigned long flags = 0;
 
-	BUG_ON(in_interrupt());
+	if (in_interrupt())
+		BUG();
 
 	/* We used to wait for the buffer to finish here, but this didn't work
 	   because, as we were keeping the state as VIDEOBUF_QUEUED,
@@ -1012,9 +1013,7 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
 	struct cx231xx *dev = fh->dev;
 	int rc;
 	struct cx231xx_fmt *fmt;
-	struct v4l2_subdev_format format = {
-		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
-	};
+	struct v4l2_mbus_framefmt mbus_fmt;
 
 	rc = check_dev(dev);
 	if (rc < 0)
@@ -1042,9 +1041,9 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
 	dev->height = f->fmt.pix.height;
 	dev->format = fmt;
 
-	v4l2_fill_mbus_format(&format.format, &f->fmt.pix, MEDIA_BUS_FMT_FIXED);
-	call_all(dev, pad, set_fmt, NULL, &format);
-	v4l2_fill_pix_format(&f->fmt.pix, &format.format);
+	v4l2_fill_mbus_format(&mbus_fmt, &f->fmt.pix, MEDIA_BUS_FMT_FIXED);
+	call_all(dev, video, s_mbus_fmt, &mbus_fmt);
+	v4l2_fill_pix_format(&f->fmt.pix, &mbus_fmt);
 
 	return rc;
 }
@@ -1062,9 +1061,7 @@ static int vidioc_s_std(struct file *file, void *priv, v4l2_std_id norm)
 {
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
-	struct v4l2_subdev_format format = {
-		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
-	};
+	struct v4l2_mbus_framefmt mbus_fmt;
 	int rc;
 
 	rc = check_dev(dev);
@@ -1088,10 +1085,11 @@ static int vidioc_s_std(struct file *file, void *priv, v4l2_std_id norm)
 	/* We need to reset basic properties in the decoder related to
 	   resolution (since a standard change effects things like the number
 	   of lines in VACT, etc) */
-	format.format.code = MEDIA_BUS_FMT_FIXED;
-	format.format.width = dev->width;
-	format.format.height = dev->height;
-	call_all(dev, pad, set_fmt, NULL, &format);
+	memset(&mbus_fmt, 0, sizeof(mbus_fmt));
+	mbus_fmt.code = MEDIA_BUS_FMT_FIXED;
+	mbus_fmt.width = dev->width;
+	mbus_fmt.height = dev->height;
+	call_all(dev, video, s_mbus_fmt, &mbus_fmt);
 
 	/* do mode control overrides */
 	cx231xx_do_mode_ctrl_overrides(dev);

@@ -2593,7 +2593,7 @@ static int bcm2048_i2c_driver_probe(struct i2c_client *client,
 					const struct i2c_device_id *id)
 {
 	struct bcm2048_device *bdev;
-	int err;
+	int err, skip_release = 0;
 
 	bdev = kzalloc(sizeof(*bdev), GFP_KERNEL);
 	if (!bdev) {
@@ -2646,6 +2646,7 @@ free_sysfs:
 	bcm2048_sysfs_unregister_properties(bdev, ARRAY_SIZE(attrs));
 free_registration:
 	video_unregister_device(&bdev->videodev);
+	skip_release = 1;
 free_irq:
 	if (client->irq)
 		free_irq(client->irq, bdev);

@@ -506,6 +506,7 @@ static int tlv320aic23_set_bias_level(struct snd_soc_codec *codec,
 		snd_soc_write(codec, TLV320AIC23_PWR, 0x1ff);
 		break;
 	}
+	codec->dapm.bias_level = level;
 	return 0;
 }
 

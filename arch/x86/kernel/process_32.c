@@ -39,7 +39,8 @@
 #include <asm/pgtable.h>
 #include <asm/ldt.h>
 #include <asm/processor.h>
-#include <asm/fpu/internal.h>
+#include <asm/i387.h>
+#include <asm/fpu-internal.h>
 #include <asm/desc.h>
 #ifdef CONFIG_MATH_EMULATION
 #include <asm/math_emu.h>
@@ -241,16 +242,14 @@ __visible __notrace_funcgraph struct task_struct *
 __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
 	struct thread_struct *prev = &prev_p->thread,
-			     *next = &next_p->thread;
-	struct fpu *prev_fpu = &prev->fpu;
-	struct fpu *next_fpu = &next->fpu;
+				 *next = &next_p->thread;
 	int cpu = smp_processor_id();
 	struct tss_struct *tss = &per_cpu(cpu_tss, cpu);
-	fpu_switch_t fpu_switch;
+	fpu_switch_t fpu;
 
 	/* never put a printk in __switch_to... printk() calls wake_up*() indirectly */
 
-	fpu_switch = switch_fpu_prepare(prev_fpu, next_fpu, cpu);
+	fpu = switch_fpu_prepare(prev_p, next_p, cpu);
 
 	/*
 	 * Save away %gs. No need to save %fs, as it was saved on the
@@ -297,16 +296,19 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	 * Leave lazy mode, flushing any hypercalls made here.
 	 * This must be done before restoring TLS segments so
 	 * the GDT and LDT are properly updated, and must be
-	 * done before fpu__restore(), so the TS bit is up
+	 * done before math_state_restore, so the TS bit is up
 	 * to date.
 	 */
 	arch_end_context_switch(next_p);
 
 	/*
-	 * Reload esp0 and cpu_current_top_of_stack.  This changes
+	 * Reload esp0, kernel_stack, and current_top_of_stack.  This changes
 	 * current_thread_info().
 	 */
 	load_sp0(tss, next);
+	this_cpu_write(kernel_stack,
+		       (unsigned long)task_stack_page(next_p) +
+		       THREAD_SIZE);
 	this_cpu_write(cpu_current_top_of_stack,
 		       (unsigned long)task_stack_page(next_p) +
 		       THREAD_SIZE);
@@ -317,7 +319,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	if (prev->gs | next->gs)
 		lazy_load_gs(next->gs);
 
-	switch_fpu_finish(next_fpu, fpu_switch);
+	switch_fpu_finish(next_p, fpu);
 
 	this_cpu_write(current_task, next_p);
 

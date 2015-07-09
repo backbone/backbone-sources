@@ -26,6 +26,7 @@
  */
 
 #include <linux/linkage.h>
+#include <asm/dwarf2.h>
 #include <asm/errno.h>
 #include <asm/asm.h>
 				
@@ -49,8 +50,9 @@ unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
 	   * alignment for the unrolled loop.
 	   */		
 ENTRY(csum_partial)
-	pushl %esi
-	pushl %ebx
+	CFI_STARTPROC
+	pushl_cfi_reg esi
+	pushl_cfi_reg ebx
 	movl 20(%esp),%eax	# Function arg: unsigned int sum
 	movl 16(%esp),%ecx	# Function arg: int len
 	movl 12(%esp),%esi	# Function arg: unsigned char *buff
@@ -127,9 +129,10 @@ ENTRY(csum_partial)
 	jz 8f
 	roll $8, %eax
 8:
-	popl %ebx
-	popl %esi
+	popl_cfi_reg ebx
+	popl_cfi_reg esi
 	ret
+	CFI_ENDPROC
 ENDPROC(csum_partial)
 
 #else
@@ -137,8 +140,9 @@ ENDPROC(csum_partial)
 /* Version for PentiumII/PPro */
 
 ENTRY(csum_partial)
-	pushl %esi
-	pushl %ebx
+	CFI_STARTPROC
+	pushl_cfi_reg esi
+	pushl_cfi_reg ebx
 	movl 20(%esp),%eax	# Function arg: unsigned int sum
 	movl 16(%esp),%ecx	# Function arg: int len
 	movl 12(%esp),%esi	# Function arg:	const unsigned char *buf
@@ -245,9 +249,10 @@ ENTRY(csum_partial)
 	jz 90f
 	roll $8, %eax
 90: 
-	popl %ebx
-	popl %esi
+	popl_cfi_reg ebx
+	popl_cfi_reg esi
 	ret
+	CFI_ENDPROC
 ENDPROC(csum_partial)
 				
 #endif
@@ -282,10 +287,12 @@ unsigned int csum_partial_copy_generic (const char *src, char *dst,
 #define FP		12
 		
 ENTRY(csum_partial_copy_generic)
+	CFI_STARTPROC
 	subl  $4,%esp	
-	pushl %edi
-	pushl %esi
-	pushl %ebx
+	CFI_ADJUST_CFA_OFFSET 4
+	pushl_cfi_reg edi
+	pushl_cfi_reg esi
+	pushl_cfi_reg ebx
 	movl ARGBASE+16(%esp),%eax	# sum
 	movl ARGBASE+12(%esp),%ecx	# len
 	movl ARGBASE+4(%esp),%esi	# src
@@ -394,11 +401,12 @@ DST(	movb %cl, (%edi)	)
 
 .previous
 
-	popl %ebx
-	popl %esi
-	popl %edi
-	popl %ecx			# equivalent to addl $4,%esp
+	popl_cfi_reg ebx
+	popl_cfi_reg esi
+	popl_cfi_reg edi
+	popl_cfi %ecx			# equivalent to addl $4,%esp
 	ret	
+	CFI_ENDPROC
 ENDPROC(csum_partial_copy_generic)
 
 #else
@@ -418,9 +426,10 @@ ENDPROC(csum_partial_copy_generic)
 #define ARGBASE 12
 		
 ENTRY(csum_partial_copy_generic)
-	pushl %ebx
-	pushl %edi
-	pushl %esi
+	CFI_STARTPROC
+	pushl_cfi_reg ebx
+	pushl_cfi_reg edi
+	pushl_cfi_reg esi
 	movl ARGBASE+4(%esp),%esi	#src
 	movl ARGBASE+8(%esp),%edi	#dst	
 	movl ARGBASE+12(%esp),%ecx	#len
@@ -480,10 +489,11 @@ DST(	movb %dl, (%edi)         )
 	jmp  7b			
 .previous				
 
-	popl %esi
-	popl %edi
-	popl %ebx
+	popl_cfi_reg esi
+	popl_cfi_reg edi
+	popl_cfi_reg ebx
 	ret
+	CFI_ENDPROC
 ENDPROC(csum_partial_copy_generic)
 				
 #undef ROUND

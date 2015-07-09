@@ -51,11 +51,9 @@
 
 static struct workqueue_struct *perf_wq;
 
-typedef int (*remote_function_f)(void *);
-
 struct remote_function_call {
 	struct task_struct	*p;
-	remote_function_f	func;
+	int			(*func)(void *info);
 	void			*info;
 	int			ret;
 };
@@ -88,7 +86,7 @@ static void remote_function(void *data)
  *	    -EAGAIN - when the process moved away
  */
 static int
-task_function_call(struct task_struct *p, remote_function_f func, void *info)
+task_function_call(struct task_struct *p, int (*func) (void *info), void *info)
 {
 	struct remote_function_call data = {
 		.p	= p,
@@ -112,7 +110,7 @@ task_function_call(struct task_struct *p, remote_function_f func, void *info)
  *
  * returns: @func return value or -ENXIO when the cpu is offline
  */
-static int cpu_function_call(int cpu, remote_function_f func, void *info)
+static int cpu_function_call(int cpu, int (*func) (void *info), void *info)
 {
 	struct remote_function_call data = {
 		.p	= NULL,
@@ -749,31 +747,62 @@ perf_cgroup_mark_enabled(struct perf_event *event,
 /*
  * function must be called with interrupts disbled
  */
-static enum hrtimer_restart perf_mux_hrtimer_handler(struct hrtimer *hr)
+static enum hrtimer_restart perf_cpu_hrtimer_handler(struct hrtimer *hr)
 {
 	struct perf_cpu_context *cpuctx;
+	enum hrtimer_restart ret = HRTIMER_NORESTART;
 	int rotations = 0;
 
 	WARN_ON(!irqs_disabled());
 
 	cpuctx = container_of(hr, struct perf_cpu_context, hrtimer);
+
 	rotations = perf_rotate_context(cpuctx);
 
-	raw_spin_lock(&cpuctx->hrtimer_lock);
-	if (rotations)
+	/*
+	 * arm timer if needed
+	 */
+	if (rotations) {
 		hrtimer_forward_now(hr, cpuctx->hrtimer_interval);
-	else
-		cpuctx->hrtimer_active = 0;
-	raw_spin_unlock(&cpuctx->hrtimer_lock);
+		ret = HRTIMER_RESTART;
+	}
 
-	return rotations ? HRTIMER_RESTART : HRTIMER_NORESTART;
+	return ret;
 }
 
-static void __perf_mux_hrtimer_init(struct perf_cpu_context *cpuctx, int cpu)
+/* CPU is going down */
+void perf_cpu_hrtimer_cancel(int cpu)
 {
-	struct hrtimer *timer = &cpuctx->hrtimer;
+	struct perf_cpu_context *cpuctx;
+	struct pmu *pmu;
+	unsigned long flags;
+
+	if (WARN_ON(cpu != smp_processor_id()))
+		return;
+
+	local_irq_save(flags);
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(pmu, &pmus, entry) {
+		cpuctx = this_cpu_ptr(pmu->pmu_cpu_context);
+
+		if (pmu->task_ctx_nr == perf_sw_context)
+			continue;
+
+		hrtimer_cancel(&cpuctx->hrtimer);
+	}
+
+	rcu_read_unlock();
+
+	local_irq_restore(flags);
+}
+
+static void __perf_cpu_hrtimer_init(struct perf_cpu_context *cpuctx, int cpu)
+{
+	struct hrtimer *hr = &cpuctx->hrtimer;
 	struct pmu *pmu = cpuctx->ctx.pmu;
-	u64 interval;
+	int timer;
 
 	/* no multiplexing needed for SW PMU */
 	if (pmu->task_ctx_nr == perf_sw_context)
@@ -783,36 +812,31 @@ static void __perf_mux_hrtimer_init(struct perf_cpu_context *cpuctx, int cpu)
 	 * check default is sane, if not set then force to
 	 * default interval (1/tick)
 	 */
-	interval = pmu->hrtimer_interval_ms;
-	if (interval < 1)
-		interval = pmu->hrtimer_interval_ms = PERF_CPU_HRTIMER;
+	timer = pmu->hrtimer_interval_ms;
+	if (timer < 1)
+		timer = pmu->hrtimer_interval_ms = PERF_CPU_HRTIMER;
 
-	cpuctx->hrtimer_interval = ns_to_ktime(NSEC_PER_MSEC * interval);
+	cpuctx->hrtimer_interval = ns_to_ktime(NSEC_PER_MSEC * timer);
 
-	raw_spin_lock_init(&cpuctx->hrtimer_lock);
-	hrtimer_init(timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS_PINNED);
-	timer->function = perf_mux_hrtimer_handler;
+	hrtimer_init(hr, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
+	hr->function = perf_cpu_hrtimer_handler;
 }
 
-static int perf_mux_hrtimer_restart(struct perf_cpu_context *cpuctx)
+static void perf_cpu_hrtimer_restart(struct perf_cpu_context *cpuctx)
 {
-	struct hrtimer *timer = &cpuctx->hrtimer;
+	struct hrtimer *hr = &cpuctx->hrtimer;
 	struct pmu *pmu = cpuctx->ctx.pmu;
-	unsigned long flags;
 
 	/* not for SW PMU */
 	if (pmu->task_ctx_nr == perf_sw_context)
-		return 0;
+		return;
 
-	raw_spin_lock_irqsave(&cpuctx->hrtimer_lock, flags);
-	if (!cpuctx->hrtimer_active) {
-		cpuctx->hrtimer_active = 1;
-		hrtimer_forward_now(timer, cpuctx->hrtimer_interval);
-		hrtimer_start_expires(timer, HRTIMER_MODE_ABS_PINNED);
-	}
-	raw_spin_unlock_irqrestore(&cpuctx->hrtimer_lock, flags);
+	if (hrtimer_active(hr))
+		return;
 
-	return 0;
+	if (!hrtimer_callback_running(hr))
+		__hrtimer_start_range_ns(hr, cpuctx->hrtimer_interval,
+					 0, HRTIMER_MODE_REL_PINNED, 0);
 }
 
 void perf_pmu_disable(struct pmu *pmu)
@@ -1911,7 +1935,7 @@ group_sched_in(struct perf_event *group_event,
 
 	if (event_sched_in(group_event, cpuctx, ctx)) {
 		pmu->cancel_txn(pmu);
-		perf_mux_hrtimer_restart(cpuctx);
+		perf_cpu_hrtimer_restart(cpuctx);
 		return -EAGAIN;
 	}
 
@@ -1958,7 +1982,7 @@ group_error:
 
 	pmu->cancel_txn(pmu);
 
-	perf_mux_hrtimer_restart(cpuctx);
+	perf_cpu_hrtimer_restart(cpuctx);
 
 	return -EAGAIN;
 }
@@ -2231,7 +2255,7 @@ static int __perf_event_enable(void *info)
 		 */
 		if (leader != event) {
 			group_sched_out(leader, cpuctx, ctx);
-			perf_mux_hrtimer_restart(cpuctx);
+			perf_cpu_hrtimer_restart(cpuctx);
 		}
 		if (leader->attr.pinned) {
 			update_group_times(leader);
@@ -5357,9 +5381,9 @@ void perf_prepare_sample(struct perf_event_header *header,
 	}
 }
 
-void perf_event_output(struct perf_event *event,
-			struct perf_sample_data *data,
-			struct pt_regs *regs)
+static void perf_event_output(struct perf_event *event,
+				struct perf_sample_data *data,
+				struct pt_regs *regs)
 {
 	struct perf_output_handle handle;
 	struct perf_event_header header;
@@ -5947,39 +5971,6 @@ void perf_event_aux_event(struct perf_event *event, unsigned long head,
 	perf_output_put(&handle, rec);
 	perf_event__output_id_sample(event, &handle, &sample);
 
-	perf_output_end(&handle);
-}
-
-/*
- * Lost/dropped samples logging
- */
-void perf_log_lost_samples(struct perf_event *event, u64 lost)
-{
-	struct perf_output_handle handle;
-	struct perf_sample_data sample;
-	int ret;
-
-	struct {
-		struct perf_event_header	header;
-		u64				lost;
-	} lost_samples_event = {
-		.header = {
-			.type = PERF_RECORD_LOST_SAMPLES,
-			.misc = 0,
-			.size = sizeof(lost_samples_event),
-		},
-		.lost		= lost,
-	};
-
-	perf_event_header__init_id(&lost_samples_event.header, &sample, event);
-
-	ret = perf_output_begin(&handle, event,
-				lost_samples_event.header.size);
-	if (ret)
-		return;
-
-	perf_output_put(&handle, lost_samples_event);
-	perf_event__output_id_sample(event, &handle, &sample);
 	perf_output_end(&handle);
 }
 
@@ -6873,8 +6864,9 @@ static void perf_swevent_start_hrtimer(struct perf_event *event)
 	} else {
 		period = max_t(u64, 10000, hwc->sample_period);
 	}
-	hrtimer_start(&hwc->hrtimer, ns_to_ktime(period),
-		      HRTIMER_MODE_REL_PINNED);
+	__hrtimer_start_range_ns(&hwc->hrtimer,
+				ns_to_ktime(period), 0,
+				HRTIMER_MODE_REL_PINNED, 0);
 }
 
 static void perf_swevent_cancel_hrtimer(struct perf_event *event)
@@ -7175,8 +7167,6 @@ perf_event_mux_interval_ms_show(struct device *dev,
 	return snprintf(page, PAGE_SIZE-1, "%d\n", pmu->hrtimer_interval_ms);
 }
 
-static DEFINE_MUTEX(mux_interval_mutex);
-
 static ssize_t
 perf_event_mux_interval_ms_store(struct device *dev,
 				 struct device_attribute *attr,
@@ -7196,21 +7186,17 @@ perf_event_mux_interval_ms_store(struct device *dev,
 	if (timer == pmu->hrtimer_interval_ms)
 		return count;
 
-	mutex_lock(&mux_interval_mutex);
 	pmu->hrtimer_interval_ms = timer;
 
 	/* update all cpuctx for this PMU */
-	get_online_cpus();
-	for_each_online_cpu(cpu) {
+	for_each_possible_cpu(cpu) {
 		struct perf_cpu_context *cpuctx;
 		cpuctx = per_cpu_ptr(pmu->pmu_cpu_context, cpu);
 		cpuctx->hrtimer_interval = ns_to_ktime(NSEC_PER_MSEC * timer);
 
-		cpu_function_call(cpu,
-			(remote_function_f)perf_mux_hrtimer_restart, cpuctx);
+		if (hrtimer_active(&cpuctx->hrtimer))
+			hrtimer_forward_now(&cpuctx->hrtimer, cpuctx->hrtimer_interval);
 	}
-	put_online_cpus();
-	mutex_unlock(&mux_interval_mutex);
 
 	return count;
 }
@@ -7315,7 +7301,7 @@ skip_type:
 		lockdep_set_class(&cpuctx->ctx.lock, &cpuctx_lock);
 		cpuctx->ctx.pmu = pmu;
 
-		__perf_mux_hrtimer_init(cpuctx, cpu);
+		__perf_cpu_hrtimer_init(cpuctx, cpu);
 
 		cpuctx->unique_pmu = pmu;
 	}

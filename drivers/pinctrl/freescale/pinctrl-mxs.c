@@ -540,9 +540,9 @@ int mxs_pinctrl_probe(struct platform_device *pdev,
 	}
 
 	d->pctl = pinctrl_register(&mxs_pinctrl_desc, &pdev->dev, d);
-	if (IS_ERR(d->pctl)) {
+	if (!d->pctl) {
 		dev_err(&pdev->dev, "Couldn't register MXS pinctrl driver\n");
-		ret = PTR_ERR(d->pctl);
+		ret = -EINVAL;
 		goto err;
 	}
 

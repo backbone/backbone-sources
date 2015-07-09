@@ -1,14 +1,13 @@
 #ifndef _ASM_X86_MSR_H
 #define _ASM_X86_MSR_H
 
-#include "msr-index.h"
+#include <uapi/asm/msr.h>
 
 #ifndef __ASSEMBLY__
 
 #include <asm/asm.h>
 #include <asm/errno.h>
 #include <asm/cpumask.h>
-#include <uapi/asm/msr.h>
 
 struct msr {
 	union {
@@ -206,13 +205,8 @@ do {                                                            \
 
 #endif	/* !CONFIG_PARAVIRT */
 
-/*
- * 64-bit version of wrmsr_safe():
- */
-static inline int wrmsrl_safe(u32 msr, u64 val)
-{
-	return wrmsr_safe(msr, (u32)val,  (u32)(val >> 32));
-}
+#define wrmsrl_safe(msr, val) wrmsr_safe((msr), (u32)(val),		\
+					     (u32)((val) >> 32))
 
 #define write_tsc(low, high) wrmsr(MSR_IA32_TSC, (low), (high))
 

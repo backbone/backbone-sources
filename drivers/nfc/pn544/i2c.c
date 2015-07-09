@@ -895,34 +895,55 @@ static int pn544_hci_i2c_acpi_request_resources(struct i2c_client *client)
 		return -ENODEV;
 
 	/* Get EN GPIO from ACPI */
-	gpiod_en = devm_gpiod_get_index(dev, PN544_GPIO_NAME_EN, 1,
-					GPIOD_OUT_LOW);
+	gpiod_en = devm_gpiod_get_index(dev, PN544_GPIO_NAME_EN, 1);
 	if (IS_ERR(gpiod_en)) {
-		nfc_err(dev, "Unable to get EN GPIO\n");
+		nfc_err(dev,
+			"Unable to get EN GPIO\n");
 		return -ENODEV;
 	}
 
-	phy->gpio_en = desc_to_gpio(gpiod_en);
+	phy->gpio_en  = desc_to_gpio(gpiod_en);
+
+	/* Configuration EN GPIO */
+	ret = gpiod_direction_output(gpiod_en, 0);
+	if (ret) {
+		nfc_err(dev, "Fail EN pin direction\n");
+		return ret;
+	}
 
 	/* Get FW GPIO from ACPI */
-	gpiod_fw = devm_gpiod_get_index(dev, PN544_GPIO_NAME_FW, 2,
-					GPIOD_OUT_LOW);
+	gpiod_fw = devm_gpiod_get_index(dev, PN544_GPIO_NAME_FW, 2);
 	if (IS_ERR(gpiod_fw)) {
-		nfc_err(dev, "Unable to get FW GPIO\n");
+		nfc_err(dev,
+			"Unable to get FW GPIO\n");
 		return -ENODEV;
 	}
 
-	phy->gpio_fw = desc_to_gpio(gpiod_fw);
+	phy->gpio_fw  = desc_to_gpio(gpiod_fw);
+
+	/* Configuration FW GPIO */
+	ret = gpiod_direction_output(gpiod_fw, 0);
+	if (ret) {
+		nfc_err(dev, "Fail FW pin direction\n");
+		return ret;
+	}
 
 	/* Get IRQ GPIO */
-	gpiod_irq = devm_gpiod_get_index(dev, PN544_GPIO_NAME_IRQ, 0,
-					 GPIOD_IN);
+	gpiod_irq = devm_gpiod_get_index(dev, PN544_GPIO_NAME_IRQ, 0);
 	if (IS_ERR(gpiod_irq)) {
-		nfc_err(dev, "Unable to get IRQ GPIO\n");
+		nfc_err(dev,
+			"Unable to get IRQ GPIO\n");
 		return -ENODEV;
 	}
 
 	phy->gpio_irq = desc_to_gpio(gpiod_irq);
+
+	/* Configure IRQ GPIO */
+	ret = gpiod_direction_input(gpiod_irq);
+	if (ret) {
+		nfc_err(dev, "Fail IRQ pin direction\n");
+		return ret;
+	}
 
 	/* Map the pin to an IRQ */
 	ret = gpiod_to_irq(gpiod_irq);

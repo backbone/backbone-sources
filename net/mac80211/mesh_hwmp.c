@@ -510,14 +510,14 @@ static u32 hwmp_route_info_get(struct ieee80211_sub_if_data *sdata,
 
 static void hwmp_preq_frame_process(struct ieee80211_sub_if_data *sdata,
 				    struct ieee80211_mgmt *mgmt,
-				    const u8 *preq_elem, u32 orig_metric)
+				    const u8 *preq_elem, u32 metric)
 {
 	struct ieee80211_if_mesh *ifmsh = &sdata->u.mesh;
 	struct mesh_path *mpath = NULL;
 	const u8 *target_addr, *orig_addr;
 	const u8 *da;
 	u8 target_flags, ttl, flags;
-	u32 orig_sn, target_sn, lifetime, target_metric;
+	u32 orig_sn, target_sn, lifetime, orig_metric;
 	bool reply = false;
 	bool forward = true;
 	bool root_is_gate;
@@ -528,6 +528,7 @@ static void hwmp_preq_frame_process(struct ieee80211_sub_if_data *sdata,
 	target_sn = PREQ_IE_TARGET_SN(preq_elem);
 	orig_sn = PREQ_IE_ORIG_SN(preq_elem);
 	target_flags = PREQ_IE_TARGET_F(preq_elem);
+	orig_metric = metric;
 	/* Proactive PREQ gate announcements */
 	flags = PREQ_IE_FLAGS(preq_elem);
 	root_is_gate = !!(flags & RANN_FLAG_IS_GATE);
@@ -538,7 +539,7 @@ static void hwmp_preq_frame_process(struct ieee80211_sub_if_data *sdata,
 		mhwmp_dbg(sdata, "PREQ is for us\n");
 		forward = false;
 		reply = true;
-		target_metric = 0;
+		metric = 0;
 		if (time_after(jiffies, ifmsh->last_sn_update +
 					net_traversal_jiffies(sdata)) ||
 		    time_before(jiffies, ifmsh->last_sn_update)) {
@@ -555,7 +556,7 @@ static void hwmp_preq_frame_process(struct ieee80211_sub_if_data *sdata,
 				reply = true;
 				target_addr = sdata->vif.addr;
 				target_sn = ++ifmsh->sn;
-				target_metric = 0;
+				metric = 0;
 				ifmsh->last_sn_update = jiffies;
 			}
 			if (root_is_gate)
@@ -573,7 +574,7 @@ static void hwmp_preq_frame_process(struct ieee80211_sub_if_data *sdata,
 			} else if ((!(target_flags & MP_F_DO)) &&
 					(mpath->flags & MESH_PATH_ACTIVE)) {
 				reply = true;
-				target_metric = mpath->metric;
+				metric = mpath->metric;
 				target_sn = mpath->sn;
 				if (target_flags & MP_F_RF)
 					target_flags |= MP_F_DO;
@@ -592,8 +593,7 @@ static void hwmp_preq_frame_process(struct ieee80211_sub_if_data *sdata,
 			mesh_path_sel_frame_tx(MPATH_PREP, 0, orig_addr,
 					       orig_sn, 0, target_addr,
 					       target_sn, mgmt->sa, 0, ttl,
-					       lifetime, target_metric, 0,
-					       sdata);
+					       lifetime, metric, 0, sdata);
 		} else {
 			ifmsh->mshstats.dropped_frames_ttl++;
 		}
@@ -619,12 +619,13 @@ static void hwmp_preq_frame_process(struct ieee80211_sub_if_data *sdata,
 		if (flags & IEEE80211_PREQ_PROACTIVE_PREP_FLAG) {
 			target_addr = PREQ_IE_TARGET_ADDR(preq_elem);
 			target_sn = PREQ_IE_TARGET_SN(preq_elem);
+			metric = orig_metric;
 		}
 
 		mesh_path_sel_frame_tx(MPATH_PREQ, flags, orig_addr,
 				       orig_sn, target_flags, target_addr,
 				       target_sn, da, hopcount, ttl, lifetime,
-				       orig_metric, preq_id, sdata);
+				       metric, preq_id, sdata);
 		if (!is_multicast_ether_addr(da))
 			ifmsh->mshstats.fwded_unicast++;
 		else
@@ -853,7 +854,7 @@ void mesh_rx_path_sel_frame(struct ieee80211_sub_if_data *sdata,
 {
 	struct ieee802_11_elems elems;
 	size_t baselen;
-	u32 path_metric;
+	u32 last_hop_metric;
 	struct sta_info *sta;
 
 	/* need action_code */
@@ -876,21 +877,21 @@ void mesh_rx_path_sel_frame(struct ieee80211_sub_if_data *sdata,
 		if (elems.preq_len != 37)
 			/* Right now we support just 1 destination and no AE */
 			return;
-		path_metric = hwmp_route_info_get(sdata, mgmt, elems.preq,
-						  MPATH_PREQ);
-		if (path_metric)
+		last_hop_metric = hwmp_route_info_get(sdata, mgmt, elems.preq,
+						      MPATH_PREQ);
+		if (last_hop_metric)
 			hwmp_preq_frame_process(sdata, mgmt, elems.preq,
-						path_metric);
+						last_hop_metric);
 	}
 	if (elems.prep) {
 		if (elems.prep_len != 31)
 			/* Right now we support no AE */
 			return;
-		path_metric = hwmp_route_info_get(sdata, mgmt, elems.prep,
-						  MPATH_PREP);
-		if (path_metric)
+		last_hop_metric = hwmp_route_info_get(sdata, mgmt, elems.prep,
+						      MPATH_PREP);
+		if (last_hop_metric)
 			hwmp_prep_frame_process(sdata, mgmt, elems.prep,
-						path_metric);
+						last_hop_metric);
 	}
 	if (elems.perr) {
 		if (elems.perr_len != 15)

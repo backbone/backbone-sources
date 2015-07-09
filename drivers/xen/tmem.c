@@ -381,9 +381,15 @@ static int __init xen_tmem_init(void)
 #ifdef CONFIG_FRONTSWAP
 	if (tmem_enabled && frontswap) {
 		char *s = "";
+		struct frontswap_ops *old_ops;
 
 		tmem_frontswap_poolid = -1;
-		frontswap_register_ops(&tmem_frontswap_ops);
+		old_ops = frontswap_register_ops(&tmem_frontswap_ops);
+		if (IS_ERR(old_ops) || old_ops) {
+			if (IS_ERR(old_ops))
+				return PTR_ERR(old_ops);
+			s = " (WARNING: frontswap_ops overridden)";
+		}
 		pr_info("frontswap enabled, RAM provided by Xen Transcendent Memory%s\n",
 			s);
 	}

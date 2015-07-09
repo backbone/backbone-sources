@@ -668,20 +668,14 @@ static int beiscsi_enable_pci(struct pci_dev *pcidev)
 		return ret;
 	}
 
-	ret = pci_request_regions(pcidev, DRV_NAME);
-	if (ret) {
-		dev_err(&pcidev->dev,
-				"beiscsi_enable_pci - request region failed\n");
-		goto pci_dev_disable;
-	}
-
 	pci_set_master(pcidev);
 	ret = pci_set_dma_mask(pcidev, DMA_BIT_MASK(64));
 	if (ret) {
 		ret = pci_set_dma_mask(pcidev, DMA_BIT_MASK(32));
 		if (ret) {
 			dev_err(&pcidev->dev, "Could not set PCI DMA Mask\n");
-			goto pci_region_release;
+			pci_disable_device(pcidev);
+			return ret;
 		} else {
 			ret = pci_set_consistent_dma_mask(pcidev,
 							  DMA_BIT_MASK(32));
@@ -690,17 +684,11 @@ static int beiscsi_enable_pci(struct pci_dev *pcidev)
 		ret = pci_set_consistent_dma_mask(pcidev, DMA_BIT_MASK(64));
 		if (ret) {
 			dev_err(&pcidev->dev, "Could not set PCI DMA Mask\n");
-			goto pci_region_release;
+			pci_disable_device(pcidev);
+			return ret;
 		}
 	}
 	return 0;
-
-pci_region_release:
-	pci_release_regions(pcidev);
-pci_dev_disable:
-	pci_disable_device(pcidev);
-
-	return ret;
 }
 
 static int be_ctrl_init(struct beiscsi_hba *phba, struct pci_dev *pdev)
@@ -1368,10 +1356,8 @@ be_complete_io(struct beiscsi_conn *beiscsi_conn,
 	if (io_task->cmd_bhs->iscsi_hdr.flags & ISCSI_FLAG_CMD_READ)
 		conn->rxdata_octets += resid;
 unmap:
-	if (io_task->scsi_cmnd) {
-		scsi_dma_unmap(io_task->scsi_cmnd);
-		io_task->scsi_cmnd = NULL;
-	}
+	scsi_dma_unmap(io_task->scsi_cmnd);
+	io_task->scsi_cmnd = NULL;
 	iscsi_complete_scsi_task(task, exp_cmdsn, max_cmdsn);
 }
 
@@ -2051,16 +2037,11 @@ static void  beiscsi_process_mcc_isr(struct beiscsi_hba *phba)
 				/* Interpret compl as a async link evt */
 				beiscsi_async_link_state_process(phba,
 				(struct be_async_event_link_state *) mcc_compl);
-			else {
+			else
 				beiscsi_log(phba, KERN_ERR, BEISCSI_LOG_MBOX,
 					    "BM_%d :  Unsupported Async Event, flags"
 					    " = 0x%08x\n",
 					    mcc_compl->flags);
-				if (phba->state & BE_ADAPTER_LINK_UP) {
-					phba->state |= BE_ADAPTER_CHECK_BOOT;
-					phba->get_boot = BE_GET_BOOT_RETRIES;
-				}
-			}
 		} else if (mcc_compl->flags & CQE_FLAGS_COMPLETED_MASK) {
 			be_mcc_compl_process_isr(&phba->ctrl, mcc_compl);
 			atomic_dec(&phba->ctrl.mcc_obj.q.used);
@@ -3697,16 +3678,14 @@ static void be_mcc_queues_destroy(struct beiscsi_hba *phba)
 	struct be_ctrl_info *ctrl = &phba->ctrl;
 
 	q = &phba->ctrl.mcc_obj.q;
-	if (q->created) {
+	if (q->created)
 		beiscsi_cmd_q_destroy(ctrl, q, QTYPE_MCCQ);
-		be_queue_free(phba, q);
-	}
+	be_queue_free(phba, q);
 
 	q = &phba->ctrl.mcc_obj.cq;
-	if (q->created) {
+	if (q->created)
 		beiscsi_cmd_q_destroy(ctrl, q, QTYPE_CQ);
-		be_queue_free(phba, q);
-	}
+	be_queue_free(phba, q);
 }
 
 static void hwi_cleanup(struct beiscsi_hba *phba)
@@ -3750,10 +3729,8 @@ static void hwi_cleanup(struct beiscsi_hba *phba)
 
 	for (i = 0; i < (phba->num_cpus); i++) {
 		q = &phwi_context->be_cq[i];
-		if (q->created) {
-			be_queue_free(phba, q);
+		if (q->created)
 			beiscsi_cmd_q_destroy(ctrl, q, QTYPE_CQ);
-		}
 	}
 
 	be_mcc_queues_destroy(phba);
@@ -3763,10 +3740,8 @@ static void hwi_cleanup(struct beiscsi_hba *phba)
 		eq_for_mcc = 0;
 	for (i = 0; i < (phba->num_cpus + eq_for_mcc); i++) {
 		q = &phwi_context->be_eq[i].q;
-		if (q->created) {
-			be_queue_free(phba, q);
+		if (q->created)
 			beiscsi_cmd_q_destroy(ctrl, q, QTYPE_EQ);
-		}
 	}
 	be_cmd_fw_uninit(ctrl);
 }
@@ -4353,14 +4328,8 @@ static int beiscsi_get_boot_info(struct beiscsi_hba *phba)
 		beiscsi_log(phba, KERN_ERR,
 			    BEISCSI_LOG_INIT | BEISCSI_LOG_CONFIG,
 			    "BM_%d : No boot session\n");
-
-		if (ret == -ENXIO)
-			phba->get_boot = 0;
-
-
 		return ret;
 	}
-	phba->get_boot = 0;
 	nonemb_cmd.va = pci_zalloc_consistent(phba->ctrl.pdev,
 					      sizeof(*session_resp),
 					      &nonemb_cmd.dma);
@@ -4400,9 +4369,6 @@ static int beiscsi_get_boot_info(struct beiscsi_hba *phba)
 
 	memcpy(&phba->boot_sess, &session_resp->session_info,
 	       sizeof(struct mgmt_session_info));
-
-	 beiscsi_logout_fw_sess(phba,
-				phba->boot_sess.session_handle);
 	ret = 0;
 
 boot_freemem:
@@ -4614,13 +4580,11 @@ beiscsi_free_mgmt_task_handles(struct beiscsi_conn *beiscsi_conn,
 		spin_unlock_bh(&phba->mgmt_sgl_lock);
 	}
 
-	if (io_task->mtask_addr) {
+	if (io_task->mtask_addr)
 		pci_unmap_single(phba->pcidev,
 				 io_task->mtask_addr,
 				 io_task->mtask_data_count,
 				 PCI_DMA_TODEVICE);
-		io_task->mtask_addr = 0;
-	}
 }
 
 /**
@@ -5300,7 +5264,6 @@ static void beiscsi_remove(struct pci_dev *pcidev)
 	iscsi_host_free(phba->shost);
 	pci_disable_pcie_error_reporting(pcidev);
 	pci_set_drvdata(pcidev, NULL);
-	pci_release_regions(pcidev);
 	pci_disable_device(pcidev);
 }
 
@@ -5411,14 +5374,8 @@ beiscsi_hw_health_check(struct work_struct *work)
 	be_eqd_update(phba);
 
 	if (phba->state & BE_ADAPTER_CHECK_BOOT) {
-		if ((phba->get_boot > 0) && (!phba->boot_kset)) {
-			phba->get_boot--;
-			if (!(phba->get_boot % BE_GET_BOOT_TO))
-				be_check_boot_session(phba);
-		} else {
-			phba->state &= ~BE_ADAPTER_CHECK_BOOT;
-			phba->get_boot = 0;
-		}
+		phba->state &= ~BE_ADAPTER_CHECK_BOOT;
+		be_check_boot_session(phba);
 	}
 
 	beiscsi_ue_detect(phba);
@@ -5781,7 +5738,6 @@ hba_free:
 	iscsi_host_free(phba->shost);
 	pci_set_drvdata(pcidev, NULL);
 disable_pci:
-	pci_release_regions(pcidev);
 	pci_disable_device(pcidev);
 	return ret;
 }

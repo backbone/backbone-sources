@@ -404,9 +404,7 @@ int em28xx_init_camera(struct em28xx *dev)
 			.addr = client->addr,
 			.platform_data = &camlink,
 		};
-		struct v4l2_subdev_format format = {
-			.which = V4L2_SUBDEV_FORMAT_ACTIVE,
-		};
+		struct v4l2_mbus_framefmt fmt;
 
 		/*
 		 * FIXME: sensor supports resolutions up to 1600x1200, but
@@ -427,10 +425,10 @@ int em28xx_init_camera(struct em28xx *dev)
 			break;
 		}
 
-		format.format.code = MEDIA_BUS_FMT_YUYV8_2X8;
-		format.format.width = 640;
-		format.format.height = 480;
-		v4l2_subdev_call(subdev, pad, set_fmt, NULL, &format);
+		fmt.code = MEDIA_BUS_FMT_YUYV8_2X8;
+		fmt.width = 640;
+		fmt.height = 480;
+		v4l2_subdev_call(subdev, video, s_mbus_fmt, &fmt);
 
 		/* NOTE: for UXGA=1600x1200 switch to 12MHz */
 		dev->board.xclk = EM28XX_XCLK_FREQUENCY_24MHZ;

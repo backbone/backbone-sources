@@ -17,15 +17,6 @@
 #include "linux/device.h"
 #include "wil_platform.h"
 
-int __init wil_platform_modinit(void)
-{
-	return 0;
-}
-
-void wil_platform_modexit(void)
-{
-}
-
 /**
  * wil_platform_init() - wil6210 platform module init
  *
@@ -35,11 +26,10 @@ void wil_platform_modexit(void)
  */
 void *wil_platform_init(struct device *dev, struct wil_platform_ops *ops)
 {
-	void *handle = ops; /* to return some non-NULL for 'void' impl. */
+	void *handle = NULL;
 
 	if (!ops) {
-		dev_err(dev,
-			"Invalid parameter. Cannot init platform module\n");
+		dev_err(dev, "Invalid parameter. Cannot init platform module\n");
 		return NULL;
 	}
 

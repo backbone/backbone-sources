@@ -3198,7 +3198,8 @@ static int qeth_l3_set_features(struct net_device *dev,
 	netdev_features_t features)
 {
 	struct qeth_card *card = dev->ml_priv;
-	netdev_features_t changed = dev->features ^ features;
+	u32 changed = dev->features ^ features;
+	int err;
 
 	if (!(changed & NETIF_F_RXCSUM))
 		return 0;
@@ -3207,7 +3208,11 @@ static int qeth_l3_set_features(struct net_device *dev,
 	    card->state == CARD_STATE_RECOVER)
 		return 0;
 
-	return qeth_l3_set_rx_csum(card, features & NETIF_F_RXCSUM ? 1 : 0);
+	err = qeth_l3_set_rx_csum(card, features & NETIF_F_RXCSUM);
+	if (err)
+		dev->features = features ^ NETIF_F_RXCSUM;
+
+	return err;
 }
 
 static const struct ethtool_ops qeth_l3_ethtool_ops = {

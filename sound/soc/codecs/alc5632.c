@@ -1000,6 +1000,7 @@ static int alc5632_set_bias_level(struct snd_soc_codec *codec,
 				ALC5632_PWR_MANAG_ADD1_MASK, 0);
 		break;
 	}
+	codec->dapm.bias_level = level;
 	return 0;
 }
 

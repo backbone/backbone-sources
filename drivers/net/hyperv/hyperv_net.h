@@ -161,7 +161,6 @@ struct netvsc_device_info {
 	unsigned char mac_adr[ETH_ALEN];
 	bool link_state;	/* 0 - link up, 1 - link down */
 	int  ring_size;
-	u32  max_num_vrss_chns;
 };
 
 enum rndis_device_state {
@@ -612,12 +611,6 @@ struct multi_send_data {
 	u32 count; /* counter of batched packets */
 };
 
-struct netvsc_stats {
-	u64 packets;
-	u64 bytes;
-	struct u64_stats_sync syncp;
-};
-
 /* The context of the netvsc device  */
 struct net_device_context {
 	/* point back to our device context */
@@ -625,9 +618,6 @@ struct net_device_context {
 	struct delayed_work dwork;
 	struct work_struct work;
 	u32 msg_enable; /* debug level */
-
-	struct netvsc_stats __percpu *tx_stats;
-	struct netvsc_stats __percpu *rx_stats;
 };
 
 /* Per netvsc device */

@@ -1203,13 +1203,17 @@ static int jffs2_do_read_inode_internal(struct jffs2_sb_info *c,
 		JFFS2_ERROR("failed to read from flash: error %d, %zd of %zd bytes read\n",
 			ret, retlen, sizeof(*latest_node));
 		/* FIXME: If this fails, there seems to be a memory leak. Find it. */
-		return ret ? ret : -EIO;
+		mutex_unlock(&f->sem);
+		jffs2_do_clear_inode(c, f);
+		return ret?ret:-EIO;
 	}
 
 	crc = crc32(0, latest_node, sizeof(*latest_node)-8);
 	if (crc != je32_to_cpu(latest_node->node_crc)) {
 		JFFS2_ERROR("CRC failed for read_inode of inode %u at physical location 0x%x\n",
 			f->inocache->ino, ref_offset(rii.latest_ref));
+		mutex_unlock(&f->sem);
+		jffs2_do_clear_inode(c, f);
 		return -EIO;
 	}
 
@@ -1246,11 +1250,16 @@ static int jffs2_do_read_inode_internal(struct jffs2_sb_info *c,
 			 * keep in RAM to facilitate quick follow symlink
 			 * operation. */
 			uint32_t csize = je32_to_cpu(latest_node->csize);
-			if (csize > JFFS2_MAX_NAME_LEN)
+			if (csize > JFFS2_MAX_NAME_LEN) {
+				mutex_unlock(&f->sem);
+				jffs2_do_clear_inode(c, f);
 				return -ENAMETOOLONG;
+			}
 			f->target = kmalloc(csize + 1, GFP_KERNEL);
 			if (!f->target) {
 				JFFS2_ERROR("can't allocate %u bytes of memory for the symlink target path cache\n", csize);
+				mutex_unlock(&f->sem);
+				jffs2_do_clear_inode(c, f);
 				return -ENOMEM;
 			}
 
@@ -1262,6 +1271,8 @@ static int jffs2_do_read_inode_internal(struct jffs2_sb_info *c,
 					ret = -EIO;
 				kfree(f->target);
 				f->target = NULL;
+				mutex_unlock(&f->sem);
+				jffs2_do_clear_inode(c, f);
 				return ret;
 			}
 
@@ -1278,11 +1289,15 @@ static int jffs2_do_read_inode_internal(struct jffs2_sb_info *c,
 		if (f->metadata) {
 			JFFS2_ERROR("Argh. Special inode #%u with mode 0%o had metadata node\n",
 			       f->inocache->ino, jemode_to_cpu(latest_node->mode));
+			mutex_unlock(&f->sem);
+			jffs2_do_clear_inode(c, f);
 			return -EIO;
 		}
 		if (!frag_first(&f->fragtree)) {
 			JFFS2_ERROR("Argh. Special inode #%u with mode 0%o has no fragments\n",
 			       f->inocache->ino, jemode_to_cpu(latest_node->mode));
+			mutex_unlock(&f->sem);
+			jffs2_do_clear_inode(c, f);
 			return -EIO;
 		}
 		/* ASSERT: f->fraglist != NULL */
@@ -1290,6 +1305,8 @@ static int jffs2_do_read_inode_internal(struct jffs2_sb_info *c,
 			JFFS2_ERROR("Argh. Special inode #%u with mode 0x%x had more than one node\n",
 			       f->inocache->ino, jemode_to_cpu(latest_node->mode));
 			/* FIXME: Deal with it - check crc32, check for duplicate node, check times and discard the older one */
+			mutex_unlock(&f->sem);
+			jffs2_do_clear_inode(c, f);
 			return -EIO;
 		}
 		/* OK. We're happy */
@@ -1383,8 +1400,10 @@ int jffs2_do_crccheck_inode(struct jffs2_sb_info *c, struct jffs2_inode_cache *i
 	f->inocache = ic;
 
 	ret = jffs2_do_read_inode_internal(c, f, &n);
-	mutex_unlock(&f->sem);
-	jffs2_do_clear_inode(c, f);
+	if (!ret) {
+		mutex_unlock(&f->sem);
+		jffs2_do_clear_inode(c, f);
+	}
 	jffs2_xattr_do_crccheck_inode(c, ic);
 	kfree (f);
 	return ret;

@@ -99,7 +99,6 @@ int inet_csk_get_port(struct sock *sk, unsigned short snum)
 	struct net *net = sock_net(sk);
 	int smallest_size = -1, smallest_rover;
 	kuid_t uid = sock_i_uid(sk);
-	int attempt_half = (sk->sk_reuse == SK_CAN_REUSE) ? 1 : 0;
 
 	local_bh_disable();
 	if (!snum) {
@@ -107,14 +106,6 @@ int inet_csk_get_port(struct sock *sk, unsigned short snum)
 
 again:
 		inet_get_local_port_range(net, &low, &high);
-		if (attempt_half) {
-			int half = low + ((high - low) >> 1);
-
-			if (attempt_half == 1)
-				high = half;
-			else
-				low = half;
-		}
 		remaining = (high - low) + 1;
 		smallest_rover = rover = prandom_u32() % remaining + low;
 
@@ -136,6 +127,11 @@ again:
 					    (tb->num_owners < smallest_size || smallest_size == -1)) {
 						smallest_size = tb->num_owners;
 						smallest_rover = rover;
+						if (atomic_read(&hashinfo->bsockets) > (high - low) + 1 &&
+						    !inet_csk(sk)->icsk_af_ops->bind_conflict(sk, tb, false)) {
+							snum = smallest_rover;
+							goto tb_found;
+						}
 					}
 					if (!inet_csk(sk)->icsk_af_ops->bind_conflict(sk, tb, false)) {
 						snum = rover;
@@ -162,11 +158,6 @@ again:
 			if (smallest_size != -1) {
 				snum = smallest_rover;
 				goto have_snum;
-			}
-			if (attempt_half == 1) {
-				/* OK we now try the upper half of the range */
-				attempt_half = 2;
-				goto again;
 			}
 			goto fail;
 		}

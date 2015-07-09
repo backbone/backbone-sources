@@ -14,7 +14,6 @@
  *
  */
 
-#include <crypto/aead.h>
 #include <crypto/internal/skcipher.h>
 #include <crypto/scatterwalk.h>
 #include <linux/errno.h>

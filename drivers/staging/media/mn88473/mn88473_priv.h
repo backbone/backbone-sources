@@ -29,7 +29,7 @@ struct mn88473_dev {
 	struct regmap *regmap[3];
 	struct dvb_frontend fe;
 	u16 i2c_wr_max;
-	enum fe_delivery_system delivery_system;
+	fe_delivery_system_t delivery_system;
 	bool warm; /* FW running */
 	u32 xtal;
 };

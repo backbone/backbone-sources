@@ -28,21 +28,20 @@
 struct tda10071_priv {
 	struct i2c_adapter *i2c;
 	struct dvb_frontend fe;
-	struct i2c_client *client;
 	struct tda10071_config cfg;
 
 	u8 meas_count[2];
 	u32 ber;
 	u32 ucb;
-	enum fe_status fe_status;
-	enum fe_delivery_system delivery_system;
+	fe_status_t fe_status;
+	fe_delivery_system_t delivery_system;
 	bool warm; /* FW running */
 };
 
 static struct tda10071_modcod {
-	enum fe_delivery_system delivery_system;
-	enum fe_modulation modulation;
-	enum fe_code_rate fec;
+	fe_delivery_system_t delivery_system;
+	fe_modulation_t modulation;
+	fe_code_rate_t fec;
 	u8 val;
 } TDA10071_MODCOD[] = {
 	/* NBC-QPSK */

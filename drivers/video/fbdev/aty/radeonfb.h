@@ -340,7 +340,7 @@ struct radeonfb_info {
 
 	struct pll_info		pll;
 
-	int			wc_cookie;
+	int			mtrr_hdl;
 
 	u32			save_regs[100];
 	int			asleep;

@@ -562,8 +562,6 @@ struct sst_ssp_config {
 	u8 active_slot_map;
 	u8 start_delay;
 	u16 fs_width;
-	u8 frame_sync_polarity;
-	u8 data_polarity;
 };
 
 struct sst_ssp_cfg {
@@ -697,7 +695,7 @@ struct sst_gain_mixer_control {
 	u16 module_id;
 	u16 pipe_id;
 	u16 task_id;
-	char pname[SNDRV_CTL_ELEM_ID_NAME_MAXLEN];
+	char pname[44];
 	struct snd_soc_dapm_widget *w;
 };
 
@@ -868,10 +866,5 @@ struct sst_enum {
 #define SST_SSP_MUX_CTL(xpname, xinstance, xreg, xshift, xtexts) \
 	SOC_DAPM_ENUM(SST_MUX_CTL_NAME(xpname, xinstance), \
 			  SST_SSP_MUX_ENUM(xreg, xshift, xtexts))
-
-int sst_fill_ssp_slot(struct snd_soc_dai *dai, unsigned int tx_mask,
-				unsigned int rx_mask, int slots, int slot_width);
-int sst_fill_ssp_config(struct snd_soc_dai *dai, unsigned int fmt);
-void sst_fill_ssp_defaults(struct snd_soc_dai *dai);
 
 #endif

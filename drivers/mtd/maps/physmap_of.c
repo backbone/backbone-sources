@@ -147,7 +147,7 @@ static void of_free_probes(const char * const *probes)
 		kfree(probes);
 }
 
-static const struct of_device_id of_flash_match[];
+static struct of_device_id of_flash_match[];
 static int of_flash_probe(struct platform_device *dev)
 {
 	const char * const *part_probe_types;
@@ -327,7 +327,7 @@ err_flash_remove:
 	return err;
 }
 
-static const struct of_device_id of_flash_match[] = {
+static struct of_device_id of_flash_match[] = {
 	{
 		.compatible	= "cfi-flash",
 		.data		= (void *)"cfi_probe",

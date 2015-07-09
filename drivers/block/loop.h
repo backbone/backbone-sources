@@ -28,7 +28,7 @@ struct loop_func_table;
 
 struct loop_device {
 	int		lo_number;
-	atomic_t	lo_refcnt;
+	int		lo_refcnt;
 	loff_t		lo_offset;
 	loff_t		lo_sizelimit;
 	int		lo_flags;
@@ -54,7 +54,6 @@ struct loop_device {
 	gfp_t		old_gfp_mask;
 
 	spinlock_t		lo_lock;
-	struct workqueue_struct *wq;
 	struct list_head	write_cmd_head;
 	struct work_struct	write_work;
 	bool			write_started;

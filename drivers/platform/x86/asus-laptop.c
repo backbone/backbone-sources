@@ -54,7 +54,6 @@
 #include <linux/slab.h>
 #include <linux/dmi.h>
 #include <linux/acpi.h>
-#include <acpi/video.h>
 
 #define ASUS_LAPTOP_VERSION	"0.42"
 
@@ -1885,11 +1884,12 @@ static int asus_acpi_add(struct acpi_device *device)
 	if (result)
 		goto fail_platform;
 
-	if (acpi_video_get_backlight_type() == acpi_backlight_vendor) {
+	if (!acpi_video_backlight_support()) {
 		result = asus_backlight_init(asus);
 		if (result)
 			goto fail_backlight;
-	}
+	} else
+		pr_info("Backlight controlled by ACPI video driver\n");
 
 	result = asus_input_init(asus);
 	if (result)

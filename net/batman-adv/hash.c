@@ -1,4 +1,4 @@
-/* Copyright (C) 2006-2015 B.A.T.M.A.N. contributors:
+/* Copyright (C) 2006-2014 B.A.T.M.A.N. contributors:
  *
  * Simon Wunderlich, Marek Lindner
  *
@@ -15,12 +15,8 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "hash.h"
 #include "main.h"
-
-#include <linux/fs.h>
-#include <linux/lockdep.h>
-#include <linux/slab.h>
+#include "hash.h"
 
 /* clears the hash */
 static void batadv_hash_init(struct batadv_hashtable *hash)

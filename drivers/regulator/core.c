@@ -678,8 +678,6 @@ static int drms_uA_update(struct regulator_dev *rdev)
 	list_for_each_entry(sibling, &rdev->consumer_list, list)
 		current_uA += sibling->uA_load;
 
-	current_uA += rdev->constraints->system_load;
-
 	if (rdev->desc->ops->set_load) {
 		/* set the optimum mode for our new total regulator load */
 		err = rdev->desc->ops->set_load(rdev, current_uA);
@@ -781,64 +779,59 @@ static int suspend_prepare(struct regulator_dev *rdev, suspend_state_t state)
 static void print_constraints(struct regulator_dev *rdev)
 {
 	struct regulation_constraints *constraints = rdev->constraints;
-	char buf[160] = "";
-	size_t len = sizeof(buf) - 1;
+	char buf[80] = "";
 	int count = 0;
 	int ret;
 
 	if (constraints->min_uV && constraints->max_uV) {
 		if (constraints->min_uV == constraints->max_uV)
-			count += scnprintf(buf + count, len - count, "%d mV ",
-					   constraints->min_uV / 1000);
+			count += sprintf(buf + count, "%d mV ",
+					 constraints->min_uV / 1000);
 		else
-			count += scnprintf(buf + count, len - count,
-					   "%d <--> %d mV ",
-					   constraints->min_uV / 1000,
-					   constraints->max_uV / 1000);
+			count += sprintf(buf + count, "%d <--> %d mV ",
+					 constraints->min_uV / 1000,
+					 constraints->max_uV / 1000);
 	}
 
 	if (!constraints->min_uV ||
 	    constraints->min_uV != constraints->max_uV) {
 		ret = _regulator_get_voltage(rdev);
 		if (ret > 0)
-			count += scnprintf(buf + count, len - count,
-					   "at %d mV ", ret / 1000);
+			count += sprintf(buf + count, "at %d mV ", ret / 1000);
 	}
 
 	if (constraints->uV_offset)
-		count += scnprintf(buf + count, len - count, "%dmV offset ",
-				   constraints->uV_offset / 1000);
+		count += sprintf(buf, "%dmV offset ",
+				 constraints->uV_offset / 1000);
 
 	if (constraints->min_uA && constraints->max_uA) {
 		if (constraints->min_uA == constraints->max_uA)
-			count += scnprintf(buf + count, len - count, "%d mA ",
-					   constraints->min_uA / 1000);
+			count += sprintf(buf + count, "%d mA ",
+					 constraints->min_uA / 1000);
 		else
-			count += scnprintf(buf + count, len - count,
-					   "%d <--> %d mA ",
-					   constraints->min_uA / 1000,
-					   constraints->max_uA / 1000);
+			count += sprintf(buf + count, "%d <--> %d mA ",
+					 constraints->min_uA / 1000,
+					 constraints->max_uA / 1000);
 	}
 
 	if (!constraints->min_uA ||
 	    constraints->min_uA != constraints->max_uA) {
 		ret = _regulator_get_current_limit(rdev);
 		if (ret > 0)
-			count += scnprintf(buf + count, len - count,
-					   "at %d mA ", ret / 1000);
+			count += sprintf(buf + count, "at %d mA ", ret / 1000);
 	}
 
 	if (constraints->valid_modes_mask & REGULATOR_MODE_FAST)
-		count += scnprintf(buf + count, len - count, "fast ");
+		count += sprintf(buf + count, "fast ");
 	if (constraints->valid_modes_mask & REGULATOR_MODE_NORMAL)
-		count += scnprintf(buf + count, len - count, "normal ");
+		count += sprintf(buf + count, "normal ");
 	if (constraints->valid_modes_mask & REGULATOR_MODE_IDLE)
-		count += scnprintf(buf + count, len - count, "idle ");
+		count += sprintf(buf + count, "idle ");
 	if (constraints->valid_modes_mask & REGULATOR_MODE_STANDBY)
-		count += scnprintf(buf + count, len - count, "standby");
+		count += sprintf(buf + count, "standby");
 
 	if (!count)
-		scnprintf(buf, len, "no parameters");
+		sprintf(buf, "no parameters");
 
 	rdev_dbg(rdev, "%s\n", buf);
 
@@ -1013,15 +1006,6 @@ static int set_machine_constraints(struct regulator_dev *rdev,
 	if (ret != 0)
 		goto out;
 
-	if (rdev->constraints->ilim_uA && ops->set_input_current_limit) {
-		ret = ops->set_input_current_limit(rdev,
-						   rdev->constraints->ilim_uA);
-		if (ret < 0) {
-			rdev_err(rdev, "failed to set input limit\n");
-			goto out;
-		}
-	}
-
 	/* do we need to setup our suspend state */
 	if (rdev->constraints->initial_state) {
 		ret = suspend_prepare(rdev, rdev->constraints->initial_state);
@@ -1061,22 +1045,6 @@ static int set_machine_constraints(struct regulator_dev *rdev,
 		ret = ops->set_ramp_delay(rdev, rdev->constraints->ramp_delay);
 		if (ret < 0) {
 			rdev_err(rdev, "failed to set ramp_delay\n");
-			goto out;
-		}
-	}
-
-	if (rdev->constraints->pull_down && ops->set_pull_down) {
-		ret = ops->set_pull_down(rdev);
-		if (ret < 0) {
-			rdev_err(rdev, "failed to set pull down\n");
-			goto out;
-		}
-	}
-
-	if (rdev->constraints->soft_start && ops->set_soft_start) {
-		ret = ops->set_soft_start(rdev);
-		if (ret < 0) {
-			rdev_err(rdev, "failed to set soft start\n");
 			goto out;
 		}
 	}
@@ -1224,10 +1192,10 @@ static struct regulator *create_regulator(struct regulator_dev *rdev,
 		if (regulator->supply_name == NULL)
 			goto overflow_err;
 
-		err = sysfs_create_link_nowarn(&rdev->dev.kobj, &dev->kobj,
+		err = sysfs_create_link(&rdev->dev.kobj, &dev->kobj,
 					buf);
 		if (err) {
-			rdev_dbg(rdev, "could not add device link %s err %d\n",
+			rdev_warn(rdev, "could not add device link %s err %d\n",
 				  dev->kobj.name, err);
 			/* non-fatal */
 		}

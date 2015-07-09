@@ -287,8 +287,7 @@ static int wm831x_gp_ldo_probe(struct platform_device *pdev)
 	irq = wm831x_irq(wm831x, platform_get_irq_byname(pdev, "UV"));
 	ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
 					wm831x_ldo_uv_irq,
-					IRQF_TRIGGER_RISING | IRQF_ONESHOT,
-					ldo->name,
+					IRQF_TRIGGER_RISING, ldo->name,
 					ldo);
 	if (ret != 0) {
 		dev_err(&pdev->dev, "Failed to request UV IRQ %d: %d\n",
@@ -497,8 +496,7 @@ static int wm831x_aldo_probe(struct platform_device *pdev)
 	irq = wm831x_irq(wm831x, platform_get_irq_byname(pdev, "UV"));
 	ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
 					wm831x_ldo_uv_irq,
-					IRQF_TRIGGER_RISING | IRQF_ONESHOT,
-					ldo->name, ldo);
+					IRQF_TRIGGER_RISING, ldo->name, ldo);
 	if (ret != 0) {
 		dev_err(&pdev->dev, "Failed to request UV IRQ %d: %d\n",
 			irq, ret);

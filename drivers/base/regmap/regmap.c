@@ -945,10 +945,11 @@ EXPORT_SYMBOL_GPL(devm_regmap_init);
 static void regmap_field_init(struct regmap_field *rm_field,
 	struct regmap *regmap, struct reg_field reg_field)
 {
+	int field_bits = reg_field.msb - reg_field.lsb + 1;
 	rm_field->regmap = regmap;
 	rm_field->reg = reg_field.reg;
 	rm_field->shift = reg_field.lsb;
-	rm_field->mask = GENMASK(reg_field.msb, reg_field.lsb);
+	rm_field->mask = ((BIT(field_bits) - 1) << reg_field.lsb);
 	rm_field->id_size = reg_field.id_size;
 	rm_field->id_offset = reg_field.id_offset;
 }
@@ -2317,7 +2318,7 @@ int regmap_bulk_read(struct regmap *map, unsigned int reg, void *val,
 					  &ival);
 			if (ret != 0)
 				return ret;
-			map->format.format_val(val + (i * val_bytes), ival, 0);
+			memcpy(val + (i * val_bytes), &ival, val_bytes);
 		}
 	}
 
@@ -2582,7 +2583,10 @@ int regmap_register_patch(struct regmap *map, const struct reg_default *regs,
 	map->async = true;
 
 	ret = _regmap_multi_reg_write(map, regs, num_regs);
+	if (ret != 0)
+		goto out;
 
+out:
 	map->async = false;
 	map->cache_bypass = bypass;
 
@@ -2608,30 +2612,6 @@ int regmap_get_val_bytes(struct regmap *map)
 	return map->format.val_bytes;
 }
 EXPORT_SYMBOL_GPL(regmap_get_val_bytes);
-
-/**
- * regmap_get_max_register(): Report the max register value
- *
- * Report the max register value, mainly intended to for use by
- * generic infrastructure built on top of regmap.
- */
-int regmap_get_max_register(struct regmap *map)
-{
-	return map->max_register ? map->max_register : -EINVAL;
-}
-EXPORT_SYMBOL_GPL(regmap_get_max_register);
-
-/**
- * regmap_get_reg_stride(): Report the register address stride
- *
- * Report the register address stride, mainly intended to for use by
- * generic infrastructure built on top of regmap.
- */
-int regmap_get_reg_stride(struct regmap *map)
-{
-	return map->reg_stride;
-}
-EXPORT_SYMBOL_GPL(regmap_get_reg_stride);
 
 int regmap_parse_val(struct regmap *map, const void *buf,
 			unsigned int *val)

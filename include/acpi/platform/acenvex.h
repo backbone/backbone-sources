@@ -56,9 +56,6 @@
 #if defined(_LINUX) || defined(__linux__)
 #include <acpi/platform/aclinuxex.h>
 
-#elif defined(__DragonFly__)
-#include "acdragonflyex.h"
-
 #endif
 
 /*! [End] no source code translation !*/

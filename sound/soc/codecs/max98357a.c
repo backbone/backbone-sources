@@ -60,12 +60,13 @@ static int max98357a_codec_probe(struct snd_soc_codec *codec)
 {
 	struct gpio_desc *sdmode;
 
-	sdmode = devm_gpiod_get(codec->dev, "sdmode", GPIOD_OUT_LOW);
+	sdmode = devm_gpiod_get(codec->dev, "sdmode");
 	if (IS_ERR(sdmode)) {
 		dev_err(codec->dev, "%s() unable to get sdmode GPIO: %ld\n",
 				__func__, PTR_ERR(sdmode));
 		return PTR_ERR(sdmode);
 	}
+	gpiod_direction_output(sdmode, 0);
 	snd_soc_codec_set_drvdata(codec, sdmode);
 
 	return 0;

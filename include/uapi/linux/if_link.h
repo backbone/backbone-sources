@@ -390,17 +390,6 @@ struct ifla_vxlan_port_range {
 	__be16	high;
 };
 
-/* GENEVE section */
-enum {
-	IFLA_GENEVE_UNSPEC,
-	IFLA_GENEVE_ID,
-	IFLA_GENEVE_REMOTE,
-	IFLA_GENEVE_TTL,
-	IFLA_GENEVE_TOS,
-	__IFLA_GENEVE_MAX
-};
-#define IFLA_GENEVE_MAX	(__IFLA_GENEVE_MAX - 1)
-
 /* Bonding section */
 
 enum {
@@ -428,9 +417,6 @@ enum {
 	IFLA_BOND_AD_LACP_RATE,
 	IFLA_BOND_AD_SELECT,
 	IFLA_BOND_AD_INFO,
-	IFLA_BOND_AD_ACTOR_SYS_PRIO,
-	IFLA_BOND_AD_USER_PORT_KEY,
-	IFLA_BOND_AD_ACTOR_SYSTEM,
 	__IFLA_BOND_MAX,
 };
 
@@ -456,8 +442,6 @@ enum {
 	IFLA_BOND_SLAVE_PERM_HWADDR,
 	IFLA_BOND_SLAVE_QUEUE_ID,
 	IFLA_BOND_SLAVE_AD_AGGREGATOR_ID,
-	IFLA_BOND_SLAVE_AD_ACTOR_OPER_PORT_STATE,
-	IFLA_BOND_SLAVE_AD_PARTNER_OPER_PORT_STATE,
 	__IFLA_BOND_SLAVE_MAX,
 };
 
@@ -484,7 +468,6 @@ enum {
 	IFLA_VF_RSS_QUERY_EN,	/* RSS Redirection Table and Hash Key query
 				 * on/off switch
 				 */
-	IFLA_VF_STATS,		/* network device statistics */
 	__IFLA_VF_MAX,
 };
 
@@ -533,18 +516,6 @@ struct ifla_vf_rss_query_en {
 	__u32 vf;
 	__u32 setting;
 };
-
-enum {
-	IFLA_VF_STATS_RX_PACKETS,
-	IFLA_VF_STATS_TX_PACKETS,
-	IFLA_VF_STATS_RX_BYTES,
-	IFLA_VF_STATS_TX_BYTES,
-	IFLA_VF_STATS_BROADCAST,
-	IFLA_VF_STATS_MULTICAST,
-	__IFLA_VF_STATS_MAX,
-};
-
-#define IFLA_VF_STATS_MAX (__IFLA_VF_STATS_MAX - 1)
 
 /* VF ports management section
  *

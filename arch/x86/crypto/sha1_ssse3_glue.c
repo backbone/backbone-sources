@@ -29,7 +29,9 @@
 #include <linux/types.h>
 #include <crypto/sha.h>
 #include <crypto/sha1_base.h>
-#include <asm/fpu/api.h>
+#include <asm/i387.h>
+#include <asm/xcr.h>
+#include <asm/xsave.h>
 
 
 asmlinkage void sha1_transform_ssse3(u32 *digest, const char *data,
@@ -121,9 +123,15 @@ static struct shash_alg alg = {
 #ifdef CONFIG_AS_AVX
 static bool __init avx_usable(void)
 {
-	if (!cpu_has_xfeatures(XSTATE_SSE | XSTATE_YMM, NULL)) {
-		if (cpu_has_avx)
-			pr_info("AVX detected but unusable.\n");
+	u64 xcr0;
+
+	if (!cpu_has_avx || !cpu_has_osxsave)
+		return false;
+
+	xcr0 = xgetbv(XCR_XFEATURE_ENABLED_MASK);
+	if ((xcr0 & (XSTATE_SSE | XSTATE_YMM)) != (XSTATE_SSE | XSTATE_YMM)) {
+		pr_info("AVX detected but unusable.\n");
+
 		return false;
 	}
 

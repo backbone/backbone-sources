@@ -13,21 +13,22 @@
  * lpass-platform.c -- ALSA SoC platform driver for QTi LPASS
  */
 
+#include <linux/compiler.h>
+#include <linux/device.h>
 #include <linux/dma-mapping.h>
+#include <linux/err.h>
 #include <linux/export.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/io.h>
 #include <linux/platform_device.h>
+#include <sound/memalloc.h>
+#include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <linux/regmap.h>
 #include <sound/soc.h>
-#include "lpass-lpaif-reg.h"
+#include "lpass-lpaif-ipq806x.h"
 #include "lpass.h"
-
-struct lpass_pcm_data {
-	int rdma_ch;
-	int i2s_port;
-};
 
 #define LPASS_PLATFORM_BUFFER_SIZE	(16 * 1024)
 #define LPASS_PLATFORM_PERIODS		2
@@ -83,15 +84,13 @@ static int lpass_platform_pcmops_hw_params(struct snd_pcm_substream *substream,
 		struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *soc_runtime = substream->private_data;
-	struct lpass_pcm_data *pcm_data = snd_soc_pcm_get_drvdata(soc_runtime);
 	struct lpass_data *drvdata =
 		snd_soc_platform_get_drvdata(soc_runtime->platform);
-	struct lpass_variant *v = drvdata->variant;
 	snd_pcm_format_t format = params_format(params);
 	unsigned int channels = params_channels(params);
 	unsigned int regval;
 	int bitwidth;
-	int ret, rdma_port = pcm_data->i2s_port + v->rdmactl_audif_start;
+	int ret;
 
 	bitwidth = snd_pcm_format_width(format);
 	if (bitwidth < 0) {
@@ -101,7 +100,7 @@ static int lpass_platform_pcmops_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	regval = LPAIF_RDMACTL_BURSTEN_INCR4 |
-			LPAIF_RDMACTL_AUDINTF(rdma_port) |
+			LPAIF_RDMACTL_AUDINTF_MI2S |
 			LPAIF_RDMACTL_FIFOWM_8;
 
 	switch (bitwidth) {
@@ -157,7 +156,7 @@ static int lpass_platform_pcmops_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	ret = regmap_write(drvdata->lpaif_map,
-			LPAIF_RDMACTL_REG(v, pcm_data->rdma_ch), regval);
+			LPAIF_RDMACTL_REG(LPAIF_RDMA_CHAN_MI2S), regval);
 	if (ret) {
 		dev_err(soc_runtime->dev, "%s() error writing to rdmactl reg: %d\n",
 				__func__, ret);
@@ -170,14 +169,12 @@ static int lpass_platform_pcmops_hw_params(struct snd_pcm_substream *substream,
 static int lpass_platform_pcmops_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *soc_runtime = substream->private_data;
-	struct lpass_pcm_data *pcm_data = snd_soc_pcm_get_drvdata(soc_runtime);
 	struct lpass_data *drvdata =
 		snd_soc_platform_get_drvdata(soc_runtime->platform);
-	struct lpass_variant *v = drvdata->variant;
 	int ret;
 
 	ret = regmap_write(drvdata->lpaif_map,
-			LPAIF_RDMACTL_REG(v, pcm_data->rdma_ch), 0);
+			LPAIF_RDMACTL_REG(LPAIF_RDMA_CHAN_MI2S), 0);
 	if (ret)
 		dev_err(soc_runtime->dev, "%s() error writing to rdmactl reg: %d\n",
 				__func__, ret);
@@ -189,14 +186,12 @@ static int lpass_platform_pcmops_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *soc_runtime = substream->private_data;
-	struct lpass_pcm_data *pcm_data = snd_soc_pcm_get_drvdata(soc_runtime);
 	struct lpass_data *drvdata =
 		snd_soc_platform_get_drvdata(soc_runtime->platform);
-	struct lpass_variant *v = drvdata->variant;
-	int ret, ch = pcm_data->rdma_ch;
+	int ret;
 
 	ret = regmap_write(drvdata->lpaif_map,
-			LPAIF_RDMABASE_REG(v, ch),
+			LPAIF_RDMABASE_REG(LPAIF_RDMA_CHAN_MI2S),
 			runtime->dma_addr);
 	if (ret) {
 		dev_err(soc_runtime->dev, "%s() error writing to rdmabase reg: %d\n",
@@ -205,7 +200,7 @@ static int lpass_platform_pcmops_prepare(struct snd_pcm_substream *substream)
 	}
 
 	ret = regmap_write(drvdata->lpaif_map,
-			LPAIF_RDMABUFF_REG(v, ch),
+			LPAIF_RDMABUFF_REG(LPAIF_RDMA_CHAN_MI2S),
 			(snd_pcm_lib_buffer_bytes(substream) >> 2) - 1);
 	if (ret) {
 		dev_err(soc_runtime->dev, "%s() error writing to rdmabuff reg: %d\n",
@@ -214,7 +209,7 @@ static int lpass_platform_pcmops_prepare(struct snd_pcm_substream *substream)
 	}
 
 	ret = regmap_write(drvdata->lpaif_map,
-			LPAIF_RDMAPER_REG(v, ch),
+			LPAIF_RDMAPER_REG(LPAIF_RDMA_CHAN_MI2S),
 			(snd_pcm_lib_period_bytes(substream) >> 2) - 1);
 	if (ret) {
 		dev_err(soc_runtime->dev, "%s() error writing to rdmaper reg: %d\n",
@@ -223,7 +218,7 @@ static int lpass_platform_pcmops_prepare(struct snd_pcm_substream *substream)
 	}
 
 	ret = regmap_update_bits(drvdata->lpaif_map,
-			LPAIF_RDMACTL_REG(v, ch),
+			LPAIF_RDMACTL_REG(LPAIF_RDMA_CHAN_MI2S),
 			LPAIF_RDMACTL_ENABLE_MASK, LPAIF_RDMACTL_ENABLE_ON);
 	if (ret) {
 		dev_err(soc_runtime->dev, "%s() error writing to rdmactl reg: %d\n",
@@ -238,11 +233,9 @@ static int lpass_platform_pcmops_trigger(struct snd_pcm_substream *substream,
 		int cmd)
 {
 	struct snd_soc_pcm_runtime *soc_runtime = substream->private_data;
-	struct lpass_pcm_data *pcm_data = snd_soc_pcm_get_drvdata(soc_runtime);
 	struct lpass_data *drvdata =
 		snd_soc_platform_get_drvdata(soc_runtime->platform);
-	struct lpass_variant *v = drvdata->variant;
-	int ret, ch = pcm_data->rdma_ch;
+	int ret;
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
@@ -250,8 +243,8 @@ static int lpass_platform_pcmops_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		/* clear status before enabling interrupts */
 		ret = regmap_write(drvdata->lpaif_map,
-				LPAIF_IRQCLEAR_REG(v, LPAIF_IRQ_PORT_HOST),
-				LPAIF_IRQ_ALL(ch));
+				LPAIF_IRQCLEAR_REG(LPAIF_IRQ_PORT_HOST),
+				LPAIF_IRQ_ALL(LPAIF_RDMA_CHAN_MI2S));
 		if (ret) {
 			dev_err(soc_runtime->dev, "%s() error writing to irqclear reg: %d\n",
 					__func__, ret);
@@ -259,9 +252,9 @@ static int lpass_platform_pcmops_trigger(struct snd_pcm_substream *substream,
 		}
 
 		ret = regmap_update_bits(drvdata->lpaif_map,
-				LPAIF_IRQEN_REG(v, LPAIF_IRQ_PORT_HOST),
-				LPAIF_IRQ_ALL(ch),
-				LPAIF_IRQ_ALL(ch));
+				LPAIF_IRQEN_REG(LPAIF_IRQ_PORT_HOST),
+				LPAIF_IRQ_ALL(LPAIF_RDMA_CHAN_MI2S),
+				LPAIF_IRQ_ALL(LPAIF_RDMA_CHAN_MI2S));
 		if (ret) {
 			dev_err(soc_runtime->dev, "%s() error writing to irqen reg: %d\n",
 					__func__, ret);
@@ -269,7 +262,7 @@ static int lpass_platform_pcmops_trigger(struct snd_pcm_substream *substream,
 		}
 
 		ret = regmap_update_bits(drvdata->lpaif_map,
-				LPAIF_RDMACTL_REG(v, ch),
+				LPAIF_RDMACTL_REG(LPAIF_RDMA_CHAN_MI2S),
 				LPAIF_RDMACTL_ENABLE_MASK,
 				LPAIF_RDMACTL_ENABLE_ON);
 		if (ret) {
@@ -282,7 +275,7 @@ static int lpass_platform_pcmops_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		ret = regmap_update_bits(drvdata->lpaif_map,
-				LPAIF_RDMACTL_REG(v, ch),
+				LPAIF_RDMACTL_REG(LPAIF_RDMA_CHAN_MI2S),
 				LPAIF_RDMACTL_ENABLE_MASK,
 				LPAIF_RDMACTL_ENABLE_OFF);
 		if (ret) {
@@ -292,8 +285,8 @@ static int lpass_platform_pcmops_trigger(struct snd_pcm_substream *substream,
 		}
 
 		ret = regmap_update_bits(drvdata->lpaif_map,
-				LPAIF_IRQEN_REG(v, LPAIF_IRQ_PORT_HOST),
-				LPAIF_IRQ_ALL(ch), 0);
+				LPAIF_IRQEN_REG(LPAIF_IRQ_PORT_HOST),
+				LPAIF_IRQ_ALL(LPAIF_RDMA_CHAN_MI2S), 0);
 		if (ret) {
 			dev_err(soc_runtime->dev, "%s() error writing to irqen reg: %d\n",
 					__func__, ret);
@@ -309,15 +302,13 @@ static snd_pcm_uframes_t lpass_platform_pcmops_pointer(
 		struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *soc_runtime = substream->private_data;
-	struct lpass_pcm_data *pcm_data = snd_soc_pcm_get_drvdata(soc_runtime);
 	struct lpass_data *drvdata =
 			snd_soc_platform_get_drvdata(soc_runtime->platform);
-	struct lpass_variant *v = drvdata->variant;
 	unsigned int base_addr, curr_addr;
-	int ret, ch = pcm_data->rdma_ch;
+	int ret;
 
 	ret = regmap_read(drvdata->lpaif_map,
-			LPAIF_RDMABASE_REG(v, ch), &base_addr);
+			LPAIF_RDMABASE_REG(LPAIF_RDMA_CHAN_MI2S), &base_addr);
 	if (ret) {
 		dev_err(soc_runtime->dev, "%s() error reading from rdmabase reg: %d\n",
 				__func__, ret);
@@ -325,7 +316,7 @@ static snd_pcm_uframes_t lpass_platform_pcmops_pointer(
 	}
 
 	ret = regmap_read(drvdata->lpaif_map,
-			LPAIF_RDMACURR_REG(v, ch), &curr_addr);
+			LPAIF_RDMACURR_REG(LPAIF_RDMA_CHAN_MI2S), &curr_addr);
 	if (ret) {
 		dev_err(soc_runtime->dev, "%s() error reading from rdmacurr reg: %d\n",
 				__func__, ret);
@@ -356,20 +347,29 @@ static struct snd_pcm_ops lpass_platform_pcm_ops = {
 	.mmap		= lpass_platform_pcmops_mmap,
 };
 
-static irqreturn_t lpass_dma_interrupt_handler(
-			struct snd_pcm_substream *substream,
-			struct lpass_data *drvdata,
-			int chan, u32 interrupts)
+static irqreturn_t lpass_platform_lpaif_irq(int irq, void *data)
 {
+	struct snd_pcm_substream *substream = data;
 	struct snd_soc_pcm_runtime *soc_runtime = substream->private_data;
-	struct lpass_variant *v = drvdata->variant;
+	struct lpass_data *drvdata =
+		snd_soc_platform_get_drvdata(soc_runtime->platform);
+	unsigned int interrupts;
 	irqreturn_t ret = IRQ_NONE;
 	int rv;
 
-	if (interrupts & LPAIF_IRQ_PER(chan)) {
+	rv = regmap_read(drvdata->lpaif_map,
+			LPAIF_IRQSTAT_REG(LPAIF_IRQ_PORT_HOST), &interrupts);
+	if (rv) {
+		dev_err(soc_runtime->dev, "%s() error reading from irqstat reg: %d\n",
+				__func__, rv);
+		return IRQ_NONE;
+	}
+	interrupts &= LPAIF_IRQ_ALL(LPAIF_RDMA_CHAN_MI2S);
+
+	if (interrupts & LPAIF_IRQ_PER(LPAIF_RDMA_CHAN_MI2S)) {
 		rv = regmap_write(drvdata->lpaif_map,
-				LPAIF_IRQCLEAR_REG(v, LPAIF_IRQ_PORT_HOST),
-				LPAIF_IRQ_PER(chan));
+				LPAIF_IRQCLEAR_REG(LPAIF_IRQ_PORT_HOST),
+				LPAIF_IRQ_PER(LPAIF_RDMA_CHAN_MI2S));
 		if (rv) {
 			dev_err(soc_runtime->dev, "%s() error writing to irqclear reg: %d\n",
 					__func__, rv);
@@ -379,10 +379,10 @@ static irqreturn_t lpass_dma_interrupt_handler(
 		ret = IRQ_HANDLED;
 	}
 
-	if (interrupts & LPAIF_IRQ_XRUN(chan)) {
+	if (interrupts & LPAIF_IRQ_XRUN(LPAIF_RDMA_CHAN_MI2S)) {
 		rv = regmap_write(drvdata->lpaif_map,
-				LPAIF_IRQCLEAR_REG(v, LPAIF_IRQ_PORT_HOST),
-				LPAIF_IRQ_XRUN(chan));
+				LPAIF_IRQCLEAR_REG(LPAIF_IRQ_PORT_HOST),
+				LPAIF_IRQ_XRUN(LPAIF_RDMA_CHAN_MI2S));
 		if (rv) {
 			dev_err(soc_runtime->dev, "%s() error writing to irqclear reg: %d\n",
 					__func__, rv);
@@ -393,10 +393,10 @@ static irqreturn_t lpass_dma_interrupt_handler(
 		ret = IRQ_HANDLED;
 	}
 
-	if (interrupts & LPAIF_IRQ_ERR(chan)) {
+	if (interrupts & LPAIF_IRQ_ERR(LPAIF_RDMA_CHAN_MI2S)) {
 		rv = regmap_write(drvdata->lpaif_map,
-				LPAIF_IRQCLEAR_REG(v, LPAIF_IRQ_PORT_HOST),
-				LPAIF_IRQ_ERR(chan));
+				LPAIF_IRQCLEAR_REG(LPAIF_IRQ_PORT_HOST),
+				LPAIF_IRQ_ERR(LPAIF_RDMA_CHAN_MI2S));
 		if (rv) {
 			dev_err(soc_runtime->dev, "%s() error writing to irqclear reg: %d\n",
 					__func__, rv);
@@ -408,35 +408,6 @@ static irqreturn_t lpass_dma_interrupt_handler(
 	}
 
 	return ret;
-}
-
-static irqreturn_t lpass_platform_lpaif_irq(int irq, void *data)
-{
-	struct lpass_data *drvdata = data;
-	struct lpass_variant *v = drvdata->variant;
-	unsigned int irqs;
-	int rv, chan;
-
-	rv = regmap_read(drvdata->lpaif_map,
-			LPAIF_IRQSTAT_REG(v, LPAIF_IRQ_PORT_HOST), &irqs);
-	if (rv) {
-		pr_err("%s() error reading from irqstat reg: %d\n",
-				__func__, rv);
-		return IRQ_NONE;
-	}
-
-	/* Handle per channel interrupts */
-	for (chan = 0; chan < LPASS_MAX_DMA_CHANNELS; chan++) {
-		if (irqs & LPAIF_IRQ_ALL(chan) && drvdata->substream[chan]) {
-			rv = lpass_dma_interrupt_handler(
-						drvdata->substream[chan],
-						drvdata, chan, irqs);
-			if (rv != IRQ_HANDLED)
-				return rv;
-		}
-	}
-
-	return IRQ_HANDLED;
 }
 
 static int lpass_platform_alloc_buffer(struct snd_pcm_substream *substream,
@@ -477,27 +448,9 @@ static int lpass_platform_pcm_new(struct snd_soc_pcm_runtime *soc_runtime)
 	struct snd_pcm *pcm = soc_runtime->pcm;
 	struct snd_pcm_substream *substream =
 		pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream;
-	struct snd_soc_dai *cpu_dai = soc_runtime->cpu_dai;
 	struct lpass_data *drvdata =
 		snd_soc_platform_get_drvdata(soc_runtime->platform);
-	struct lpass_variant *v = drvdata->variant;
 	int ret;
-	struct lpass_pcm_data *data;
-
-	data = devm_kzalloc(soc_runtime->dev, sizeof(*data), GFP_KERNEL);
-	if (!data)
-		return -ENOMEM;
-
-	if (v->alloc_dma_channel)
-		data->rdma_ch = v->alloc_dma_channel(drvdata);
-
-	if (IS_ERR_VALUE(data->rdma_ch))
-		return data->rdma_ch;
-
-	drvdata->substream[data->rdma_ch] = substream;
-	data->i2s_port = cpu_dai->driver->id;
-
-	snd_soc_pcm_set_drvdata(soc_runtime, data);
 
 	soc_runtime->dev->coherent_dma_mask = DMA_BIT_MASK(32);
 	soc_runtime->dev->dma_mask = &soc_runtime->dev->coherent_dma_mask;
@@ -506,12 +459,29 @@ static int lpass_platform_pcm_new(struct snd_soc_pcm_runtime *soc_runtime)
 	if (ret)
 		return ret;
 
+	ret = devm_request_irq(soc_runtime->dev, drvdata->lpaif_irq,
+			lpass_platform_lpaif_irq, IRQF_TRIGGER_RISING,
+			"lpass-irq-lpaif", substream);
+	if (ret) {
+		dev_err(soc_runtime->dev, "%s() irq request failed: %d\n",
+				__func__, ret);
+		goto err_buf;
+	}
+
+	/* ensure audio hardware is disabled */
 	ret = regmap_write(drvdata->lpaif_map,
-			LPAIF_RDMACTL_REG(v, data->rdma_ch), 0);
+			LPAIF_IRQEN_REG(LPAIF_IRQ_PORT_HOST), 0);
+	if (ret) {
+		dev_err(soc_runtime->dev, "%s() error writing to irqen reg: %d\n",
+				__func__, ret);
+		return ret;
+	}
+	ret = regmap_write(drvdata->lpaif_map,
+			LPAIF_RDMACTL_REG(LPAIF_RDMA_CHAN_MI2S), 0);
 	if (ret) {
 		dev_err(soc_runtime->dev, "%s() error writing to rdmactl reg: %d\n",
 				__func__, ret);
-		goto err_buf;
+		return ret;
 	}
 
 	return 0;
@@ -526,15 +496,6 @@ static void lpass_platform_pcm_free(struct snd_pcm *pcm)
 	struct snd_pcm_substream *substream =
 		pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream;
 	struct snd_soc_pcm_runtime *soc_runtime = substream->private_data;
-	struct lpass_data *drvdata =
-		snd_soc_platform_get_drvdata(soc_runtime->platform);
-	struct lpass_pcm_data *data = snd_soc_pcm_get_drvdata(soc_runtime);
-	struct lpass_variant *v = drvdata->variant;
-
-	drvdata->substream[data->rdma_ch] = NULL;
-
-	if (v->free_dma_channel)
-		v->free_dma_channel(drvdata, data->rdma_ch);
 
 	lpass_platform_free_buffer(substream, soc_runtime);
 }
@@ -548,8 +509,6 @@ static struct snd_soc_platform_driver lpass_platform_driver = {
 int asoc_qcom_lpass_platform_register(struct platform_device *pdev)
 {
 	struct lpass_data *drvdata = platform_get_drvdata(pdev);
-	struct lpass_variant *v = drvdata->variant;
-	int ret;
 
 	drvdata->lpaif_irq = platform_get_irq_byname(pdev, "lpass-irq-lpaif");
 	if (drvdata->lpaif_irq < 0) {
@@ -557,25 +516,6 @@ int asoc_qcom_lpass_platform_register(struct platform_device *pdev)
 				__func__, drvdata->lpaif_irq);
 		return -ENODEV;
 	}
-
-	/* ensure audio hardware is disabled */
-	ret = regmap_write(drvdata->lpaif_map,
-			LPAIF_IRQEN_REG(v, LPAIF_IRQ_PORT_HOST), 0);
-	if (ret) {
-		dev_err(&pdev->dev, "%s() error writing to irqen reg: %d\n",
-				__func__, ret);
-		return ret;
-	}
-
-	ret = devm_request_irq(&pdev->dev, drvdata->lpaif_irq,
-			lpass_platform_lpaif_irq, IRQF_TRIGGER_RISING,
-			"lpass-irq-lpaif", drvdata);
-	if (ret) {
-		dev_err(&pdev->dev, "%s() irq request failed: %d\n",
-				__func__, ret);
-		return ret;
-	}
-
 
 	return devm_snd_soc_register_platform(&pdev->dev,
 			&lpass_platform_driver);

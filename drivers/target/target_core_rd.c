@@ -29,7 +29,8 @@
 #include <linux/timer.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
-#include <scsi/scsi_proto.h>
+#include <scsi/scsi.h>
+#include <scsi/scsi_host.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_backend.h>

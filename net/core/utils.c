@@ -304,15 +304,13 @@ void inet_proto_csum_replace4(__sum16 *sum, struct sk_buff *skb,
 			      __be32 from, __be32 to, int pseudohdr)
 {
 	if (skb->ip_summed != CHECKSUM_PARTIAL) {
-		csum_replace4(sum, from, to);
+		*sum = csum_fold(csum_add(csum_sub(~csum_unfold(*sum), from),
+				 to));
 		if (skb->ip_summed == CHECKSUM_COMPLETE && pseudohdr)
-			skb->csum = ~csum_add(csum_sub(~(skb->csum),
-						       (__force __wsum)from),
-					      (__force __wsum)to);
+			skb->csum = ~csum_add(csum_sub(~(skb->csum), from), to);
 	} else if (pseudohdr)
-		*sum = ~csum_fold(csum_add(csum_sub(csum_unfold(*sum),
-						    (__force __wsum)from),
-					   (__force __wsum)to));
+		*sum = ~csum_fold(csum_add(csum_sub(csum_unfold(*sum), from),
+				  to));
 }
 EXPORT_SYMBOL(inet_proto_csum_replace4);
 

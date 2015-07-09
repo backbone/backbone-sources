@@ -57,8 +57,6 @@ static int add_hist_entries(struct hists *hists, struct machine *machine)
 			},
 		};
 		struct hist_entry_iter iter = {
-			.evsel = evsel,
-			.sample = &sample,
 			.ops = &hist_iter_normal,
 			.hide_unresolved = false,
 		};
@@ -72,11 +70,9 @@ static int add_hist_entries(struct hists *hists, struct machine *machine)
 						  &sample) < 0)
 			goto out;
 
-		if (hist_entry_iter__add(&iter, &al, PERF_MAX_STACK_DEPTH,
-					 NULL) < 0) {
-			addr_location__put(&al);
+		if (hist_entry_iter__add(&iter, &al, evsel, &sample,
+					 PERF_MAX_STACK_DEPTH, NULL) < 0)
 			goto out;
-		}
 
 		fake_samples[i].thread = al.thread;
 		fake_samples[i].map = al.map;
@@ -594,7 +590,7 @@ int test__hists_output(void)
 
 	TEST_ASSERT_VAL("No memory", evlist);
 
-	err = parse_events(evlist, "cpu-clock", NULL);
+	err = parse_events(evlist, "cpu-clock");
 	if (err)
 		goto out;
 

@@ -174,8 +174,7 @@ static inline bool cputimer_running(struct task_struct *tsk)
 {
 	struct thread_group_cputimer *cputimer = &tsk->signal->cputimer;
 
-	/* Check if cputimer isn't running. This is accessed without locking. */
-	if (!READ_ONCE(cputimer->running))
+	if (!cputimer->running)
 		return false;
 
 	/*
@@ -216,7 +215,9 @@ static inline void account_group_user_time(struct task_struct *tsk,
 	if (!cputimer_running(tsk))
 		return;
 
-	atomic64_add(cputime, &cputimer->cputime_atomic.utime);
+	raw_spin_lock(&cputimer->lock);
+	cputimer->cputime.utime += cputime;
+	raw_spin_unlock(&cputimer->lock);
 }
 
 /**
@@ -237,7 +238,9 @@ static inline void account_group_system_time(struct task_struct *tsk,
 	if (!cputimer_running(tsk))
 		return;
 
-	atomic64_add(cputime, &cputimer->cputime_atomic.stime);
+	raw_spin_lock(&cputimer->lock);
+	cputimer->cputime.stime += cputime;
+	raw_spin_unlock(&cputimer->lock);
 }
 
 /**
@@ -258,5 +261,7 @@ static inline void account_group_exec_runtime(struct task_struct *tsk,
 	if (!cputimer_running(tsk))
 		return;
 
-	atomic64_add(ns, &cputimer->cputime_atomic.sum_exec_runtime);
+	raw_spin_lock(&cputimer->lock);
+	cputimer->cputime.sum_exec_runtime += ns;
+	raw_spin_unlock(&cputimer->lock);
 }

@@ -134,8 +134,8 @@ void mwifiex_dfs_cac_work_queue(struct work_struct *work)
 
 	chandef = priv->dfs_chandef;
 	if (priv->wdev.cac_started) {
-		mwifiex_dbg(priv->adapter, MSG,
-			    "CAC timer finished; No radar detected\n");
+		dev_dbg(priv->adapter->dev,
+			"CAC timer finished; No radar detected\n");
 		cfg80211_cac_event(priv->netdev, &chandef,
 				   NL80211_RADAR_CAC_FINISHED,
 				   GFP_KERNEL);
@@ -161,27 +161,11 @@ int mwifiex_cmd_issue_chan_report_request(struct mwifiex_private *priv,
 	cr_req->chan_desc.chan_width = radar_params->chandef->width;
 	cr_req->msec_dwell_time = cpu_to_le32(radar_params->cac_time_ms);
 
-	if (radar_params->cac_time_ms)
-		mwifiex_dbg(priv->adapter, MSG,
-			    "11h: issuing DFS Radar check for channel=%d\n",
-			    radar_params->chandef->chan->hw_value);
-	else
-		mwifiex_dbg(priv->adapter, MSG, "cancelling CAC\n");
+	dev_dbg(priv->adapter->dev,
+		"11h: issuing DFS Radar check for channel=%d\n",
+		radar_params->chandef->chan->hw_value);
 
 	return 0;
-}
-
-int mwifiex_stop_radar_detection(struct mwifiex_private *priv,
-				 struct cfg80211_chan_def *chandef)
-{
-	struct mwifiex_radar_params radar_params;
-
-	memset(&radar_params, 0, sizeof(struct mwifiex_radar_params));
-	radar_params.chandef = chandef;
-	radar_params.cac_time_ms = 0;
-
-	return mwifiex_send_cmd(priv, HostCmd_CMD_CHAN_REPORT_REQUEST,
-				HostCmd_ACT_GEN_SET, 0, &radar_params, true);
 }
 
 /* This function is to abort ongoing CAC upon stopping AP operations
@@ -190,11 +174,8 @@ int mwifiex_stop_radar_detection(struct mwifiex_private *priv,
 void mwifiex_abort_cac(struct mwifiex_private *priv)
 {
 	if (priv->wdev.cac_started) {
-		if (mwifiex_stop_radar_detection(priv, &priv->dfs_chandef))
-			mwifiex_dbg(priv->adapter, ERROR,
-				    "failed to stop CAC in FW\n");
-		mwifiex_dbg(priv->adapter, MSG,
-			    "Aborting delayed work for CAC.\n");
+		dev_dbg(priv->adapter->dev,
+			"Aborting delayed work for CAC.\n");
 		cancel_delayed_work_sync(&priv->dfs_cac_work);
 		cfg80211_cac_event(priv->netdev, &priv->dfs_chandef,
 				   NL80211_RADAR_CAC_ABORTED, GFP_KERNEL);
@@ -218,8 +199,7 @@ int mwifiex_11h_handle_chanrpt_ready(struct mwifiex_private *priv,
 				sizeof(u32));
 
 	if (le32_to_cpu(rpt_event->result) != HostCmd_RESULT_OK) {
-		mwifiex_dbg(priv->adapter, ERROR,
-			    "Error in channel report event\n");
+		dev_err(priv->adapter->dev, "Error in channel report event\n");
 		return -1;
 	}
 
@@ -232,8 +212,8 @@ int mwifiex_11h_handle_chanrpt_ready(struct mwifiex_private *priv,
 		switch (le16_to_cpu(rpt->header.type)) {
 		case TLV_TYPE_CHANRPT_11H_BASIC:
 			if (rpt->map.radar) {
-				mwifiex_dbg(priv->adapter, MSG,
-					    "RADAR Detected on channel %d!\n",
+				dev_notice(priv->adapter->dev,
+					   "RADAR Detected on channel %d!\n",
 					    priv->dfs_chandef.chan->hw_value);
 				cancel_delayed_work_sync(&priv->dfs_cac_work);
 				cfg80211_cac_event(priv->netdev,
@@ -262,20 +242,16 @@ int mwifiex_11h_handle_radar_detected(struct mwifiex_private *priv,
 	rdr_event = (void *)(skb->data + sizeof(u32));
 
 	if (le32_to_cpu(rdr_event->passed)) {
-		mwifiex_dbg(priv->adapter, MSG,
-			    "radar detected; indicating kernel\n");
-		if (mwifiex_stop_radar_detection(priv, &priv->dfs_chandef))
-			mwifiex_dbg(priv->adapter, ERROR,
-				    "Failed to stop CAC in FW\n");
+		dev_notice(priv->adapter->dev,
+			   "radar detected; indicating kernel\n");
 		cfg80211_radar_event(priv->adapter->wiphy, &priv->dfs_chandef,
 				     GFP_KERNEL);
-		mwifiex_dbg(priv->adapter, MSG, "regdomain: %d\n",
-			    rdr_event->reg_domain);
-		mwifiex_dbg(priv->adapter, MSG, "radar detection type: %d\n",
-			    rdr_event->det_type);
+		dev_dbg(priv->adapter->dev, "regdomain: %d\n",
+			rdr_event->reg_domain);
+		dev_dbg(priv->adapter->dev, "radar detection type: %d\n",
+			rdr_event->det_type);
 	} else {
-		mwifiex_dbg(priv->adapter, MSG,
-			    "false radar detection event!\n");
+		dev_dbg(priv->adapter->dev, "false radar detection event!\n");
 	}
 
 	return 0;
@@ -300,20 +276,20 @@ void mwifiex_dfs_chan_sw_work_queue(struct work_struct *work)
 
 	bss_cfg = &priv->bss_cfg;
 	if (!bss_cfg->beacon_period) {
-		mwifiex_dbg(priv->adapter, ERROR,
-			    "channel switch: AP already stopped\n");
+		dev_err(priv->adapter->dev,
+			"channel switch: AP already stopped\n");
 		return;
 	}
 
-	mwifiex_uap_set_channel(priv, bss_cfg, priv->dfs_chandef);
+	mwifiex_uap_set_channel(bss_cfg, priv->dfs_chandef);
 
 	if (mwifiex_config_start_uap(priv, bss_cfg)) {
-		mwifiex_dbg(priv->adapter, ERROR,
-			    "Failed to start AP after channel switch\n");
+		dev_dbg(priv->adapter->dev,
+			"Failed to start AP after channel switch\n");
 		return;
 	}
 
-	mwifiex_dbg(priv->adapter, MSG,
-		    "indicating channel switch completion to kernel\n");
+	dev_notice(priv->adapter->dev,
+		   "indicating channel switch completion to kernel\n");
 	cfg80211_ch_switch_notify(priv->netdev, &priv->dfs_chandef);
 }

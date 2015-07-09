@@ -1,6 +1,7 @@
 /* Copyright 2002 Andi Kleen, SuSE Labs */
 
 #include <linux/linkage.h>
+#include <asm/dwarf2.h>
 #include <asm/cpufeature.h>
 #include <asm/alternative-asm.h>
 
@@ -65,6 +66,7 @@ ENTRY(memset_erms)
 ENDPROC(memset_erms)
 
 ENTRY(memset_orig)
+	CFI_STARTPROC
 	movq %rdi,%r10
 
 	/* expand byte value  */
@@ -76,6 +78,7 @@ ENTRY(memset_orig)
 	movl  %edi,%r9d
 	andl  $7,%r9d
 	jnz  .Lbad_alignment
+	CFI_REMEMBER_STATE
 .Lafter_bad_alignment:
 
 	movq  %rdx,%rcx
@@ -125,6 +128,7 @@ ENTRY(memset_orig)
 	movq	%r10,%rax
 	ret
 
+	CFI_RESTORE_STATE
 .Lbad_alignment:
 	cmpq $7,%rdx
 	jbe	.Lhandle_7
@@ -135,4 +139,5 @@ ENTRY(memset_orig)
 	subq %r8,%rdx
 	jmp .Lafter_bad_alignment
 .Lfinal:
+	CFI_ENDPROC
 ENDPROC(memset_orig)

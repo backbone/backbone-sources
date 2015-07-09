@@ -146,10 +146,10 @@ struct pcie_app_reg {
 static int spear13xx_pcie_establish_link(struct pcie_port *pp)
 {
 	u32 val;
+	int count = 0;
 	struct spear13xx_pcie *spear13xx_pcie = to_spear13xx_pcie(pp);
 	struct pcie_app_reg *app_reg = spear13xx_pcie->app_base;
 	u32 exp_cap_off = EXP_CAP_ID_OFFSET;
-	unsigned int retries;
 
 	if (dw_pcie_link_up(pp)) {
 		dev_err(pp->dev, "link already up\n");
@@ -201,16 +201,17 @@ static int spear13xx_pcie_establish_link(struct pcie_port *pp)
 			&app_reg->app_ctrl_0);
 
 	/* check if the link is up or not */
-	for (retries = 0; retries < 10; retries++) {
-		if (dw_pcie_link_up(pp)) {
-			dev_info(pp->dev, "link up\n");
-			return 0;
-		}
+	while (!dw_pcie_link_up(pp)) {
 		mdelay(100);
+		count++;
+		if (count == 10) {
+			dev_err(pp->dev, "link Fail\n");
+			return -EINVAL;
+		}
 	}
+	dev_info(pp->dev, "link up\n");
 
-	dev_err(pp->dev, "link Fail\n");
-	return -EINVAL;
+	return 0;
 }
 
 static irqreturn_t spear13xx_pcie_irq_handler(int irq, void *arg)

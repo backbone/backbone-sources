@@ -85,17 +85,8 @@ static int prefix_underscores_count(const char *str)
 	return tail - str;
 }
 
-int __weak arch__choose_best_symbol(struct symbol *syma,
-				    struct symbol *symb __maybe_unused)
-{
-	/* Avoid "SyS" kernel syscall aliases */
-	if (strlen(syma->name) >= 3 && !strncmp(syma->name, "SyS", 3))
-		return SYMBOL_B;
-	if (strlen(syma->name) >= 10 && !strncmp(syma->name, "compat_SyS", 10))
-		return SYMBOL_B;
-
-	return SYMBOL_A;
-}
+#define SYMBOL_A 0
+#define SYMBOL_B 1
 
 static int choose_best_symbol(struct symbol *syma, struct symbol *symb)
 {
@@ -143,7 +134,13 @@ static int choose_best_symbol(struct symbol *syma, struct symbol *symb)
 	else if (na < nb)
 		return SYMBOL_B;
 
-	return arch__choose_best_symbol(syma, symb);
+	/* Avoid "SyS" kernel syscall aliases */
+	if (na >= 3 && !strncmp(syma->name, "SyS", 3))
+		return SYMBOL_B;
+	if (na >= 10 && !strncmp(syma->name, "compat_SyS", 10))
+		return SYMBOL_B;
+
+	return SYMBOL_A;
 }
 
 void symbols__fixup_duplicate(struct rb_root *symbols)
@@ -202,18 +199,18 @@ void symbols__fixup_end(struct rb_root *symbols)
 
 void __map_groups__fixup_end(struct map_groups *mg, enum map_type type)
 {
-	struct maps *maps = &mg->maps[type];
-	struct map *next, *curr;
+	struct map *prev, *curr;
+	struct rb_node *nd, *prevnd = rb_first(&mg->maps[type]);
 
-	pthread_rwlock_wrlock(&maps->lock);
+	if (prevnd == NULL)
+		return;
 
-	curr = maps__first(maps);
-	if (curr == NULL)
-		goto out_unlock;
+	curr = rb_entry(prevnd, struct map, rb_node);
 
-	for (next = map__next(curr); next; next = map__next(curr)) {
-		curr->end = next->start;
-		curr = next;
+	for (nd = rb_next(prevnd); nd; nd = rb_next(nd)) {
+		prev = curr;
+		curr = rb_entry(nd, struct map, rb_node);
+		prev->end = curr->start;
 	}
 
 	/*
@@ -221,9 +218,6 @@ void __map_groups__fixup_end(struct map_groups *mg, enum map_type type)
 	 * last map final address.
 	 */
 	curr->end = ~0ULL;
-
-out_unlock:
-	pthread_rwlock_unlock(&maps->lock);
 }
 
 struct symbol *symbol__new(u64 start, u64 len, u8 binding, const char *name)
@@ -403,7 +397,7 @@ static struct symbol *symbols__find_by_name(struct rb_root *symbols,
 					    const char *name)
 {
 	struct rb_node *n;
-	struct symbol_name_rb_node *s = NULL;
+	struct symbol_name_rb_node *s;
 
 	if (symbols == NULL)
 		return NULL;
@@ -414,7 +408,7 @@ static struct symbol *symbols__find_by_name(struct rb_root *symbols,
 		int cmp;
 
 		s = rb_entry(n, struct symbol_name_rb_node, rb_node);
-		cmp = arch__compare_symbol_names(name, s->sym.name);
+		cmp = strcmp(name, s->sym.name);
 
 		if (cmp < 0)
 			n = n->rb_left;
@@ -432,7 +426,7 @@ static struct symbol *symbols__find_by_name(struct rb_root *symbols,
 		struct symbol_name_rb_node *tmp;
 
 		tmp = rb_entry(n, struct symbol_name_rb_node, rb_node);
-		if (arch__compare_symbol_names(tmp->sym.name, s->sym.name))
+		if (strcmp(tmp->sym.name, s->sym.name))
 			break;
 
 		s = tmp;
@@ -659,14 +653,14 @@ static int dso__split_kallsyms_for_kcore(struct dso *dso, struct map *map,
 		curr_map = map_groups__find(kmaps, map->type, pos->start);
 
 		if (!curr_map || (filter && filter(curr_map, pos))) {
-			rb_erase_init(&pos->rb_node, root);
+			rb_erase(&pos->rb_node, root);
 			symbol__delete(pos);
 		} else {
 			pos->start -= curr_map->start - curr_map->pgoff;
 			if (pos->end)
 				pos->end -= curr_map->start - curr_map->pgoff;
 			if (curr_map != map) {
-				rb_erase_init(&pos->rb_node, root);
+				rb_erase(&pos->rb_node, root);
 				symbols__insert(
 					&curr_map->dso->symbols[curr_map->type],
 					pos);
@@ -786,7 +780,7 @@ static int dso__split_kallsyms(struct dso *dso, struct map *map, u64 delta,
 
 			curr_map = map__new2(pos->start, ndso, map->type);
 			if (curr_map == NULL) {
-				dso__put(ndso);
+				dso__delete(ndso);
 				return -1;
 			}
 
@@ -1173,23 +1167,20 @@ static int dso__load_kcore(struct dso *dso, struct map *map,
 	/* Add new maps */
 	while (!list_empty(&md.maps)) {
 		new_map = list_entry(md.maps.next, struct map, node);
-		list_del_init(&new_map->node);
+		list_del(&new_map->node);
 		if (new_map == replacement_map) {
 			map->start	= new_map->start;
 			map->end	= new_map->end;
 			map->pgoff	= new_map->pgoff;
 			map->map_ip	= new_map->map_ip;
 			map->unmap_ip	= new_map->unmap_ip;
+			map__delete(new_map);
 			/* Ensure maps are correctly ordered */
-			map__get(map);
 			map_groups__remove(kmaps, map);
 			map_groups__insert(kmaps, map);
-			map__put(map);
 		} else {
 			map_groups__insert(kmaps, new_map);
 		}
-
-		map__put(new_map);
 	}
 
 	/*
@@ -1214,8 +1205,8 @@ static int dso__load_kcore(struct dso *dso, struct map *map,
 out_err:
 	while (!list_empty(&md.maps)) {
 		map = list_entry(md.maps.next, struct map, node);
-		list_del_init(&map->node);
-		map__put(map);
+		list_del(&map->node);
+		map__delete(map);
 	}
 	close(fd);
 	return -EINVAL;
@@ -1364,7 +1355,7 @@ static bool dso__is_compatible_symtab_type(struct dso *dso, bool kmod,
 	case DSO_BINARY_TYPE__SYSTEM_PATH_KMODULE_COMP:
 		/*
 		 * kernel modules know their symtab type - it's set when
-		 * creating a module dso in machine__findnew_module_map().
+		 * creating a module dso in machine__new_module().
 		 */
 		return kmod && dso->symtab_type == type;
 
@@ -1389,22 +1380,12 @@ int dso__load(struct dso *dso, struct map *map, symbol_filter_t filter)
 	struct symsrc *syms_ss = NULL, *runtime_ss = NULL;
 	bool kmod;
 
-	pthread_mutex_lock(&dso->lock);
+	dso__set_loaded(dso, map->type);
 
-	/* check again under the dso->lock */
-	if (dso__loaded(dso, map->type)) {
-		ret = 1;
-		goto out;
-	}
-
-	if (dso->kernel) {
-		if (dso->kernel == DSO_TYPE_KERNEL)
-			ret = dso__load_kernel_sym(dso, map, filter);
-		else if (dso->kernel == DSO_TYPE_GUEST_KERNEL)
-			ret = dso__load_guest_kernel_sym(dso, map, filter);
-
-		goto out;
-	}
+	if (dso->kernel == DSO_TYPE_KERNEL)
+		return dso__load_kernel_sym(dso, map, filter);
+	else if (dso->kernel == DSO_TYPE_GUEST_KERNEL)
+		return dso__load_guest_kernel_sym(dso, map, filter);
 
 	if (map->groups && map->groups->machine)
 		machine = map->groups->machine;
@@ -1417,18 +1398,18 @@ int dso__load(struct dso *dso, struct map *map, symbol_filter_t filter)
 		struct stat st;
 
 		if (lstat(dso->name, &st) < 0)
-			goto out;
+			return -1;
 
 		if (st.st_uid && (st.st_uid != geteuid())) {
 			pr_warning("File %s not owned by current user or root, "
 				"ignoring it.\n", dso->name);
-			goto out;
+			return -1;
 		}
 
 		ret = dso__load_perf_map(dso, map, filter);
 		dso->symtab_type = ret > 0 ? DSO_BINARY_TYPE__JAVA_JIT :
 					     DSO_BINARY_TYPE__NOT_FOUND;
-		goto out;
+		return ret;
 	}
 
 	if (machine)
@@ -1436,7 +1417,7 @@ int dso__load(struct dso *dso, struct map *map, symbol_filter_t filter)
 
 	name = malloc(PATH_MAX);
 	if (!name)
-		goto out;
+		return -1;
 
 	kmod = dso->symtab_type == DSO_BINARY_TYPE__SYSTEM_PATH_KMODULE ||
 		dso->symtab_type == DSO_BINARY_TYPE__SYSTEM_PATH_KMODULE_COMP ||
@@ -1517,32 +1498,23 @@ int dso__load(struct dso *dso, struct map *map, symbol_filter_t filter)
 out_free:
 	free(name);
 	if (ret < 0 && strstr(dso->name, " (deleted)") != NULL)
-		ret = 0;
-out:
-	dso__set_loaded(dso, map->type);
-	pthread_mutex_unlock(&dso->lock);
-
+		return 0;
 	return ret;
 }
 
 struct map *map_groups__find_by_name(struct map_groups *mg,
 				     enum map_type type, const char *name)
 {
-	struct maps *maps = &mg->maps[type];
-	struct map *map;
+	struct rb_node *nd;
 
-	pthread_rwlock_rdlock(&maps->lock);
+	for (nd = rb_first(&mg->maps[type]); nd; nd = rb_next(nd)) {
+		struct map *map = rb_entry(nd, struct map, rb_node);
 
-	for (map = maps__first(maps); map; map = map__next(map)) {
 		if (map->dso && strcmp(map->dso->short_name, name) == 0)
-			goto out_unlock;
+			return map;
 	}
 
-	map = NULL;
-
-out_unlock:
-	pthread_rwlock_unlock(&maps->lock);
-	return map;
+	return NULL;
 }
 
 int dso__load_vmlinux(struct dso *dso, struct map *map,
@@ -1830,7 +1802,6 @@ static void vmlinux_path__exit(void)
 {
 	while (--vmlinux_path__nr_entries >= 0)
 		zfree(&vmlinux_path[vmlinux_path__nr_entries]);
-	vmlinux_path__nr_entries = 0;
 
 	zfree(&vmlinux_path);
 }

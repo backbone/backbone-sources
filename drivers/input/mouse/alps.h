@@ -278,7 +278,6 @@ struct alps_data {
 
 	int prev_fin;
 	int multi_packet;
-	int second_touch;
 	unsigned char multi_data[6];
 	struct alps_fields f;
 	u8 quirks;

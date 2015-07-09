@@ -806,7 +806,7 @@ static int samsung_pinctrl_parse_dt(struct platform_device *pdev,
 	functions = samsung_pinctrl_create_functions(dev, drvdata, &func_cnt);
 	if (IS_ERR(functions)) {
 		dev_err(dev, "failed to parse pin functions\n");
-		return PTR_ERR(functions);
+		return PTR_ERR(groups);
 	}
 
 	drvdata->pin_groups = groups;
@@ -873,9 +873,9 @@ static int samsung_pinctrl_register(struct platform_device *pdev,
 		return ret;
 
 	drvdata->pctl_dev = pinctrl_register(ctrldesc, &pdev->dev, drvdata);
-	if (IS_ERR(drvdata->pctl_dev)) {
+	if (!drvdata->pctl_dev) {
 		dev_err(&pdev->dev, "could not register pinctrl driver\n");
-		return PTR_ERR(drvdata->pctl_dev);
+		return -EINVAL;
 	}
 
 	for (bank = 0; bank < drvdata->nr_banks; ++bank) {

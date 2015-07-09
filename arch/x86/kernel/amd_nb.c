@@ -89,7 +89,9 @@ int amd_cache_northbridges(void)
 			next_northbridge(link, amd_nb_link_ids);
 	}
 
-	if (amd_gart_present())
+	/* GART present only on Fam15h upto model 0fh */
+	if (boot_cpu_data.x86 == 0xf || boot_cpu_data.x86 == 0x10 ||
+	    (boot_cpu_data.x86 == 0x15 && boot_cpu_data.x86_model < 0x10))
 		amd_northbridges.flags |= AMD_NB_GART;
 
 	/*

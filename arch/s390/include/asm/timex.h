@@ -10,7 +10,6 @@
 #define _ASM_S390_TIMEX_H
 
 #include <asm/lowcore.h>
-#include <linux/time64.h>
 
 /* The value of the TOD clock for 1.1.1970. */
 #define TOD_UNIX_EPOCH 0x7d91048bca000000ULL
@@ -109,10 +108,10 @@ int get_sync_clock(unsigned long long *clock);
 void init_cpu_timer(void);
 unsigned long long monotonic_clock(void);
 
-void tod_to_timeval(__u64 todval, struct timespec64 *xt);
+void tod_to_timeval(__u64, struct timespec *);
 
 static inline
-void stck_to_timespec64(unsigned long long stck, struct timespec64 *ts)
+void stck_to_timespec(unsigned long long stck, struct timespec *ts)
 {
 	tod_to_timeval(stck - TOD_UNIX_EPOCH, ts);
 }

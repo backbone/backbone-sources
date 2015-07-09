@@ -1,4 +1,3 @@
-ifndef CROSS_COMPILE
 # List of programs to build
 hostprogs-$(CONFIG_X86_64) := mpssd
 
@@ -18,4 +17,3 @@ HOSTLOADLIBES_mpssd := -lpthread
 install:
 	install mpssd /usr/sbin/mpssd
 	install micctrl /usr/sbin/micctrl
-endif

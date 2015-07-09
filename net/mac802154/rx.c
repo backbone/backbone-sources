@@ -47,6 +47,8 @@ ieee802154_subif_frame(struct ieee802154_sub_if_data *sdata,
 
 	pr_debug("getting packet via slave interface %s\n", sdata->dev->name);
 
+	spin_lock_bh(&sdata->mib_lock);
+
 	span = wpan_dev->pan_id;
 	sshort = wpan_dev->short_addr;
 
@@ -81,9 +83,12 @@ ieee802154_subif_frame(struct ieee802154_sub_if_data *sdata,
 			skb->pkt_type = PACKET_OTHERHOST;
 		break;
 	default:
+		spin_unlock_bh(&sdata->mib_lock);
 		pr_debug("invalid dest mode\n");
 		goto fail;
 	}
+
+	spin_unlock_bh(&sdata->mib_lock);
 
 	skb->dev = sdata->dev;
 
@@ -202,10 +207,8 @@ __ieee802154_rx_handle_packet(struct ieee802154_local *local,
 	}
 
 	list_for_each_entry_rcu(sdata, &local->interfaces, list) {
-		if (sdata->wpan_dev.iftype != NL802154_IFTYPE_NODE)
-			continue;
-
-		if (!ieee802154_sdata_running(sdata))
+		if (sdata->vif.type != NL802154_IFTYPE_NODE ||
+		    !netif_running(sdata->dev))
 			continue;
 
 		ieee802154_subif_frame(sdata, skb, &hdr);
@@ -229,7 +232,7 @@ ieee802154_monitors_rx(struct ieee802154_local *local, struct sk_buff *skb)
 	skb->protocol = htons(ETH_P_IEEE802154);
 
 	list_for_each_entry_rcu(sdata, &local->interfaces, list) {
-		if (sdata->wpan_dev.iftype != NL802154_IFTYPE_MONITOR)
+		if (sdata->vif.type != NL802154_IFTYPE_MONITOR)
 			continue;
 
 		if (!ieee802154_sdata_running(sdata))

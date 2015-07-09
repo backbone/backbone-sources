@@ -599,18 +599,15 @@ static struct v4l2_file_operations usbtv_fops = {
 };
 
 static int usbtv_queue_setup(struct vb2_queue *vq,
-	const struct v4l2_format *fmt, unsigned int *nbuffers,
+	const struct v4l2_format *v4l_fmt, unsigned int *nbuffers,
 	unsigned int *nplanes, unsigned int sizes[], void *alloc_ctxs[])
 {
 	struct usbtv *usbtv = vb2_get_drv_priv(vq);
-	unsigned size = USBTV_CHUNK * usbtv->n_chunks * 2 * sizeof(u32);
 
-	if (vq->num_buffers + *nbuffers < 2)
-		*nbuffers = 2 - vq->num_buffers;
+	if (*nbuffers < 2)
+		*nbuffers = 2;
 	*nplanes = 1;
-	if (fmt && fmt->fmt.pix.sizeimage < size)
-		return -EINVAL;
-	sizes[0] = fmt ? fmt->fmt.pix.sizeimage : size;
+	sizes[0] = USBTV_CHUNK * usbtv->n_chunks * 2 * sizeof(u32);
 
 	return 0;
 }
@@ -638,7 +635,6 @@ static int usbtv_start_streaming(struct vb2_queue *vq, unsigned int count)
 	if (usbtv->udev == NULL)
 		return -ENODEV;
 
-	usbtv->sequence = 0;
 	return usbtv_start(usbtv);
 }
 

@@ -21,7 +21,6 @@
 #ifndef _ASM_X86_LIVEPATCH_H
 #define _ASM_X86_LIVEPATCH_H
 
-#include <asm/setup.h>
 #include <linux/module.h>
 #include <linux/ftrace.h>
 

@@ -443,13 +443,12 @@ static struct irq_chip pca953x_irq_chip = {
 	.irq_set_type		= pca953x_irq_set_type,
 };
 
-static bool pca953x_irq_pending(struct pca953x_chip *chip, u8 *pending)
+static u8 pca953x_irq_pending(struct pca953x_chip *chip, u8 *pending)
 {
 	u8 cur_stat[MAX_BANK];
 	u8 old_stat[MAX_BANK];
-	bool pending_seen = false;
-	bool trigger_seen = false;
-	u8 trigger[MAX_BANK];
+	u8 pendings = 0;
+	u8 trigger[MAX_BANK], triggers = 0;
 	int ret, i, offset = 0;
 
 	switch (chip->chip_type) {
@@ -462,7 +461,7 @@ static bool pca953x_irq_pending(struct pca953x_chip *chip, u8 *pending)
 	}
 	ret = pca953x_read_regs(chip, offset, cur_stat);
 	if (ret)
-		return false;
+		return 0;
 
 	/* Remove output pins from the equation */
 	for (i = 0; i < NBANK(chip); i++)
@@ -472,12 +471,11 @@ static bool pca953x_irq_pending(struct pca953x_chip *chip, u8 *pending)
 
 	for (i = 0; i < NBANK(chip); i++) {
 		trigger[i] = (cur_stat[i] ^ old_stat[i]) & chip->irq_mask[i];
-		if (trigger[i])
-			trigger_seen = true;
+		triggers += trigger[i];
 	}
 
-	if (!trigger_seen)
-		return false;
+	if (!triggers)
+		return 0;
 
 	memcpy(chip->irq_stat, cur_stat, NBANK(chip));
 
@@ -485,11 +483,10 @@ static bool pca953x_irq_pending(struct pca953x_chip *chip, u8 *pending)
 		pending[i] = (old_stat[i] & chip->irq_trig_fall[i]) |
 			(cur_stat[i] & chip->irq_trig_raise[i]);
 		pending[i] &= trigger[i];
-		if (pending[i])
-			pending_seen = true;
+		pendings += pending[i];
 	}
 
-	return pending_seen;
+	return pendings;
 }
 
 static irqreturn_t pca953x_irq_handler(int irq, void *devid)
@@ -633,7 +630,7 @@ static int device_pca957x_init(struct pca953x_chip *chip, u32 invert)
 		memset(val, 0, NBANK(chip));
 	pca953x_write_regs(chip, PCA957X_INVRT, val);
 
-	/* To enable register 6, 7 to control pull up and pull down */
+	/* To enable register 6, 7 to controll pull up and pull down */
 	memset(val, 0x02, NBANK(chip));
 	pca953x_write_regs(chip, PCA957X_BKEN, val);
 

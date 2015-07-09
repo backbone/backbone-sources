@@ -465,7 +465,6 @@ static dma_cookie_t rcar_dmac_tx_submit(struct dma_async_tx_descriptor *tx)
 static int rcar_dmac_desc_alloc(struct rcar_dmac_chan *chan, gfp_t gfp)
 {
 	struct rcar_dmac_desc_page *page;
-	unsigned long flags;
 	LIST_HEAD(list);
 	unsigned int i;
 
@@ -483,10 +482,10 @@ static int rcar_dmac_desc_alloc(struct rcar_dmac_chan *chan, gfp_t gfp)
 		list_add_tail(&desc->node, &list);
 	}
 
-	spin_lock_irqsave(&chan->lock, flags);
+	spin_lock_irq(&chan->lock);
 	list_splice_tail(&list, &chan->desc.free);
 	list_add_tail(&page->node, &chan->desc.pages);
-	spin_unlock_irqrestore(&chan->lock, flags);
+	spin_unlock_irq(&chan->lock);
 
 	return 0;
 }
@@ -517,7 +516,6 @@ static void rcar_dmac_desc_put(struct rcar_dmac_chan *chan,
 static void rcar_dmac_desc_recycle_acked(struct rcar_dmac_chan *chan)
 {
 	struct rcar_dmac_desc *desc, *_desc;
-	unsigned long flags;
 	LIST_HEAD(list);
 
 	/*
@@ -526,9 +524,9 @@ static void rcar_dmac_desc_recycle_acked(struct rcar_dmac_chan *chan)
 	 * list_for_each_entry_safe, isn't safe if we release the channel lock
 	 * around the rcar_dmac_desc_put() call.
 	 */
-	spin_lock_irqsave(&chan->lock, flags);
+	spin_lock_irq(&chan->lock);
 	list_splice_init(&chan->desc.wait, &list);
-	spin_unlock_irqrestore(&chan->lock, flags);
+	spin_unlock_irq(&chan->lock);
 
 	list_for_each_entry_safe(desc, _desc, &list, node) {
 		if (async_tx_test_ack(&desc->async_tx)) {
@@ -541,9 +539,9 @@ static void rcar_dmac_desc_recycle_acked(struct rcar_dmac_chan *chan)
 		return;
 
 	/* Put the remaining descriptors back in the wait list. */
-	spin_lock_irqsave(&chan->lock, flags);
+	spin_lock_irq(&chan->lock);
 	list_splice(&list, &chan->desc.wait);
-	spin_unlock_irqrestore(&chan->lock, flags);
+	spin_unlock_irq(&chan->lock);
 }
 
 /*
@@ -558,13 +556,12 @@ static void rcar_dmac_desc_recycle_acked(struct rcar_dmac_chan *chan)
 static struct rcar_dmac_desc *rcar_dmac_desc_get(struct rcar_dmac_chan *chan)
 {
 	struct rcar_dmac_desc *desc;
-	unsigned long flags;
 	int ret;
 
 	/* Recycle acked descriptors before attempting allocation. */
 	rcar_dmac_desc_recycle_acked(chan);
 
-	spin_lock_irqsave(&chan->lock, flags);
+	spin_lock_irq(&chan->lock);
 
 	while (list_empty(&chan->desc.free)) {
 		/*
@@ -573,17 +570,17 @@ static struct rcar_dmac_desc *rcar_dmac_desc_get(struct rcar_dmac_chan *chan)
 		 * allocated descriptors. If the allocation fails return an
 		 * error.
 		 */
-		spin_unlock_irqrestore(&chan->lock, flags);
+		spin_unlock_irq(&chan->lock);
 		ret = rcar_dmac_desc_alloc(chan, GFP_NOWAIT);
 		if (ret < 0)
 			return NULL;
-		spin_lock_irqsave(&chan->lock, flags);
+		spin_lock_irq(&chan->lock);
 	}
 
 	desc = list_first_entry(&chan->desc.free, struct rcar_dmac_desc, node);
 	list_del(&desc->node);
 
-	spin_unlock_irqrestore(&chan->lock, flags);
+	spin_unlock_irq(&chan->lock);
 
 	return desc;
 }
@@ -596,7 +593,6 @@ static struct rcar_dmac_desc *rcar_dmac_desc_get(struct rcar_dmac_chan *chan)
 static int rcar_dmac_xfer_chunk_alloc(struct rcar_dmac_chan *chan, gfp_t gfp)
 {
 	struct rcar_dmac_desc_page *page;
-	unsigned long flags;
 	LIST_HEAD(list);
 	unsigned int i;
 
@@ -610,10 +606,10 @@ static int rcar_dmac_xfer_chunk_alloc(struct rcar_dmac_chan *chan, gfp_t gfp)
 		list_add_tail(&chunk->node, &list);
 	}
 
-	spin_lock_irqsave(&chan->lock, flags);
+	spin_lock_irq(&chan->lock);
 	list_splice_tail(&list, &chan->desc.chunks_free);
 	list_add_tail(&page->node, &chan->desc.pages);
-	spin_unlock_irqrestore(&chan->lock, flags);
+	spin_unlock_irq(&chan->lock);
 
 	return 0;
 }
@@ -631,10 +627,9 @@ static struct rcar_dmac_xfer_chunk *
 rcar_dmac_xfer_chunk_get(struct rcar_dmac_chan *chan)
 {
 	struct rcar_dmac_xfer_chunk *chunk;
-	unsigned long flags;
 	int ret;
 
-	spin_lock_irqsave(&chan->lock, flags);
+	spin_lock_irq(&chan->lock);
 
 	while (list_empty(&chan->desc.chunks_free)) {
 		/*
@@ -643,18 +638,18 @@ rcar_dmac_xfer_chunk_get(struct rcar_dmac_chan *chan)
 		 * allocated descriptors. If the allocation fails return an
 		 * error.
 		 */
-		spin_unlock_irqrestore(&chan->lock, flags);
+		spin_unlock_irq(&chan->lock);
 		ret = rcar_dmac_xfer_chunk_alloc(chan, GFP_NOWAIT);
 		if (ret < 0)
 			return NULL;
-		spin_lock_irqsave(&chan->lock, flags);
+		spin_lock_irq(&chan->lock);
 	}
 
 	chunk = list_first_entry(&chan->desc.chunks_free,
 				 struct rcar_dmac_xfer_chunk, node);
 	list_del(&chunk->node);
 
-	spin_unlock_irqrestore(&chan->lock, flags);
+	spin_unlock_irq(&chan->lock);
 
 	return chunk;
 }

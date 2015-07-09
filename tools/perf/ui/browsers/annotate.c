@@ -11,21 +11,16 @@
 #include "../../util/evsel.h"
 #include <pthread.h>
 
-struct disasm_line_samples {
-	double		percent;
-	u64		nr;
-};
-
 struct browser_disasm_line {
-	struct rb_node			rb_node;
-	u32				idx;
-	int				idx_asm;
-	int				jump_sources;
+	struct rb_node	rb_node;
+	u32		idx;
+	int		idx_asm;
+	int		jump_sources;
 	/*
 	 * actual length of this array is saved on the nr_events field
 	 * of the struct annotate_browser
 	 */
-	struct disasm_line_samples	samples[1];
+	double		percent[1];
 };
 
 static struct annotate_browser_opt {
@@ -33,8 +28,7 @@ static struct annotate_browser_opt {
 	     use_offset,
 	     jump_arrows,
 	     show_linenr,
-	     show_nr_jumps,
-	     show_total_period;
+	     show_nr_jumps;
 } annotate_browser__opts = {
 	.use_offset	= true,
 	.jump_arrows	= true,
@@ -111,20 +105,15 @@ static void annotate_browser__write(struct ui_browser *browser, void *entry, int
 	char bf[256];
 
 	for (i = 0; i < ab->nr_events; i++) {
-		if (bdl->samples[i].percent > percent_max)
-			percent_max = bdl->samples[i].percent;
+		if (bdl->percent[i] > percent_max)
+			percent_max = bdl->percent[i];
 	}
 
 	if (dl->offset != -1 && percent_max != 0.0) {
 		for (i = 0; i < ab->nr_events; i++) {
-			ui_browser__set_percent_color(browser,
-						      bdl->samples[i].percent,
+			ui_browser__set_percent_color(browser, bdl->percent[i],
 						      current_entry);
-			if (annotate_browser__opts.show_total_period)
-				slsmg_printf("%6" PRIu64 " ",
-					     bdl->samples[i].nr);
-			else
-				slsmg_printf("%6.2f ", bdl->samples[i].percent);
+			slsmg_printf("%6.2f ", bdl->percent[i]);
 		}
 	} else {
 		ui_browser__set_percent_color(browser, 0, current_entry);
@@ -284,9 +273,9 @@ static int disasm__cmp(struct browser_disasm_line *a,
 	int i;
 
 	for (i = 0; i < nr_pcnt; i++) {
-		if (a->samples[i].percent == b->samples[i].percent)
+		if (a->percent[i] == b->percent[i])
 			continue;
-		return a->samples[i].percent < b->samples[i].percent;
+		return a->percent[i] < b->percent[i];
 	}
 	return 0;
 }
@@ -377,17 +366,14 @@ static void annotate_browser__calc_percent(struct annotate_browser *browser,
 		next = disasm__get_next_ip_line(&notes->src->source, pos);
 
 		for (i = 0; i < browser->nr_events; i++) {
-			u64 nr_samples;
-
-			bpos->samples[i].percent = disasm__calc_percent(notes,
+			bpos->percent[i] = disasm__calc_percent(notes,
 						evsel->idx + i,
 						pos->offset,
 						next ? next->offset : len,
-						&path, &nr_samples);
-			bpos->samples[i].nr = nr_samples;
+					        &path);
 
-			if (max_percent < bpos->samples[i].percent)
-				max_percent = bpos->samples[i].percent;
+			if (max_percent < bpos->percent[i])
+				max_percent = bpos->percent[i];
 		}
 
 		if (max_percent < 0.01) {
@@ -751,7 +737,6 @@ static int annotate_browser__run(struct annotate_browser *browser,
 		"n             Search next string\n"
 		"o             Toggle disassembler output/simplified view\n"
 		"s             Toggle source code view\n"
-		"t             Toggle total period view\n"
 		"/             Search string\n"
 		"k             Toggle line numbers\n"
 		"r             Run available scripts\n"
@@ -827,11 +812,6 @@ show_sup_ins:
 				ui_helpline__puts("Actions are only available for 'callq', 'retq' & jump instructions.");
 			}
 			continue;
-		case 't':
-			annotate_browser__opts.show_total_period =
-			  !annotate_browser__opts.show_total_period;
-			annotate_browser__update_addr_width(browser);
-			continue;
 		case K_LEFT:
 		case K_ESC:
 		case 'q':
@@ -852,20 +832,12 @@ out:
 int map_symbol__tui_annotate(struct map_symbol *ms, struct perf_evsel *evsel,
 			     struct hist_browser_timer *hbt)
 {
-	/* Set default value for show_total_period.  */
-	annotate_browser__opts.show_total_period =
-	  symbol_conf.show_total_period;
-
 	return symbol__tui_annotate(ms->sym, ms->map, evsel, hbt);
 }
 
 int hist_entry__tui_annotate(struct hist_entry *he, struct perf_evsel *evsel,
 			     struct hist_browser_timer *hbt)
 {
-	/* reset abort key so that it can get Ctrl-C as a key */
-	SLang_reset_tty();
-	SLang_init_tty(0, 0, 0);
-
 	return map_symbol__tui_annotate(&he->ms, evsel, hbt);
 }
 
@@ -953,8 +925,7 @@ int symbol__tui_annotate(struct symbol *sym, struct map *map,
 
 	if (perf_evsel__is_group_event(evsel)) {
 		nr_pcnt = evsel->nr_members;
-		sizeof_bdl += sizeof(struct disasm_line_samples) *
-		  (nr_pcnt - 1);
+		sizeof_bdl += sizeof(double) * (nr_pcnt - 1);
 	}
 
 	if (symbol__annotate(sym, map, sizeof_bdl) < 0) {
@@ -1031,7 +1002,6 @@ static struct annotate_config {
 	ANNOTATE_CFG(show_linenr),
 	ANNOTATE_CFG(show_nr_jumps),
 	ANNOTATE_CFG(use_offset),
-	ANNOTATE_CFG(show_total_period),
 };
 
 #undef ANNOTATE_CFG

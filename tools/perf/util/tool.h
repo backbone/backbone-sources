@@ -3,8 +3,6 @@
 
 #include <stdbool.h>
 
-#include <linux/types.h>
-
 struct perf_session;
 union perf_event;
 struct perf_evlist;
@@ -31,9 +29,6 @@ typedef int (*event_op2)(struct perf_tool *tool, union perf_event *event,
 typedef int (*event_oe)(struct perf_tool *tool, union perf_event *event,
 			struct ordered_events *oe);
 
-typedef s64 (*event_op3)(struct perf_tool *tool, union perf_event *event,
-			 struct perf_session *session);
-
 struct perf_tool {
 	event_sample	sample,
 			read;
@@ -43,19 +38,13 @@ struct perf_tool {
 			fork,
 			exit,
 			lost,
-			lost_samples,
-			aux,
-			itrace_start,
 			throttle,
 			unthrottle;
 	event_attr_op	attr;
 	event_op2	tracing_data;
 	event_oe	finished_round;
 	event_op2	build_id,
-			id_index,
-			auxtrace_info,
-			auxtrace_error;
-	event_op3	auxtrace;
+			id_index;
 	bool		ordered_events;
 	bool		ordering_requires_timestamps;
 };

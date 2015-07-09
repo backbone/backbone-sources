@@ -100,7 +100,6 @@
  *    ->tree_lock		(page_remove_rmap->set_page_dirty)
  *    bdi.wb->list_lock		(page_remove_rmap->set_page_dirty)
  *    ->inode->i_lock		(page_remove_rmap->set_page_dirty)
- *    ->memcg->move_lock	(page_remove_rmap->mem_cgroup_begin_page_stat)
  *    bdi.wb->list_lock		(zap_pte_range->set_page_dirty)
  *    ->inode->i_lock		(zap_pte_range->set_page_dirty)
  *    ->private_lock		(zap_pte_range->__set_page_dirty_buffers)
@@ -175,11 +174,9 @@ static void page_cache_tree_delete(struct address_space *mapping,
 /*
  * Delete a page from the page cache and free it. Caller has to make
  * sure the page is locked and that nobody else uses it - or that usage
- * is safe.  The caller must hold the mapping's tree_lock and
- * mem_cgroup_begin_page_stat().
+ * is safe.  The caller must hold the mapping's tree_lock.
  */
-void __delete_from_page_cache(struct page *page, void *shadow,
-			      struct mem_cgroup *memcg)
+void __delete_from_page_cache(struct page *page, void *shadow)
 {
 	struct address_space *mapping = page->mapping;
 
@@ -199,9 +196,7 @@ void __delete_from_page_cache(struct page *page, void *shadow,
 	page->mapping = NULL;
 	/* Leave page->index set: truncation lookup relies upon it */
 
-	/* hugetlb pages do not participate in page cache accounting. */
-	if (!PageHuge(page))
-		__dec_zone_page_state(page, NR_FILE_PAGES);
+	__dec_zone_page_state(page, NR_FILE_PAGES);
 	if (PageSwapBacked(page))
 		__dec_zone_page_state(page, NR_SHMEM);
 	BUG_ON(page_mapped(page));
@@ -215,8 +210,7 @@ void __delete_from_page_cache(struct page *page, void *shadow,
 	 * anyway will be cleared before returning page into buddy allocator.
 	 */
 	if (WARN_ON_ONCE(PageDirty(page)))
-		account_page_cleaned(page, mapping, memcg,
-				     inode_to_wb(mapping->host));
+		account_page_cleaned(page, mapping);
 }
 
 /**
@@ -230,20 +224,14 @@ void __delete_from_page_cache(struct page *page, void *shadow,
 void delete_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
-	struct mem_cgroup *memcg;
-	unsigned long flags;
-
 	void (*freepage)(struct page *);
 
 	BUG_ON(!PageLocked(page));
 
 	freepage = mapping->a_ops->freepage;
-
-	memcg = mem_cgroup_begin_page_stat(page);
-	spin_lock_irqsave(&mapping->tree_lock, flags);
-	__delete_from_page_cache(page, NULL, memcg);
-	spin_unlock_irqrestore(&mapping->tree_lock, flags);
-	mem_cgroup_end_page_stat(memcg);
+	spin_lock_irq(&mapping->tree_lock);
+	__delete_from_page_cache(page, NULL);
+	spin_unlock_irq(&mapping->tree_lock);
 
 	if (freepage)
 		freepage(page);
@@ -293,9 +281,7 @@ int __filemap_fdatawrite_range(struct address_space *mapping, loff_t start,
 	if (!mapping_cap_writeback_dirty(mapping))
 		return 0;
 
-	wbc_attach_fdatawrite_inode(&wbc, mapping->host);
 	ret = do_writepages(mapping, &wbc);
-	wbc_detach_inode(&wbc);
 	return ret;
 }
 
@@ -484,8 +470,6 @@ int replace_page_cache_page(struct page *old, struct page *new, gfp_t gfp_mask)
 	if (!error) {
 		struct address_space *mapping = old->mapping;
 		void (*freepage)(struct page *);
-		struct mem_cgroup *memcg;
-		unsigned long flags;
 
 		pgoff_t offset = old->index;
 		freepage = mapping->a_ops->freepage;
@@ -494,22 +478,15 @@ int replace_page_cache_page(struct page *old, struct page *new, gfp_t gfp_mask)
 		new->mapping = mapping;
 		new->index = offset;
 
-		memcg = mem_cgroup_begin_page_stat(old);
-		spin_lock_irqsave(&mapping->tree_lock, flags);
-		__delete_from_page_cache(old, NULL, memcg);
+		spin_lock_irq(&mapping->tree_lock);
+		__delete_from_page_cache(old, NULL);
 		error = radix_tree_insert(&mapping->page_tree, offset, new);
 		BUG_ON(error);
 		mapping->nrpages++;
-
-		/*
-		 * hugetlb pages do not participate in page cache accounting.
-		 */
-		if (!PageHuge(new))
-			__inc_zone_page_state(new, NR_FILE_PAGES);
+		__inc_zone_page_state(new, NR_FILE_PAGES);
 		if (PageSwapBacked(new))
 			__inc_zone_page_state(new, NR_SHMEM);
-		spin_unlock_irqrestore(&mapping->tree_lock, flags);
-		mem_cgroup_end_page_stat(memcg);
+		spin_unlock_irq(&mapping->tree_lock);
 		mem_cgroup_migrate(old, new, true);
 		radix_tree_preload_end();
 		if (freepage)
@@ -598,10 +575,7 @@ static int __add_to_page_cache_locked(struct page *page,
 	radix_tree_preload_end();
 	if (unlikely(error))
 		goto err_insert;
-
-	/* hugetlb pages do not participate in page cache accounting. */
-	if (!huge)
-		__inc_zone_page_state(page, NR_FILE_PAGES);
+	__inc_zone_page_state(page, NR_FILE_PAGES);
 	spin_unlock_irq(&mapping->tree_lock);
 	if (!huge)
 		mem_cgroup_commit_charge(page, memcg, false);
@@ -1680,8 +1654,8 @@ no_cached_page:
 			error = -ENOMEM;
 			goto out;
 		}
-		error = add_to_page_cache_lru(page, mapping, index,
-					GFP_KERNEL & mapping_gfp_mask(mapping));
+		error = add_to_page_cache_lru(page, mapping,
+						index, GFP_KERNEL);
 		if (error) {
 			page_cache_release(page);
 			if (error == -EEXIST) {
@@ -1782,8 +1756,7 @@ static int page_cache_read(struct file *file, pgoff_t offset)
 		if (!page)
 			return -ENOMEM;
 
-		ret = add_to_page_cache_lru(page, mapping, offset,
-				GFP_KERNEL & mapping_gfp_mask(mapping));
+		ret = add_to_page_cache_lru(page, mapping, offset, GFP_KERNEL);
 		if (ret == 0)
 			ret = mapping->a_ops->readpage(file, page);
 		else if (ret == -EEXIST)

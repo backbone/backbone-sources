@@ -173,7 +173,7 @@ void parse_ftrace_printk(struct pevent *pevent,
 	char *line;
 	char *next = NULL;
 	char *addr_str;
-	char *fmt = NULL;
+	char *fmt;
 
 	line = strtok_r(file, "\n", &next);
 	while (line) {

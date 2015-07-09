@@ -41,6 +41,7 @@
 
 #include <linux/capability.h>
 #include <linux/xattr.h>
+#include <linux/namei.h>
 #include <linux/posix_acl.h>
 #include <linux/security.h>
 #include <linux/fiemap.h>
@@ -413,10 +414,10 @@ xfs_vn_rename(
  * we need to be very careful about how much stack we use.
  * uio is kmalloced for this reason...
  */
-STATIC const char *
+STATIC void *
 xfs_vn_follow_link(
 	struct dentry		*dentry,
-	void			**cookie)
+	struct nameidata	*nd)
 {
 	char			*link;
 	int			error = -ENOMEM;
@@ -429,12 +430,14 @@ xfs_vn_follow_link(
 	if (unlikely(error))
 		goto out_kfree;
 
-	return *cookie = link;
+	nd_set_link(nd, link);
+	return NULL;
 
  out_kfree:
 	kfree(link);
  out_err:
-	return ERR_PTR(error);
+	nd_set_link(nd, ERR_PTR(error));
+	return NULL;
 }
 
 STATIC int

@@ -585,6 +585,7 @@ void *rhashtable_walk_next(struct rhashtable_iter *iter)
 	struct bucket_table *tbl = iter->walker->tbl;
 	struct rhashtable *ht = iter->ht;
 	struct rhash_head *p = iter->p;
+	void *obj = NULL;
 
 	if (p) {
 		p = rht_dereference_bucket_rcu(p->next, tbl, iter->slot);
@@ -604,7 +605,8 @@ next:
 		if (!rht_is_a_nulls(p)) {
 			iter->skip++;
 			iter->p = p;
-			return rht_obj(ht, p);
+			obj = rht_obj(ht, p);
+			goto out;
 		}
 
 		iter->skip = 0;
@@ -622,7 +624,9 @@ next:
 
 	iter->p = NULL;
 
-	return NULL;
+out:
+
+	return obj;
 }
 EXPORT_SYMBOL_GPL(rhashtable_walk_next);
 

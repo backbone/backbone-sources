@@ -17,7 +17,6 @@
 #include "parse-events-flex.h"
 #include "pmu.h"
 #include "thread_map.h"
-#include "asm/bug.h"
 
 #define MAX_NAME_LEN 100
 
@@ -539,40 +538,16 @@ int parse_events_add_breakpoint(struct list_head *list, int *idx,
 	return add_event(list, idx, &attr, NULL);
 }
 
-static int check_type_val(struct parse_events_term *term,
-			  struct parse_events_error *err,
-			  int type)
-{
-	if (type == term->type_val)
-		return 0;
-
-	if (err) {
-		err->idx = term->err_val;
-		if (type == PARSE_EVENTS__TERM_TYPE_NUM)
-			err->str = strdup("expected numeric value");
-		else
-			err->str = strdup("expected string value");
-	}
-	return -EINVAL;
-}
-
 static int config_term(struct perf_event_attr *attr,
-		       struct parse_events_term *term,
-		       struct parse_events_error *err)
+		       struct parse_events_term *term)
 {
-#define CHECK_TYPE_VAL(type)						   \
-do {									   \
-	if (check_type_val(term, err, PARSE_EVENTS__TERM_TYPE_ ## type)) \
-		return -EINVAL;						   \
+#define CHECK_TYPE_VAL(type)					\
+do {								\
+	if (PARSE_EVENTS__TERM_TYPE_ ## type != term->type_val)	\
+		return -EINVAL;					\
 } while (0)
 
 	switch (term->type_term) {
-	case PARSE_EVENTS__TERM_TYPE_USER:
-		/*
-		 * Always succeed for sysfs terms, as we dont know
-		 * at this point what type they need to have.
-		 */
-		return 0;
 	case PARSE_EVENTS__TERM_TYPE_CONFIG:
 		CHECK_TYPE_VAL(NUM);
 		attr->config = term->val.num;
@@ -607,20 +582,18 @@ do {									   \
 }
 
 static int config_attr(struct perf_event_attr *attr,
-		       struct list_head *head,
-		       struct parse_events_error *err)
+		       struct list_head *head, int fail)
 {
 	struct parse_events_term *term;
 
 	list_for_each_entry(term, head, list)
-		if (config_term(attr, term, err))
+		if (config_term(attr, term) && fail)
 			return -EINVAL;
 
 	return 0;
 }
 
-int parse_events_add_numeric(struct parse_events_evlist *data,
-			     struct list_head *list,
+int parse_events_add_numeric(struct list_head *list, int *idx,
 			     u32 type, u64 config,
 			     struct list_head *head_config)
 {
@@ -631,10 +604,10 @@ int parse_events_add_numeric(struct parse_events_evlist *data,
 	attr.config = config;
 
 	if (head_config &&
-	    config_attr(&attr, head_config, data->error))
+	    config_attr(&attr, head_config, 1))
 		return -EINVAL;
 
-	return add_event(list, &data->idx, &attr, NULL);
+	return add_event(list, idx, &attr, NULL);
 }
 
 static int parse_events__is_name_term(struct parse_events_term *term)
@@ -653,9 +626,8 @@ static char *pmu_event_name(struct list_head *head_terms)
 	return NULL;
 }
 
-int parse_events_add_pmu(struct parse_events_evlist *data,
-			 struct list_head *list, char *name,
-			 struct list_head *head_config)
+int parse_events_add_pmu(struct list_head *list, int *idx,
+			 char *name, struct list_head *head_config)
 {
 	struct perf_event_attr attr;
 	struct perf_pmu_info info;
@@ -675,7 +647,7 @@ int parse_events_add_pmu(struct parse_events_evlist *data,
 
 	if (!head_config) {
 		attr.type = pmu->type;
-		evsel = __add_event(list, &data->idx, &attr, NULL, pmu->cpus);
+		evsel = __add_event(list, idx, &attr, NULL, pmu->cpus);
 		return evsel ? 0 : -ENOMEM;
 	}
 
@@ -686,14 +658,13 @@ int parse_events_add_pmu(struct parse_events_evlist *data,
 	 * Configure hardcoded terms first, no need to check
 	 * return value when called with fail == 0 ;)
 	 */
-	if (config_attr(&attr, head_config, data->error))
+	config_attr(&attr, head_config, 0);
+
+	if (perf_pmu__config(pmu, &attr, head_config))
 		return -EINVAL;
 
-	if (perf_pmu__config(pmu, &attr, head_config, data->error))
-		return -EINVAL;
-
-	evsel = __add_event(list, &data->idx, &attr,
-			    pmu_event_name(head_config), pmu->cpus);
+	evsel = __add_event(list, idx, &attr, pmu_event_name(head_config),
+			    pmu->cpus);
 	if (evsel) {
 		evsel->unit = info.unit;
 		evsel->scale = info.scale;
@@ -1048,13 +1019,11 @@ int parse_events_terms(struct list_head *terms, const char *str)
 	return ret;
 }
 
-int parse_events(struct perf_evlist *evlist, const char *str,
-		 struct parse_events_error *err)
+int parse_events(struct perf_evlist *evlist, const char *str)
 {
 	struct parse_events_evlist data = {
-		.list  = LIST_HEAD_INIT(data.list),
-		.idx   = evlist->nr_entries,
-		.error = err,
+		.list = LIST_HEAD_INIT(data.list),
+		.idx  = evlist->nr_entries,
 	};
 	int ret;
 
@@ -1075,87 +1044,16 @@ int parse_events(struct perf_evlist *evlist, const char *str,
 	return ret;
 }
 
-#define MAX_WIDTH 1000
-static int get_term_width(void)
-{
-	struct winsize ws;
-
-	get_term_dimensions(&ws);
-	return ws.ws_col > MAX_WIDTH ? MAX_WIDTH : ws.ws_col;
-}
-
-static void parse_events_print_error(struct parse_events_error *err,
-				     const char *event)
-{
-	const char *str = "invalid or unsupported event: ";
-	char _buf[MAX_WIDTH];
-	char *buf = (char *) event;
-	int idx = 0;
-
-	if (err->str) {
-		/* -2 for extra '' in the final fprintf */
-		int width       = get_term_width() - 2;
-		int len_event   = strlen(event);
-		int len_str, max_len, cut = 0;
-
-		/*
-		 * Maximum error index indent, we will cut
-		 * the event string if it's bigger.
-		 */
-		int max_err_idx = 10;
-
-		/*
-		 * Let's be specific with the message when
-		 * we have the precise error.
-		 */
-		str     = "event syntax error: ";
-		len_str = strlen(str);
-		max_len = width - len_str;
-
-		buf = _buf;
-
-		/* We're cutting from the beggining. */
-		if (err->idx > max_err_idx)
-			cut = err->idx - max_err_idx;
-
-		strncpy(buf, event + cut, max_len);
-
-		/* Mark cut parts with '..' on both sides. */
-		if (cut)
-			buf[0] = buf[1] = '.';
-
-		if ((len_event - cut) > max_len) {
-			buf[max_len - 1] = buf[max_len - 2] = '.';
-			buf[max_len] = 0;
-		}
-
-		idx = len_str + err->idx - cut;
-	}
-
-	fprintf(stderr, "%s'%s'\n", str, buf);
-	if (idx) {
-		fprintf(stderr, "%*s\\___ %s\n", idx + 1, "", err->str);
-		if (err->help)
-			fprintf(stderr, "\n%s\n", err->help);
-		free(err->str);
-		free(err->help);
-	}
-
-	fprintf(stderr, "Run 'perf list' for a list of valid events\n");
-}
-
-#undef MAX_WIDTH
-
 int parse_events_option(const struct option *opt, const char *str,
 			int unset __maybe_unused)
 {
 	struct perf_evlist *evlist = *(struct perf_evlist **)opt->value;
-	struct parse_events_error err = { .idx = 0, };
-	int ret = parse_events(evlist, str, &err);
+	int ret = parse_events(evlist, str);
 
-	if (ret)
-		parse_events_print_error(&err, str);
-
+	if (ret) {
+		fprintf(stderr, "invalid or unsupported event: '%s'\n", str);
+		fprintf(stderr, "Run 'perf list' for a list of valid events\n");
+	}
 	return ret;
 }
 
@@ -1562,7 +1460,7 @@ int parse_events__is_hardcoded_term(struct parse_events_term *term)
 
 static int new_term(struct parse_events_term **_term, int type_val,
 		    int type_term, char *config,
-		    char *str, u64 num, int err_term, int err_val)
+		    char *str, u64 num)
 {
 	struct parse_events_term *term;
 
@@ -1574,8 +1472,6 @@ static int new_term(struct parse_events_term **_term, int type_val,
 	term->type_val  = type_val;
 	term->type_term = type_term;
 	term->config = config;
-	term->err_term = err_term;
-	term->err_val  = err_val;
 
 	switch (type_val) {
 	case PARSE_EVENTS__TERM_TYPE_NUM:
@@ -1594,29 +1490,17 @@ static int new_term(struct parse_events_term **_term, int type_val,
 }
 
 int parse_events_term__num(struct parse_events_term **term,
-			   int type_term, char *config, u64 num,
-			   void *loc_term_, void *loc_val_)
+			   int type_term, char *config, u64 num)
 {
-	YYLTYPE *loc_term = loc_term_;
-	YYLTYPE *loc_val = loc_val_;
-
 	return new_term(term, PARSE_EVENTS__TERM_TYPE_NUM, type_term,
-			config, NULL, num,
-			loc_term ? loc_term->first_column : 0,
-			loc_val ? loc_val->first_column : 0);
+			config, NULL, num);
 }
 
 int parse_events_term__str(struct parse_events_term **term,
-			   int type_term, char *config, char *str,
-			   void *loc_term_, void *loc_val_)
+			   int type_term, char *config, char *str)
 {
-	YYLTYPE *loc_term = loc_term_;
-	YYLTYPE *loc_val = loc_val_;
-
 	return new_term(term, PARSE_EVENTS__TERM_TYPE_STR, type_term,
-			config, str, 0,
-			loc_term ? loc_term->first_column : 0,
-			loc_val ? loc_val->first_column : 0);
+			config, str, 0);
 }
 
 int parse_events_term__sym_hw(struct parse_events_term **term,
@@ -1630,20 +1514,18 @@ int parse_events_term__sym_hw(struct parse_events_term **term,
 	if (config)
 		return new_term(term, PARSE_EVENTS__TERM_TYPE_STR,
 				PARSE_EVENTS__TERM_TYPE_USER, config,
-				(char *) sym->symbol, 0, 0, 0);
+				(char *) sym->symbol, 0);
 	else
 		return new_term(term, PARSE_EVENTS__TERM_TYPE_STR,
 				PARSE_EVENTS__TERM_TYPE_USER,
-				(char *) "event", (char *) sym->symbol,
-				0, 0, 0);
+				(char *) "event", (char *) sym->symbol, 0);
 }
 
 int parse_events_term__clone(struct parse_events_term **new,
 			     struct parse_events_term *term)
 {
 	return new_term(new, term->type_val, term->type_term, term->config,
-			term->val.str, term->val.num,
-			term->err_term, term->err_val);
+			term->val.str, term->val.num);
 }
 
 void parse_events__free_terms(struct list_head *terms)
@@ -1652,16 +1534,4 @@ void parse_events__free_terms(struct list_head *terms)
 
 	list_for_each_entry_safe(term, h, terms, list)
 		free(term);
-}
-
-void parse_events_evlist_error(struct parse_events_evlist *data,
-			       int idx, const char *str)
-{
-	struct parse_events_error *err = data->error;
-
-	if (!err)
-		return;
-	err->idx = idx;
-	err->str = strdup(str);
-	WARN_ONCE(!err->str, "WARNING: failed to allocate error string");
 }

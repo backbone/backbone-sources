@@ -42,9 +42,6 @@ int ioremap_change_attr(unsigned long vaddr, unsigned long size,
 	case _PAGE_CACHE_MODE_WC:
 		err = _set_memory_wc(vaddr, nrpages);
 		break;
-	case _PAGE_CACHE_MODE_WT:
-		err = _set_memory_wt(vaddr, nrpages);
-		break;
 	case _PAGE_CACHE_MODE_WB:
 		err = _set_memory_wb(vaddr, nrpages);
 		break;
@@ -175,10 +172,6 @@ static void __iomem *__ioremap_caller(resource_size_t phys_addr,
 		prot = __pgprot(pgprot_val(prot) |
 				cachemode2protval(_PAGE_CACHE_MODE_WC));
 		break;
-	case _PAGE_CACHE_MODE_WT:
-		prot = __pgprot(pgprot_val(prot) |
-				cachemode2protval(_PAGE_CACHE_MODE_WT));
-		break;
 	case _PAGE_CACHE_MODE_WB:
 		break;
 	}
@@ -241,11 +234,10 @@ void __iomem *ioremap_nocache(resource_size_t phys_addr, unsigned long size)
 {
 	/*
 	 * Ideally, this should be:
-	 *	pat_enabled() ? _PAGE_CACHE_MODE_UC : _PAGE_CACHE_MODE_UC_MINUS;
+	 *	pat_enabled ? _PAGE_CACHE_MODE_UC : _PAGE_CACHE_MODE_UC_MINUS;
 	 *
 	 * Till we fix all X drivers to use ioremap_wc(), we will use
-	 * UC MINUS. Drivers that are certain they need or can already
-	 * be converted over to strong UC can use ioremap_uc().
+	 * UC MINUS.
 	 */
 	enum page_cache_mode pcm = _PAGE_CACHE_MODE_UC_MINUS;
 
@@ -253,39 +245,6 @@ void __iomem *ioremap_nocache(resource_size_t phys_addr, unsigned long size)
 				__builtin_return_address(0));
 }
 EXPORT_SYMBOL(ioremap_nocache);
-
-/**
- * ioremap_uc     -   map bus memory into CPU space as strongly uncachable
- * @phys_addr:    bus address of the memory
- * @size:      size of the resource to map
- *
- * ioremap_uc performs a platform specific sequence of operations to
- * make bus memory CPU accessible via the readb/readw/readl/writeb/
- * writew/writel functions and the other mmio helpers. The returned
- * address is not guaranteed to be usable directly as a virtual
- * address.
- *
- * This version of ioremap ensures that the memory is marked with a strong
- * preference as completely uncachable on the CPU when possible. For non-PAT
- * systems this ends up setting page-attribute flags PCD=1, PWT=1. For PAT
- * systems this will set the PAT entry for the pages as strong UC.  This call
- * will honor existing caching rules from things like the PCI bus. Note that
- * there are other caches and buffers on many busses. In particular driver
- * authors should read up on PCI writes.
- *
- * It's useful if some control registers are in such an area and
- * write combining or read caching is not desirable:
- *
- * Must be freed with iounmap.
- */
-void __iomem *ioremap_uc(resource_size_t phys_addr, unsigned long size)
-{
-	enum page_cache_mode pcm = _PAGE_CACHE_MODE_UC;
-
-	return __ioremap_caller(phys_addr, size, pcm,
-				__builtin_return_address(0));
-}
-EXPORT_SYMBOL_GPL(ioremap_uc);
 
 /**
  * ioremap_wc	-	map memory into CPU space write combined
@@ -299,27 +258,13 @@ EXPORT_SYMBOL_GPL(ioremap_uc);
  */
 void __iomem *ioremap_wc(resource_size_t phys_addr, unsigned long size)
 {
-	return __ioremap_caller(phys_addr, size, _PAGE_CACHE_MODE_WC,
+	if (pat_enabled)
+		return __ioremap_caller(phys_addr, size, _PAGE_CACHE_MODE_WC,
 					__builtin_return_address(0));
+	else
+		return ioremap_nocache(phys_addr, size);
 }
 EXPORT_SYMBOL(ioremap_wc);
-
-/**
- * ioremap_wt	-	map memory into CPU space write through
- * @phys_addr:	bus address of the memory
- * @size:	size of the resource to map
- *
- * This version of ioremap ensures that the memory is marked write through.
- * Write through stores data into memory while keeping the cache up-to-date.
- *
- * Must be freed with iounmap.
- */
-void __iomem *ioremap_wt(resource_size_t phys_addr, unsigned long size)
-{
-	return __ioremap_caller(phys_addr, size, _PAGE_CACHE_MODE_WT,
-					__builtin_return_address(0));
-}
-EXPORT_SYMBOL(ioremap_wt);
 
 void __iomem *ioremap_cache(resource_size_t phys_addr, unsigned long size)
 {
@@ -386,7 +331,7 @@ void iounmap(volatile void __iomem *addr)
 }
 EXPORT_SYMBOL(iounmap);
 
-int __init arch_ioremap_pud_supported(void)
+int arch_ioremap_pud_supported(void)
 {
 #ifdef CONFIG_X86_64
 	return cpu_has_gbpages;
@@ -395,7 +340,7 @@ int __init arch_ioremap_pud_supported(void)
 #endif
 }
 
-int __init arch_ioremap_pmd_supported(void)
+int arch_ioremap_pmd_supported(void)
 {
 	return cpu_has_pse;
 }
@@ -408,18 +353,18 @@ void *xlate_dev_mem_ptr(phys_addr_t phys)
 {
 	unsigned long start  = phys &  PAGE_MASK;
 	unsigned long offset = phys & ~PAGE_MASK;
-	void *vaddr;
+	unsigned long vaddr;
 
 	/* If page is RAM, we can use __va. Otherwise ioremap and unmap. */
 	if (page_is_ram(start >> PAGE_SHIFT))
 		return __va(phys);
 
-	vaddr = ioremap_cache(start, PAGE_SIZE);
+	vaddr = (unsigned long)ioremap_cache(start, PAGE_SIZE);
 	/* Only add the offset on success and return NULL if the ioremap() failed: */
 	if (vaddr)
 		vaddr += offset;
 
-	return vaddr;
+	return (void *)vaddr;
 }
 
 void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr)
@@ -428,6 +373,7 @@ void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr)
 		return;
 
 	iounmap((void __iomem *)((unsigned long)addr & PAGE_MASK));
+	return;
 }
 
 static pte_t bm_pte[PAGE_SIZE/sizeof(pte_t)] __page_aligned_bss;

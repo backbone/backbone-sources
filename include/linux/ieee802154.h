@@ -225,13 +225,15 @@ static inline bool ieee802154_is_valid_psdu_len(const u8 len)
  * ieee802154_is_valid_psdu_len - check if extended addr is valid
  * @addr: extended addr to check
  */
-static inline bool ieee802154_is_valid_extended_unicast_addr(const __le64 addr)
+static inline bool ieee802154_is_valid_extended_addr(const __le64 addr)
 {
-	/* Bail out if the address is all zero, or if the group
-	 * address bit is set.
+	/* These EUI-64 addresses are reserved by IEEE. 0xffffffffffffffff
+	 * is used internally as extended to short address broadcast mapping.
+	 * This is currently a workaround because neighbor discovery can't
+	 * deal with short addresses types right now.
 	 */
 	return ((addr != cpu_to_le64(0x0000000000000000ULL)) &&
-		!(addr & cpu_to_le64(0x0100000000000000ULL)));
+		(addr != cpu_to_le64(0xffffffffffffffffULL)));
 }
 
 /**
@@ -242,9 +244,9 @@ static inline void ieee802154_random_extended_addr(__le64 *addr)
 {
 	get_random_bytes(addr, IEEE802154_EXTENDED_ADDR_LEN);
 
-	/* clear the group bit, and set the locally administered bit */
-	((u8 *)addr)[IEEE802154_EXTENDED_ADDR_LEN - 1] &= ~0x01;
-	((u8 *)addr)[IEEE802154_EXTENDED_ADDR_LEN - 1] |= 0x02;
+	/* toggle some bit if we hit an invalid extended addr */
+	if (!ieee802154_is_valid_extended_addr(*addr))
+		((u8 *)addr)[IEEE802154_EXTENDED_ADDR_LEN - 1] ^= 0x01;
 }
 
 #endif /* LINUX_IEEE802154_H */

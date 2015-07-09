@@ -170,7 +170,7 @@ static struct notifier_block opal_hmi_handler_nb = {
 	.priority	= 0,
 };
 
-int __init opal_hmi_handler_init(void)
+static int __init opal_hmi_handler_init(void)
 {
 	int ret;
 
@@ -186,3 +186,4 @@ int __init opal_hmi_handler_init(void)
 	}
 	return 0;
 }
+machine_subsys_initcall(powernv, opal_hmi_handler_init);

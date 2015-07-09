@@ -88,7 +88,7 @@ DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_mrrs);
 static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
 {
 	struct pcie_port *pp = &ks_pcie->pp;
-	unsigned int retries;
+	int count = 200;
 
 	dw_pcie_setup_rc(pp);
 
@@ -99,15 +99,17 @@ static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
 
 	ks_dw_pcie_initiate_link_train(ks_pcie);
 	/* check if the link is up or not */
-	for (retries = 0; retries < 200; retries++) {
-		if (dw_pcie_link_up(pp))
-			return 0;
+	while (!dw_pcie_link_up(pp)) {
 		usleep_range(100, 1000);
-		ks_dw_pcie_initiate_link_train(ks_pcie);
+		if (--count) {
+			ks_dw_pcie_initiate_link_train(ks_pcie);
+			continue;
+		}
+		dev_err(pp->dev, "phy link never came up\n");
+		return -EINVAL;
 	}
 
-	dev_err(pp->dev, "phy link never came up\n");
-	return -EINVAL;
+	return 0;
 }
 
 static void ks_pcie_msi_irq_handler(unsigned int irq, struct irq_desc *desc)

@@ -16,6 +16,7 @@
 
 #include <libaudit.h>
 #include <stdlib.h>
+#include <sys/eventfd.h>
 #include <sys/mman.h>
 #include <linux/futex.h>
 
@@ -39,51 +40,6 @@
 #ifndef EFD_SEMAPHORE
 # define EFD_SEMAPHORE		1
 #endif
-
-#ifndef EFD_NONBLOCK
-# define EFD_NONBLOCK		00004000
-#endif
-
-#ifndef EFD_CLOEXEC
-# define EFD_CLOEXEC		02000000
-#endif
-
-#ifndef O_CLOEXEC
-# define O_CLOEXEC		02000000
-#endif
-
-#ifndef SOCK_DCCP
-# define SOCK_DCCP		6
-#endif
-
-#ifndef SOCK_CLOEXEC
-# define SOCK_CLOEXEC		02000000
-#endif
-
-#ifndef SOCK_NONBLOCK
-# define SOCK_NONBLOCK		00004000
-#endif
-
-#ifndef MSG_CMSG_CLOEXEC
-# define MSG_CMSG_CLOEXEC	0x40000000
-#endif
-
-#ifndef PERF_FLAG_FD_NO_GROUP
-# define PERF_FLAG_FD_NO_GROUP		(1UL << 0)
-#endif
-
-#ifndef PERF_FLAG_FD_OUTPUT
-# define PERF_FLAG_FD_OUTPUT		(1UL << 1)
-#endif
-
-#ifndef PERF_FLAG_PID_CGROUP
-# define PERF_FLAG_PID_CGROUP		(1UL << 2) /* pid=cgroup id, per-cpu mode only */
-#endif
-
-#ifndef PERF_FLAG_FD_CLOEXEC
-# define PERF_FLAG_FD_CLOEXEC		(1UL << 3) /* O_CLOEXEC */
-#endif
-
 
 struct tp_field {
 	int offset;
@@ -374,14 +330,6 @@ static size_t syscall_arg__scnprintf_hex(char *bf, size_t size,
 }
 
 #define SCA_HEX syscall_arg__scnprintf_hex
-
-static size_t syscall_arg__scnprintf_int(char *bf, size_t size,
-					 struct syscall_arg *arg)
-{
-	return scnprintf(bf, size, "%d", arg->val);
-}
-
-#define SCA_INT syscall_arg__scnprintf_int
 
 static size_t syscall_arg__scnprintf_mmap_prot(char *bf, size_t size,
 					       struct syscall_arg *arg)
@@ -835,34 +783,6 @@ static size_t syscall_arg__scnprintf_open_flags(char *bf, size_t size,
 
 #define SCA_OPEN_FLAGS syscall_arg__scnprintf_open_flags
 
-static size_t syscall_arg__scnprintf_perf_flags(char *bf, size_t size,
-						struct syscall_arg *arg)
-{
-	int printed = 0, flags = arg->val;
-
-	if (flags == 0)
-		return 0;
-
-#define	P_FLAG(n) \
-	if (flags & PERF_FLAG_##n) { \
-		printed += scnprintf(bf + printed, size - printed, "%s%s", printed ? "|" : "", #n); \
-		flags &= ~PERF_FLAG_##n; \
-	}
-
-	P_FLAG(FD_NO_GROUP);
-	P_FLAG(FD_OUTPUT);
-	P_FLAG(PID_CGROUP);
-	P_FLAG(FD_CLOEXEC);
-#undef P_FLAG
-
-	if (flags)
-		printed += scnprintf(bf + printed, size - printed, "%s%#x", printed ? "|" : "", flags);
-
-	return printed;
-}
-
-#define SCA_PERF_FLAGS syscall_arg__scnprintf_perf_flags
-
 static size_t syscall_arg__scnprintf_eventfd_flags(char *bf, size_t size,
 						   struct syscall_arg *arg)
 {
@@ -1130,11 +1050,6 @@ static struct syscall_fmt {
 	{ .name	    = "openat",	    .errmsg = true,
 	  .arg_scnprintf = { [0] = SCA_FDAT, /* dfd */
 			     [2] = SCA_OPEN_FLAGS, /* flags */ }, },
-	{ .name	    = "perf_event_open", .errmsg = true,
-	  .arg_scnprintf = { [1] = SCA_INT, /* pid */
-			     [2] = SCA_INT, /* cpu */
-			     [3] = SCA_FD,  /* group_fd */
-			     [4] = SCA_PERF_FLAGS,  /* flags */ }, },
 	{ .name	    = "pipe2",	    .errmsg = true,
 	  .arg_scnprintf = { [1] = SCA_PIPE_FLAGS, /* flags */ }, },
 	{ .name	    = "poll",	    .errmsg = true, .timeout = true, },
@@ -1518,8 +1433,7 @@ static int trace__symbols_init(struct trace *trace, struct perf_evlist *evlist)
 		return -ENOMEM;
 
 	err = __machine__synthesize_threads(trace->host, &trace->tool, &trace->opts.target,
-					    evlist->threads, trace__tool_process, false,
-					    trace->opts.proc_map_timeout);
+					    evlist->threads, trace__tool_process, false);
 	if (err)
 		symbol__exit();
 
@@ -1798,7 +1712,7 @@ static int trace__sys_enter(struct trace *trace, struct perf_evsel *evsel,
 	void *args;
 	size_t printed = 0;
 	struct thread *thread;
-	int id = perf_evsel__sc_tp_uint(evsel, id, sample), err = -1;
+	int id = perf_evsel__sc_tp_uint(evsel, id, sample);
 	struct syscall *sc = trace__syscall_info(trace, evsel, id);
 	struct thread_trace *ttrace;
 
@@ -1811,14 +1725,14 @@ static int trace__sys_enter(struct trace *trace, struct perf_evsel *evsel,
 	thread = machine__findnew_thread(trace->host, sample->pid, sample->tid);
 	ttrace = thread__trace(thread, trace->output);
 	if (ttrace == NULL)
-		goto out_put;
+		return -1;
 
 	args = perf_evsel__sc_tp_ptr(evsel, args, sample);
 
 	if (ttrace->entry_str == NULL) {
 		ttrace->entry_str = malloc(1024);
 		if (!ttrace->entry_str)
-			goto out_put;
+			return -1;
 	}
 
 	if (!trace->summary_only)
@@ -1843,10 +1757,8 @@ static int trace__sys_enter(struct trace *trace, struct perf_evsel *evsel,
 		thread__put(trace->current);
 		trace->current = thread__get(thread);
 	}
-	err = 0;
-out_put:
-	thread__put(thread);
-	return err;
+
+	return 0;
 }
 
 static int trace__sys_exit(struct trace *trace, struct perf_evsel *evsel,
@@ -1856,7 +1768,7 @@ static int trace__sys_exit(struct trace *trace, struct perf_evsel *evsel,
 	long ret;
 	u64 duration = 0;
 	struct thread *thread;
-	int id = perf_evsel__sc_tp_uint(evsel, id, sample), err = -1;
+	int id = perf_evsel__sc_tp_uint(evsel, id, sample);
 	struct syscall *sc = trace__syscall_info(trace, evsel, id);
 	struct thread_trace *ttrace;
 
@@ -1869,7 +1781,7 @@ static int trace__sys_exit(struct trace *trace, struct perf_evsel *evsel,
 	thread = machine__findnew_thread(trace->host, sample->pid, sample->tid);
 	ttrace = thread__trace(thread, trace->output);
 	if (ttrace == NULL)
-		goto out_put;
+		return -1;
 
 	if (trace->summary)
 		thread__update_stats(ttrace, id, sample);
@@ -1923,10 +1835,8 @@ signed_print:
 	fputc('\n', trace->output);
 out:
 	ttrace->entry_pending = false;
-	err = 0;
-out_put:
-	thread__put(thread);
-	return err;
+
+	return 0;
 }
 
 static int trace__vfs_getname(struct trace *trace, struct perf_evsel *evsel,
@@ -1953,7 +1863,6 @@ static int trace__sched_stat_runtime(struct trace *trace, struct perf_evsel *evs
 
 	ttrace->runtime_ms += runtime_ms;
 	trace->runtime_ms += runtime_ms;
-	thread__put(thread);
 	return 0;
 
 out_dump:
@@ -1963,7 +1872,6 @@ out_dump:
 	       (pid_t)perf_evsel__intval(evsel, sample, "pid"),
 	       runtime,
 	       perf_evsel__intval(evsel, sample, "vruntime"));
-	thread__put(thread);
 	return 0;
 }
 
@@ -2016,12 +1924,11 @@ static int trace__pgfault(struct trace *trace,
 	struct addr_location al;
 	char map_type = 'd';
 	struct thread_trace *ttrace;
-	int err = -1;
 
 	thread = machine__findnew_thread(trace->host, sample->pid, sample->tid);
 	ttrace = thread__trace(thread, trace->output);
 	if (ttrace == NULL)
-		goto out_put;
+		return -1;
 
 	if (evsel->attr.config == PERF_COUNT_SW_PAGE_FAULTS_MAJ)
 		ttrace->pfmaj++;
@@ -2029,7 +1936,7 @@ static int trace__pgfault(struct trace *trace,
 		ttrace->pfmin++;
 
 	if (trace->summary_only)
-		goto out;
+		return 0;
 
 	thread__find_addr_location(thread, cpumode, MAP__FUNCTION,
 			      sample->ip, &al);
@@ -2060,11 +1967,8 @@ static int trace__pgfault(struct trace *trace,
 	print_location(trace->output, sample, &al, true, false);
 
 	fprintf(trace->output, " (%c%c)\n", map_type, al.level);
-out:
-	err = 0;
-out_put:
-	thread__put(thread);
-	return err;
+
+	return 0;
 }
 
 static bool skip_sample(struct trace *trace, struct perf_sample *sample)
@@ -2748,7 +2652,6 @@ int cmd_trace(int argc, const char **argv, const char *prefix __maybe_unused)
 			.user_interval = ULLONG_MAX,
 			.no_buffering  = true,
 			.mmap_pages    = UINT_MAX,
-			.proc_map_timeout  = 500,
 		},
 		.output = stdout,
 		.show_comm = true,
@@ -2763,15 +2666,16 @@ int cmd_trace(int argc, const char **argv, const char *prefix __maybe_unused)
 	OPT_BOOLEAN(0, "comm", &trace.show_comm,
 		    "show the thread COMM next to its id"),
 	OPT_BOOLEAN(0, "tool_stats", &trace.show_tool_stats, "show tool stats"),
-	OPT_STRING('e', "expr", &ev_qualifier_str, "expr", "list of syscalls to trace"),
+	OPT_STRING('e', "expr", &ev_qualifier_str, "expr",
+		    "list of events to trace"),
 	OPT_STRING('o', "output", &output_name, "file", "output file name"),
 	OPT_STRING('i', "input", &input_name, "file", "Analyze events in file"),
 	OPT_STRING('p', "pid", &trace.opts.target.pid, "pid",
 		    "trace events on existing process id"),
 	OPT_STRING('t', "tid", &trace.opts.target.tid, "tid",
 		    "trace events on existing thread id"),
-	OPT_CALLBACK(0, "filter-pids", &trace, "CSV list of pids",
-		     "pids to filter (by the kernel)", trace__set_filter_pids),
+	OPT_CALLBACK(0, "filter-pids", &trace, "float",
+		     "show only events with duration > N.M ms", trace__set_filter_pids),
 	OPT_BOOLEAN('a', "all-cpus", &trace.opts.target.system_wide,
 		    "system-wide collection from all CPUs"),
 	OPT_STRING('C', "cpu", &trace.opts.target.cpu_list, "cpu",
@@ -2798,8 +2702,6 @@ int cmd_trace(int argc, const char **argv, const char *prefix __maybe_unused)
 		     "Trace pagefaults", parse_pagefaults, "maj"),
 	OPT_BOOLEAN(0, "syscalls", &trace.trace_syscalls, "Trace syscalls"),
 	OPT_BOOLEAN('f', "force", &trace.force, "don't complain, do it"),
-	OPT_UINTEGER(0, "proc-map-timeout", &trace.opts.proc_map_timeout,
-			"per thread proc mmap processing timeout in ms"),
 	OPT_END()
 	};
 	const char * const trace_subcommands[] = { "record", NULL };
@@ -2810,10 +2712,11 @@ int cmd_trace(int argc, const char **argv, const char *prefix __maybe_unused)
 	signal(SIGFPE, sighandler_dump_stack);
 
 	trace.evlist = perf_evlist__new();
+	if (trace.evlist == NULL)
+		return -ENOMEM;
 
 	if (trace.evlist == NULL) {
 		pr_err("Not enough memory to run!\n");
-		err = -ENOMEM;
 		goto out;
 	}
 

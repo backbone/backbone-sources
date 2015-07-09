@@ -198,16 +198,15 @@ int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 
 int kvm_arch_prepare_memory_region(struct kvm *kvm,
 				   struct kvm_memory_slot *memslot,
-				   const struct kvm_userspace_memory_region *mem,
+				   struct kvm_userspace_memory_region *mem,
 				   enum kvm_mr_change change)
 {
 	return 0;
 }
 
 void kvm_arch_commit_memory_region(struct kvm *kvm,
-				   const struct kvm_userspace_memory_region *mem,
+				   struct kvm_userspace_memory_region *mem,
 				   const struct kvm_memory_slot *old,
-				   const struct kvm_memory_slot *new,
 				   enum kvm_mr_change change)
 {
 	unsigned long npages = 0;
@@ -394,7 +393,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 	kvm_mips_deliver_interrupts(vcpu,
 				    kvm_read_c0_guest_cause(vcpu->arch.cop0));
 
-	__kvm_guest_enter();
+	kvm_guest_enter();
 
 	/* Disable hardware page table walking while in guest */
 	htw_stop();
@@ -404,7 +403,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 	/* Re-enable HTW before enabling interrupts */
 	htw_start();
 
-	__kvm_guest_exit();
+	kvm_guest_exit();
 	local_irq_enable();
 
 	if (vcpu->sigset_active)
@@ -969,7 +968,6 @@ out:
 /* Get (and clear) the dirty memory log for a memory slot. */
 int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 {
-	struct kvm_memslots *slots;
 	struct kvm_memory_slot *memslot;
 	unsigned long ga, ga_end;
 	int is_dirty = 0;
@@ -984,8 +982,7 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 
 	/* If nothing is dirty, don't bother messing with page tables. */
 	if (is_dirty) {
-		slots = kvm_memslots(kvm);
-		memslot = id_to_memslot(slots, log->slot);
+		memslot = &kvm->memslots->memslots[log->slot];
 
 		ga = memslot->base_gfn << PAGE_SHIFT;
 		ga_end = ga + (memslot->npages << PAGE_SHIFT);

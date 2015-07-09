@@ -541,7 +541,7 @@ page_cache_async_readahead(struct address_space *mapping,
 	/*
 	 * Defer asynchronous read-ahead on IO congestion.
 	 */
-	if (inode_read_congested(mapping->host))
+	if (bdi_read_congested(inode_to_bdi(mapping->host)))
 		return;
 
 	/* do read-ahead */

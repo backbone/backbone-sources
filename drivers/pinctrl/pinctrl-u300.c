@@ -1068,9 +1068,9 @@ static int u300_pmx_probe(struct platform_device *pdev)
 		return PTR_ERR(upmx->virtbase);
 
 	upmx->pctl = pinctrl_register(&u300_pmx_desc, &pdev->dev, upmx);
-	if (IS_ERR(upmx->pctl)) {
+	if (!upmx->pctl) {
 		dev_err(&pdev->dev, "could not register U300 pinmux driver\n");
-		return PTR_ERR(upmx->pctl);
+		return -EINVAL;
 	}
 
 	platform_set_drvdata(pdev, upmx);

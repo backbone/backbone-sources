@@ -241,7 +241,6 @@ rcu_torture_free(struct rcu_torture *p)
 struct rcu_torture_ops {
 	int ttype;
 	void (*init)(void);
-	void (*cleanup)(void);
 	int (*readlock)(void);
 	void (*read_delay)(struct torture_random_state *rrsp);
 	void (*readunlock)(int idx);
@@ -478,12 +477,10 @@ static struct rcu_torture_ops rcu_busted_ops = {
  */
 
 DEFINE_STATIC_SRCU(srcu_ctl);
-static struct srcu_struct srcu_ctld;
-static struct srcu_struct *srcu_ctlp = &srcu_ctl;
 
-static int srcu_torture_read_lock(void) __acquires(srcu_ctlp)
+static int srcu_torture_read_lock(void) __acquires(&srcu_ctl)
 {
-	return srcu_read_lock(srcu_ctlp);
+	return srcu_read_lock(&srcu_ctl);
 }
 
 static void srcu_read_delay(struct torture_random_state *rrsp)
@@ -502,49 +499,49 @@ static void srcu_read_delay(struct torture_random_state *rrsp)
 		rcu_read_delay(rrsp);
 }
 
-static void srcu_torture_read_unlock(int idx) __releases(srcu_ctlp)
+static void srcu_torture_read_unlock(int idx) __releases(&srcu_ctl)
 {
-	srcu_read_unlock(srcu_ctlp, idx);
+	srcu_read_unlock(&srcu_ctl, idx);
 }
 
 static unsigned long srcu_torture_completed(void)
 {
-	return srcu_batches_completed(srcu_ctlp);
+	return srcu_batches_completed(&srcu_ctl);
 }
 
 static void srcu_torture_deferred_free(struct rcu_torture *rp)
 {
-	call_srcu(srcu_ctlp, &rp->rtort_rcu, rcu_torture_cb);
+	call_srcu(&srcu_ctl, &rp->rtort_rcu, rcu_torture_cb);
 }
 
 static void srcu_torture_synchronize(void)
 {
-	synchronize_srcu(srcu_ctlp);
+	synchronize_srcu(&srcu_ctl);
 }
 
 static void srcu_torture_call(struct rcu_head *head,
 			      void (*func)(struct rcu_head *head))
 {
-	call_srcu(srcu_ctlp, head, func);
+	call_srcu(&srcu_ctl, head, func);
 }
 
 static void srcu_torture_barrier(void)
 {
-	srcu_barrier(srcu_ctlp);
+	srcu_barrier(&srcu_ctl);
 }
 
 static void srcu_torture_stats(void)
 {
 	int cpu;
-	int idx = srcu_ctlp->completed & 0x1;
+	int idx = srcu_ctl.completed & 0x1;
 
 	pr_alert("%s%s per-CPU(idx=%d):",
 		 torture_type, TORTURE_FLAG, idx);
 	for_each_possible_cpu(cpu) {
 		long c0, c1;
 
-		c0 = (long)per_cpu_ptr(srcu_ctlp->per_cpu_ref, cpu)->c[!idx];
-		c1 = (long)per_cpu_ptr(srcu_ctlp->per_cpu_ref, cpu)->c[idx];
+		c0 = (long)per_cpu_ptr(srcu_ctl.per_cpu_ref, cpu)->c[!idx];
+		c1 = (long)per_cpu_ptr(srcu_ctl.per_cpu_ref, cpu)->c[idx];
 		pr_cont(" %d(%ld,%ld)", cpu, c0, c1);
 	}
 	pr_cont("\n");
@@ -552,7 +549,7 @@ static void srcu_torture_stats(void)
 
 static void srcu_torture_synchronize_expedited(void)
 {
-	synchronize_srcu_expedited(srcu_ctlp);
+	synchronize_srcu_expedited(&srcu_ctl);
 }
 
 static struct rcu_torture_ops srcu_ops = {
@@ -570,38 +567,6 @@ static struct rcu_torture_ops srcu_ops = {
 	.cb_barrier	= srcu_torture_barrier,
 	.stats		= srcu_torture_stats,
 	.name		= "srcu"
-};
-
-static void srcu_torture_init(void)
-{
-	rcu_sync_torture_init();
-	WARN_ON(init_srcu_struct(&srcu_ctld));
-	srcu_ctlp = &srcu_ctld;
-}
-
-static void srcu_torture_cleanup(void)
-{
-	cleanup_srcu_struct(&srcu_ctld);
-	srcu_ctlp = &srcu_ctl; /* In case of a later rcutorture run. */
-}
-
-/* As above, but dynamically allocated. */
-static struct rcu_torture_ops srcud_ops = {
-	.ttype		= SRCU_FLAVOR,
-	.init		= srcu_torture_init,
-	.cleanup	= srcu_torture_cleanup,
-	.readlock	= srcu_torture_read_lock,
-	.read_delay	= srcu_read_delay,
-	.readunlock	= srcu_torture_read_unlock,
-	.started	= NULL,
-	.completed	= srcu_torture_completed,
-	.deferred_free	= srcu_torture_deferred_free,
-	.sync		= srcu_torture_synchronize,
-	.exp_sync	= srcu_torture_synchronize_expedited,
-	.call		= srcu_torture_call,
-	.cb_barrier	= srcu_torture_barrier,
-	.stats		= srcu_torture_stats,
-	.name		= "srcud"
 };
 
 /*
@@ -707,8 +672,8 @@ static void rcu_torture_boost_cb(struct rcu_head *head)
 	struct rcu_boost_inflight *rbip =
 		container_of(head, struct rcu_boost_inflight, rcu);
 
-	/* Ensure RCU-core accesses precede clearing ->inflight */
-	smp_store_release(&rbip->inflight, 0);
+	smp_mb(); /* Ensure RCU-core accesses precede clearing ->inflight */
+	rbip->inflight = 0;
 }
 
 static int rcu_torture_boost(void *arg)
@@ -745,9 +710,9 @@ static int rcu_torture_boost(void *arg)
 		call_rcu_time = jiffies;
 		while (ULONG_CMP_LT(jiffies, endtime)) {
 			/* If we don't have a callback in flight, post one. */
-			if (!smp_load_acquire(&rbi.inflight)) {
-				/* RCU core before ->inflight = 1. */
-				smp_store_release(&rbi.inflight, 1);
+			if (!rbi.inflight) {
+				smp_mb(); /* RCU core before ->inflight = 1. */
+				rbi.inflight = 1;
 				call_rcu(&rbi.rcu, rcu_torture_boost_cb);
 				if (jiffies - call_rcu_time >
 					 test_boost_duration * HZ - HZ / 2) {
@@ -786,10 +751,11 @@ checkwait:	stutter_wait("rcu_torture_boost");
 	} while (!torture_must_stop());
 
 	/* Clean up and exit. */
-	while (!kthread_should_stop() || smp_load_acquire(&rbi.inflight)) {
+	while (!kthread_should_stop() || rbi.inflight) {
 		torture_shutdown_absorb("rcu_torture_boost");
 		schedule_timeout_uninterruptible(1);
 	}
+	smp_mb(); /* order accesses to ->inflight before stack-frame death. */
 	destroy_rcu_head_on_stack(&rbi.rcu);
 	torture_kthread_stopping("rcu_torture_boost");
 	return 0;
@@ -1088,7 +1054,7 @@ static void rcu_torture_timer(unsigned long unused)
 	p = rcu_dereference_check(rcu_torture_current,
 				  rcu_read_lock_bh_held() ||
 				  rcu_read_lock_sched_held() ||
-				  srcu_read_lock_held(srcu_ctlp));
+				  srcu_read_lock_held(&srcu_ctl));
 	if (p == NULL) {
 		/* Leave because rcu_torture_writer is not yet underway */
 		cur_ops->readunlock(idx);
@@ -1162,7 +1128,7 @@ rcu_torture_reader(void *arg)
 		p = rcu_dereference_check(rcu_torture_current,
 					  rcu_read_lock_bh_held() ||
 					  rcu_read_lock_sched_held() ||
-					  srcu_read_lock_held(srcu_ctlp));
+					  srcu_read_lock_held(&srcu_ctl));
 		if (p == NULL) {
 			/* Wait for rcu_torture_writer to get underway */
 			cur_ops->readunlock(idx);
@@ -1447,15 +1413,12 @@ static int rcu_torture_barrier_cbs(void *arg)
 	do {
 		wait_event(barrier_cbs_wq[myid],
 			   (newphase =
-			    smp_load_acquire(&barrier_phase)) != lastphase ||
+			    ACCESS_ONCE(barrier_phase)) != lastphase ||
 			   torture_must_stop());
 		lastphase = newphase;
+		smp_mb(); /* ensure barrier_phase load before ->call(). */
 		if (torture_must_stop())
 			break;
-		/*
-		 * The above smp_load_acquire() ensures barrier_phase load
-		 * is ordered before the folloiwng ->call().
-		 */
 		cur_ops->call(&rcu, rcu_torture_barrier_cbf);
 		if (atomic_dec_and_test(&barrier_cbs_count))
 			wake_up(&barrier_wq);
@@ -1476,8 +1439,8 @@ static int rcu_torture_barrier(void *arg)
 	do {
 		atomic_set(&barrier_cbs_invoked, 0);
 		atomic_set(&barrier_cbs_count, n_barrier_cbs);
-		/* Ensure barrier_phase ordered after prior assignments. */
-		smp_store_release(&barrier_phase, !barrier_phase);
+		smp_mb(); /* Ensure barrier_phase after prior assignments. */
+		barrier_phase = !barrier_phase;
 		for (i = 0; i < n_barrier_cbs; i++)
 			wake_up(&barrier_cbs_wq[i]);
 		wait_event(barrier_wq,
@@ -1625,14 +1588,10 @@ rcu_torture_cleanup(void)
 			rcutorture_booster_cleanup(i);
 	}
 
-	/*
-	 * Wait for all RCU callbacks to fire, then do flavor-specific
-	 * cleanup operations.
-	 */
+	/* Wait for all RCU callbacks to fire.  */
+
 	if (cur_ops->cb_barrier != NULL)
 		cur_ops->cb_barrier();
-	if (cur_ops->cleanup != NULL)
-		cur_ops->cleanup();
 
 	rcu_torture_stats_print();  /* -After- the stats thread is stopped! */
 
@@ -1709,8 +1668,8 @@ rcu_torture_init(void)
 	int cpu;
 	int firsterr = 0;
 	static struct rcu_torture_ops *torture_ops[] = {
-		&rcu_ops, &rcu_bh_ops, &rcu_busted_ops, &srcu_ops, &srcud_ops,
-		&sched_ops, RCUTORTURE_TASKS_OPS
+		&rcu_ops, &rcu_bh_ops, &rcu_busted_ops, &srcu_ops, &sched_ops,
+		RCUTORTURE_TASKS_OPS
 	};
 
 	if (!torture_init_begin(torture_type, verbose, &torture_runnable))
@@ -1742,7 +1701,7 @@ rcu_torture_init(void)
 	if (nreaders >= 0) {
 		nrealreaders = nreaders;
 	} else {
-		nrealreaders = num_online_cpus() - 2 - nreaders;
+		nrealreaders = num_online_cpus() - 1;
 		if (nrealreaders <= 0)
 			nrealreaders = 1;
 	}

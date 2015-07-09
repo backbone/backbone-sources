@@ -1726,7 +1726,7 @@ static int pcs_irqdomain_map(struct irq_domain *d, unsigned int irq,
 	return 0;
 }
 
-static const struct irq_domain_ops pcs_irqdomain_ops = {
+static struct irq_domain_ops pcs_irqdomain_ops = {
 	.map = pcs_irqdomain_map,
 	.xlate = irq_domain_xlate_onecell,
 };
@@ -1921,9 +1921,9 @@ static int pcs_probe(struct platform_device *pdev)
 		goto free;
 
 	pcs->pctl = pinctrl_register(&pcs->desc, pcs->dev, pcs);
-	if (IS_ERR(pcs->pctl)) {
+	if (!pcs->pctl) {
 		dev_err(pcs->dev, "could not register single pinctrl driver\n");
-		ret = PTR_ERR(pcs->pctl);
+		ret = -EINVAL;
 		goto free;
 	}
 

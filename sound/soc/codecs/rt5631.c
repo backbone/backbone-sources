@@ -1546,7 +1546,7 @@ static int rt5631_set_bias_level(struct snd_soc_codec *codec,
 		break;
 
 	case SND_SOC_BIAS_STANDBY:
-		if (snd_soc_codec_get_bias_level(codec) == SND_SOC_BIAS_OFF) {
+		if (codec->dapm.bias_level == SND_SOC_BIAS_OFF) {
 			snd_soc_update_bits(codec, RT5631_PWR_MANAG_ADD3,
 				RT5631_PWR_VREF | RT5631_PWR_MAIN_BIAS,
 				RT5631_PWR_VREF | RT5631_PWR_MAIN_BIAS);
@@ -1569,6 +1569,7 @@ static int rt5631_set_bias_level(struct snd_soc_codec *codec,
 	default:
 		break;
 	}
+	codec->dapm.bias_level = level;
 
 	return 0;
 }
@@ -1614,7 +1615,7 @@ static int rt5631_probe(struct snd_soc_codec *codec)
 			RT5631_DMIC_R_CH_LATCH_RISING);
 	}
 
-	snd_soc_codec_init_bias_level(codec, SND_SOC_BIAS_STANDBY);
+	codec->dapm.bias_level = SND_SOC_BIAS_STANDBY;
 
 	return 0;
 }

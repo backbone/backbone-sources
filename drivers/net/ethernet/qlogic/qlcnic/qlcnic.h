@@ -1326,6 +1326,9 @@ struct qlcnic_eswitch {
 };
 
 
+/* Return codes for Error handling */
+#define QL_STATUS_INVALID_PARAM	-1
+
 #define MAX_BW			100	/* % of link speed */
 #define MIN_BW			1	/* % of link speed */
 #define MAX_VLAN_ID		4095

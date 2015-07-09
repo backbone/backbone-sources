@@ -1004,10 +1004,10 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		break;
 	}
 
-	trace_kvm_exit(exit_nr, vcpu);
-	__kvm_guest_exit();
-
 	local_irq_enable();
+
+	trace_kvm_exit(exit_nr, vcpu);
+	kvm_guest_exit();
 
 	run->exit_reason = KVM_EXIT_UNKNOWN;
 	run->ready_for_interrupt_injection = 1;
@@ -1784,15 +1784,14 @@ int kvmppc_core_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 
 int kvmppc_core_prepare_memory_region(struct kvm *kvm,
 				      struct kvm_memory_slot *memslot,
-				      const struct kvm_userspace_memory_region *mem)
+				      struct kvm_userspace_memory_region *mem)
 {
 	return 0;
 }
 
 void kvmppc_core_commit_memory_region(struct kvm *kvm,
-				const struct kvm_userspace_memory_region *mem,
-				const struct kvm_memory_slot *old,
-				const struct kvm_memory_slot *new)
+				struct kvm_userspace_memory_region *mem,
+				const struct kvm_memory_slot *old)
 {
 }
 

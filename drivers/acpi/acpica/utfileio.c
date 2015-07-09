@@ -198,8 +198,11 @@ acpi_ut_read_table(FILE * fp,
 			     table_header.length, file_size);
 
 #ifdef ACPI_ASL_COMPILER
-			acpi_os_printf("File is corrupt or is ASCII text -- "
-				       "it must be a binary file\n");
+			status = fl_check_for_ascii(fp, NULL, FALSE);
+			if (ACPI_SUCCESS(status)) {
+				acpi_os_printf
+				    ("File appears to be ASCII only, must be binary\n");
+			}
 #endif
 			return (AE_BAD_HEADER);
 		}
@@ -312,7 +315,7 @@ acpi_ut_read_table_from_file(char *filename, struct acpi_table_header ** table)
 	/* Get the entire file */
 
 	fprintf(stderr,
-		"Reading ACPI table from file %10s - Length %.8u (0x%06X)\n",
+		"Loading Acpi table from file %10s - Length %.8u (%06X)\n",
 		filename, file_size, file_size);
 
 	status = acpi_ut_read_table(file, table, &table_length);

@@ -1,11 +1,9 @@
 #ifndef __PERF_DSO
 #define __PERF_DSO
 
-#include <linux/atomic.h>
 #include <linux/types.h>
 #include <linux/rbtree.h>
 #include <stdbool.h>
-#include <pthread.h>
 #include <linux/types.h>
 #include <linux/bitops.h>
 #include "map.h"
@@ -126,13 +124,9 @@ struct dso_cache {
 struct dsos {
 	struct list_head head;
 	struct rb_root	 root;	/* rbtree root sorted by long name */
-	pthread_rwlock_t lock;
 };
 
-struct auxtrace_cache;
-
 struct dso {
-	pthread_mutex_t	 lock;
 	struct list_head node;
 	struct rb_node	 rb_node;	/* rbtree node sorted by long name */
 	struct rb_root	 symbols[MAP__NR_TYPES];
@@ -162,7 +156,6 @@ struct dso {
 	u16		 long_name_len;
 	u16		 short_name_len;
 	void		*dwfl;			/* DWARF debug info */
-	struct auxtrace_cache *auxtrace_cache;
 
 	/* dso data file */
 	struct {
@@ -180,7 +173,7 @@ struct dso {
 		void	 *priv;
 		u64	 db_id;
 	};
-	atomic_t	 refcnt;
+
 	char		 name[0];
 };
 
@@ -207,17 +200,6 @@ void dso__set_long_name(struct dso *dso, const char *name, bool name_allocated);
 
 int dso__name_len(const struct dso *dso);
 
-struct dso *dso__get(struct dso *dso);
-void dso__put(struct dso *dso);
-
-static inline void __dso__zput(struct dso **dso)
-{
-	dso__put(*dso);
-	*dso = NULL;
-}
-
-#define dso__zput(dso) __dso__zput(&dso)
-
 bool dso__loaded(const struct dso *dso, enum map_type type);
 
 bool dso__sorted_by_name(const struct dso *dso, enum map_type type);
@@ -234,7 +216,7 @@ char dso__symtab_origin(const struct dso *dso);
 int dso__read_binary_type_filename(const struct dso *dso, enum dso_binary_type type,
 				   char *root_dir, char *filename, size_t size);
 bool is_supported_compression(const char *ext);
-bool is_kernel_module(const char *pathname, int cpumode);
+bool is_kernel_module(const char *pathname);
 bool decompress_to_file(const char *ext, const char *filename, int output_fd);
 bool dso__needs_decompress(struct dso *dso);
 
@@ -254,8 +236,7 @@ int __kmod_path__parse(struct kmod_path *m, const char *path,
 
 /*
  * The dso__data_* external interface provides following functions:
- *   dso__data_get_fd
- *   dso__data_put_fd
+ *   dso__data_fd
  *   dso__data_close
  *   dso__data_size
  *   dso__data_read_offset
@@ -272,11 +253,8 @@ int __kmod_path__parse(struct kmod_path *m, const char *path,
  * The current usage of the dso__data_* interface is as follows:
  *
  * Get DSO's fd:
- *   int fd = dso__data_get_fd(dso, machine);
- *   if (fd >= 0) {
- *       USE 'fd' SOMEHOW
- *       dso__data_put_fd(dso);
- *   }
+ *   int fd = dso__data_fd(dso, machine);
+ *   USE 'fd' SOMEHOW
  *
  * Read DSO's data:
  *   n = dso__data_read_offset(dso_0, &machine, 0, buf, BUFSIZE);
@@ -295,8 +273,7 @@ int __kmod_path__parse(struct kmod_path *m, const char *path,
  *
  * TODO
 */
-int dso__data_get_fd(struct dso *dso, struct machine *machine);
-void dso__data_put_fd(struct dso *dso __maybe_unused);
+int dso__data_fd(struct dso *dso, struct machine *machine);
 void dso__data_close(struct dso *dso);
 
 off_t dso__data_size(struct dso *dso, struct machine *machine);
@@ -308,16 +285,14 @@ ssize_t dso__data_read_addr(struct dso *dso, struct map *map,
 bool dso__data_status_seen(struct dso *dso, enum dso_data_status_seen by);
 
 struct map *dso__new_map(const char *name);
-struct dso *machine__findnew_kernel(struct machine *machine, const char *name,
-				    const char *short_name, int dso_type);
+struct dso *dso__kernel_findnew(struct machine *machine, const char *name,
+				const char *short_name, int dso_type);
 
-void __dsos__add(struct dsos *dsos, struct dso *dso);
 void dsos__add(struct dsos *dsos, struct dso *dso);
-struct dso *__dsos__addnew(struct dsos *dsos, const char *name);
-struct dso *__dsos__find(struct dsos *dsos, const char *name, bool cmp_short);
-struct dso *dsos__find(struct dsos *dsos, const char *name, bool cmp_short);
+struct dso *dsos__addnew(struct dsos *dsos, const char *name);
+struct dso *dsos__find(const struct dsos *dsos, const char *name,
+		       bool cmp_short);
 struct dso *__dsos__findnew(struct dsos *dsos, const char *name);
-struct dso *dsos__findnew(struct dsos *dsos, const char *name);
 bool __dsos__read_build_ids(struct list_head *head, bool with_hits);
 
 size_t __dsos__fprintf_buildid(struct list_head *head, FILE *fp,

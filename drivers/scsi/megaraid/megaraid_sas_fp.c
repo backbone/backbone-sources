@@ -66,15 +66,7 @@ MODULE_PARM_DESC(lb_pending_cmds, "Change raid-1 load balancing outstanding "
 
 #define ABS_DIFF(a, b)   (((a) > (b)) ? ((a) - (b)) : ((b) - (a)))
 #define MR_LD_STATE_OPTIMAL 3
-
-#ifdef FALSE
-#undef FALSE
-#endif
 #define FALSE 0
-
-#ifdef TRUE
-#undef TRUE
-#endif
 #define TRUE 1
 
 #define SPAN_DEBUG 0
@@ -150,7 +142,7 @@ u16 MR_LdSpanArrayGet(u32 ld, u32 span, struct MR_DRV_RAID_MAP_ALL *map)
 	return le16_to_cpu(map->raidMap.ldSpanMap[ld].spanBlock[span].span.arrayRef);
 }
 
-__le16 MR_PdDevHandleGet(u32 pd, struct MR_DRV_RAID_MAP_ALL *map)
+u16 MR_PdDevHandleGet(u32 pd, struct MR_DRV_RAID_MAP_ALL *map)
 {
 	return map->raidMap.devHndlInfo[pd].curDevHdl;
 }
@@ -743,7 +735,7 @@ static u8 mr_spanset_get_phy_params(struct megasas_instance *instance, u32 ld,
 	u8	retval = TRUE;
 	u8	do_invader = 0;
 	u64	*pdBlock = &io_info->pdBlock;
-	__le16	*pDevHandle = &io_info->devHandle;
+	u16	*pDevHandle = &io_info->devHandle;
 	u32	logArm, rowMod, armQ, arm;
 
 	if ((instance->pdev->device == PCI_DEVICE_ID_LSI_INVADER ||
@@ -777,7 +769,7 @@ static u8 mr_spanset_get_phy_params(struct megasas_instance *instance, u32 ld,
 	if (pd != MR_PD_INVALID)
 		*pDevHandle = MR_PdDevHandleGet(pd, map);
 	else {
-		*pDevHandle = cpu_to_le16(MR_PD_INVALID);
+		*pDevHandle = MR_PD_INVALID;
 		if ((raid->level >= 5) &&
 			(!do_invader  || (do_invader &&
 			(raid->regTypeReqOnRead != REGION_TYPE_UNUSED))))
@@ -825,7 +817,7 @@ u8 MR_GetPhyParams(struct megasas_instance *instance, u32 ld, u64 stripRow,
 	u8	    retval = TRUE;
 	u8          do_invader = 0;
 	u64	    *pdBlock = &io_info->pdBlock;
-	__le16	    *pDevHandle = &io_info->devHandle;
+	u16	    *pDevHandle = &io_info->devHandle;
 
 	if ((instance->pdev->device == PCI_DEVICE_ID_LSI_INVADER ||
 		instance->pdev->device == PCI_DEVICE_ID_LSI_FURY))
@@ -872,8 +864,7 @@ u8 MR_GetPhyParams(struct megasas_instance *instance, u32 ld, u64 stripRow,
 		/* Get dev handle from Pd. */
 		*pDevHandle = MR_PdDevHandleGet(pd, map);
 	else {
-		/* set dev handle as invalid. */
-		*pDevHandle = cpu_to_le16(MR_PD_INVALID);
+		*pDevHandle = MR_PD_INVALID; /* set dev handle as invalid. */
 		if ((raid->level >= 5) &&
 			(!do_invader  || (do_invader &&
 			(raid->regTypeReqOnRead != REGION_TYPE_UNUSED))))
@@ -1118,7 +1109,7 @@ MR_BuildRaidContext(struct megasas_instance *instance,
 					ref_in_start_stripe, io_info,
 					pRAID_Context, map);
 		/* If IO on an invalid Pd, then FP is not possible.*/
-		if (io_info->devHandle == cpu_to_le16(MR_PD_INVALID))
+		if (io_info->devHandle == MR_PD_INVALID)
 			io_info->fpOkForIo = FALSE;
 		return retval;
 	} else if (isRead) {
@@ -1350,11 +1341,11 @@ u8 megasas_get_best_arm_pd(struct megasas_instance *instance,
 	return io_info->pd_after_lb;
 }
 
-__le16 get_updated_dev_handle(struct megasas_instance *instance,
+u16 get_updated_dev_handle(struct megasas_instance *instance,
 	struct LD_LOAD_BALANCE_INFO *lbInfo, struct IO_REQUEST_INFO *io_info)
 {
 	u8 arm_pd;
-	__le16 devHandle;
+	u16 devHandle;
 	struct fusion_context *fusion;
 	struct MR_DRV_RAID_MAP_ALL *drv_map;
 

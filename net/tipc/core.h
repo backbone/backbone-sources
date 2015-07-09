@@ -60,18 +60,15 @@
 #include <net/netns/generic.h>
 #include <linux/rhashtable.h>
 
-struct tipc_node;
-struct tipc_bearer;
-struct tipc_bcbearer;
-struct tipc_bclink;
-struct tipc_link;
-struct tipc_name_table;
-struct tipc_server;
+#include "node.h"
+#include "bearer.h"
+#include "bcast.h"
+#include "netlink.h"
+#include "link.h"
+#include "node.h"
+#include "msg.h"
 
 #define TIPC_MOD_VER "2.0.0"
-
-#define NODE_HTABLE_SIZE   512
-#define MAX_BEARERS	   3
 
 extern int tipc_net_id __read_mostly;
 extern int sysctl_tipc_rmem[3] __read_mostly;
@@ -108,26 +105,6 @@ struct tipc_net {
 	struct tipc_server *topsrv;
 	atomic_t subscription_count;
 };
-
-static inline u16 mod(u16 x)
-{
-	return x & 0xffffu;
-}
-
-static inline int less_eq(u16 left, u16 right)
-{
-	return mod(right - left) < 32768u;
-}
-
-static inline int more(u16 left, u16 right)
-{
-	return !less_eq(left, right);
-}
-
-static inline int less(u16 left, u16 right)
-{
-	return less_eq(left, right) && (mod(right) != mod(left));
-}
 
 #ifdef CONFIG_SYSCTL
 int tipc_register_sysctl(void);

@@ -174,7 +174,7 @@ int cxl_context_iomap(struct cxl_context *ctx, struct vm_area_struct *vma)
  * return until all outstanding interrupts for this context have completed. The
  * hardware should no longer access *ctx after this has returned.
  */
-int __detach_context(struct cxl_context *ctx)
+static void __detach_context(struct cxl_context *ctx)
 {
 	enum cxl_context_status status;
 
@@ -183,13 +183,12 @@ int __detach_context(struct cxl_context *ctx)
 	ctx->status = CLOSED;
 	mutex_unlock(&ctx->status_mutex);
 	if (status != STARTED)
-		return -EBUSY;
+		return;
 
 	WARN_ON(cxl_detach_process(ctx));
+	afu_release_irqs(ctx);
 	flush_work(&ctx->fault_work); /* Only needed for dedicated process */
-	put_pid(ctx->pid);
-	cxl_ctx_put();
-	return 0;
+	wake_up_all(&ctx->wq);
 }
 
 /*
@@ -200,14 +199,7 @@ int __detach_context(struct cxl_context *ctx)
  */
 void cxl_context_detach(struct cxl_context *ctx)
 {
-	int rc;
-
-	rc = __detach_context(ctx);
-	if (rc)
-		return;
-
-	afu_release_irqs(ctx, ctx);
-	wake_up_all(&ctx->wq);
+	__detach_context(ctx);
 }
 
 /*
@@ -224,7 +216,7 @@ void cxl_context_detach_all(struct cxl_afu *afu)
 		 * Anything done in here needs to be setup before the IDR is
 		 * created and torn down after the IDR removed
 		 */
-		cxl_context_detach(ctx);
+		__detach_context(ctx);
 
 		/*
 		 * We are force detaching - remove any active PSA mappings so
@@ -240,20 +232,16 @@ void cxl_context_detach_all(struct cxl_afu *afu)
 	mutex_unlock(&afu->contexts_lock);
 }
 
-static void reclaim_ctx(struct rcu_head *rcu)
-{
-	struct cxl_context *ctx = container_of(rcu, struct cxl_context, rcu);
-
-	free_page((u64)ctx->sstp);
-	ctx->sstp = NULL;
-
-	kfree(ctx);
-}
-
 void cxl_context_free(struct cxl_context *ctx)
 {
 	mutex_lock(&ctx->afu->contexts_lock);
 	idr_remove(&ctx->afu->contexts_idr, ctx->pe);
 	mutex_unlock(&ctx->afu->contexts_lock);
-	call_rcu(&ctx->rcu, reclaim_ctx);
+	synchronize_rcu();
+
+	free_page((u64)ctx->sstp);
+	ctx->sstp = NULL;
+
+	put_pid(ctx->pid);
+	kfree(ctx);
 }

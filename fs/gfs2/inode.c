@@ -1548,7 +1548,7 @@ out:
  * Returns: 0 on success or error code
  */
 
-static const char *gfs2_follow_link(struct dentry *dentry, void **cookie)
+static void *gfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	struct gfs2_inode *ip = GFS2_I(d_inode(dentry));
 	struct gfs2_holder i_gh;
@@ -1561,7 +1561,8 @@ static const char *gfs2_follow_link(struct dentry *dentry, void **cookie)
 	error = gfs2_glock_nq(&i_gh);
 	if (error) {
 		gfs2_holder_uninit(&i_gh);
-		return ERR_PTR(error);
+		nd_set_link(nd, ERR_PTR(error));
+		return NULL;
 	}
 
 	size = (unsigned int)i_size_read(&ip->i_inode);
@@ -1585,9 +1586,8 @@ static const char *gfs2_follow_link(struct dentry *dentry, void **cookie)
 	brelse(dibh);
 out:
 	gfs2_glock_dq_uninit(&i_gh);
-	if (!IS_ERR(buf))
-		*cookie = buf;
-	return buf;
+	nd_set_link(nd, buf);
+	return NULL;
 }
 
 /**

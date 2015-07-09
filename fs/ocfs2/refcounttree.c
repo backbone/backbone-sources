@@ -1406,9 +1406,11 @@ static int cmp_refcount_rec_by_cpos(const void *a, const void *b)
 
 static void swap_refcount_rec(void *a, void *b, int size)
 {
-	struct ocfs2_refcount_rec *l = a, *r = b;
+	struct ocfs2_refcount_rec *l = a, *r = b, tmp;
 
-	swap(*l, *r);
+	tmp = *l;
+	*l = *r;
+	*r = tmp;
 }
 
 /*

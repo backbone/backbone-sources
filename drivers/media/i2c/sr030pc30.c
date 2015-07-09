@@ -471,30 +471,24 @@ static int sr030pc30_s_ctrl(struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
-static int sr030pc30_enum_mbus_code(struct v4l2_subdev *sd,
-		struct v4l2_subdev_pad_config *cfg,
-		struct v4l2_subdev_mbus_code_enum *code)
+static int sr030pc30_enum_fmt(struct v4l2_subdev *sd, unsigned int index,
+			      u32 *code)
 {
-	if (!code || code->pad ||
-	    code->index >= ARRAY_SIZE(sr030pc30_formats))
+	if (!code || index >= ARRAY_SIZE(sr030pc30_formats))
 		return -EINVAL;
 
-	code->code = sr030pc30_formats[code->index].code;
+	*code = sr030pc30_formats[index].code;
 	return 0;
 }
 
-static int sr030pc30_get_fmt(struct v4l2_subdev *sd,
-		struct v4l2_subdev_pad_config *cfg,
-		struct v4l2_subdev_format *format)
+static int sr030pc30_g_fmt(struct v4l2_subdev *sd,
+			   struct v4l2_mbus_framefmt *mf)
 {
-	struct v4l2_mbus_framefmt *mf;
 	struct sr030pc30_info *info = to_sr030pc30(sd);
 	int ret;
 
-	if (!format || format->pad)
+	if (!mf)
 		return -EINVAL;
-
-	mf = &format->format;
 
 	if (!info->curr_win || !info->curr_fmt) {
 		ret = sr030pc30_set_params(sd);
@@ -529,28 +523,25 @@ static const struct sr030pc30_format *try_fmt(struct v4l2_subdev *sd,
 }
 
 /* Return nearest media bus frame format. */
-static int sr030pc30_set_fmt(struct v4l2_subdev *sd,
-		struct v4l2_subdev_pad_config *cfg,
-		struct v4l2_subdev_format *format)
+static int sr030pc30_try_fmt(struct v4l2_subdev *sd,
+			     struct v4l2_mbus_framefmt *mf)
 {
-	struct sr030pc30_info *info = sd ? to_sr030pc30(sd) : NULL;
-	const struct sr030pc30_format *fmt;
-	struct v4l2_mbus_framefmt *mf;
-
-	if (!sd || !format)
+	if (!sd || !mf)
 		return -EINVAL;
 
-	mf = &format->format;
-	if (format->pad)
+	try_fmt(sd, mf);
+	return 0;
+}
+
+static int sr030pc30_s_fmt(struct v4l2_subdev *sd,
+			   struct v4l2_mbus_framefmt *mf)
+{
+	struct sr030pc30_info *info = to_sr030pc30(sd);
+
+	if (!sd || !mf)
 		return -EINVAL;
 
-	fmt = try_fmt(sd, mf);
-	if (format->which == V4L2_SUBDEV_FORMAT_TRY) {
-		cfg->try_fmt = *mf;
-		return 0;
-	}
-
-	info->curr_fmt = fmt;
+	info->curr_fmt = try_fmt(sd, mf);
 
 	return sr030pc30_set_params(sd);
 }
@@ -645,15 +636,16 @@ static const struct v4l2_subdev_core_ops sr030pc30_core_ops = {
 	.querymenu = v4l2_subdev_querymenu,
 };
 
-static const struct v4l2_subdev_pad_ops sr030pc30_pad_ops = {
-	.enum_mbus_code = sr030pc30_enum_mbus_code,
-	.get_fmt	= sr030pc30_get_fmt,
-	.set_fmt	= sr030pc30_set_fmt,
+static const struct v4l2_subdev_video_ops sr030pc30_video_ops = {
+	.g_mbus_fmt	= sr030pc30_g_fmt,
+	.s_mbus_fmt	= sr030pc30_s_fmt,
+	.try_mbus_fmt	= sr030pc30_try_fmt,
+	.enum_mbus_fmt	= sr030pc30_enum_fmt,
 };
 
 static const struct v4l2_subdev_ops sr030pc30_ops = {
 	.core	= &sr030pc30_core_ops,
-	.pad	= &sr030pc30_pad_ops,
+	.video	= &sr030pc30_video_ops,
 };
 
 /*

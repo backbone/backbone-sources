@@ -49,7 +49,10 @@
 
 #include <generated/utsrelease.h>
 
-#include <scsi/scsi_host.h> /* SG_ALL */
+#include <scsi/scsi.h>
+#include <scsi/scsi_dbg.h>
+#include <scsi/scsi_eh.h>
+#include <scsi/scsi_tcq.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_fabric.h>

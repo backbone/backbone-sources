@@ -41,7 +41,6 @@
 #include "link.h"
 #include "name_distr.h"
 #include "socket.h"
-#include "bcast.h"
 
 #define SS_LISTENING		-1	/* socket is listening */
 #define SS_READY		-2	/* socket is connectionless */
@@ -343,7 +342,7 @@ static int tipc_sk_create(struct net *net, struct socket *sock,
 	}
 
 	/* Allocate socket's protocol area */
-	sk = sk_alloc(net, AF_TIPC, GFP_KERNEL, &tipc_proto, kern);
+	sk = sk_alloc(net, AF_TIPC, GFP_KERNEL, &tipc_proto);
 	if (sk == NULL)
 		return -ENOMEM;
 
@@ -410,7 +409,7 @@ static int tipc_release(struct socket *sock)
 	struct net *net;
 	struct tipc_sock *tsk;
 	struct sk_buff *skb;
-	u32 dnode;
+	u32 dnode, probing_state;
 
 	/*
 	 * Exit if socket isn't fully initialized (occurs when a failed accept()
@@ -448,7 +447,10 @@ static int tipc_release(struct socket *sock)
 	}
 
 	tipc_sk_withdraw(tsk, 0, NULL);
-	sk_stop_timer(sk, &sk->sk_timer);
+	probing_state = tsk->probing_state;
+	if (del_timer_sync(&sk->sk_timer) &&
+	    probing_state != TIPC_CONN_PROBING)
+		sock_put(sk);
 	tipc_sk_remove(tsk);
 	if (tsk->connected) {
 		skb = tipc_msg_create(TIPC_CRITICAL_IMPORTANCE,

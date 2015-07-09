@@ -183,7 +183,7 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
 	writel(SYS_RC_INTX_MASK, pcie->base + SYS_RC_INTX_EN);
 }
 
-int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+int iproc_pcie_setup(struct iproc_pcie *pcie)
 {
 	int ret;
 	struct pci_bus *bus;
@@ -211,7 +211,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
 	pcie->sysdata.private_data = pcie;
 
 	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
-				  &pcie->sysdata, res);
+				  &pcie->sysdata, pcie->resources);
 	if (!bus) {
 		dev_err(pcie->dev, "unable to create PCI root bus\n");
 		ret = -ENOMEM;
@@ -229,7 +229,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
 
 	pci_scan_child_bus(bus);
 	pci_assign_unassigned_bus_resources(bus);
-	pci_fixup_irqs(pci_common_swizzle, pcie->map_irq);
+	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
 	pci_bus_add_devices(bus);
 
 	return 0;

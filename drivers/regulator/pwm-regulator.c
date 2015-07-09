@@ -21,8 +21,10 @@
 #include <linux/pwm.h>
 
 struct pwm_regulator_data {
+	struct regulator_desc desc;
 	struct pwm_voltages *duty_cycle_table;
 	struct pwm_device *pwm;
+	bool enabled;
 	int state;
 };
 
@@ -31,17 +33,17 @@ struct pwm_voltages {
 	unsigned int dutycycle;
 };
 
-static int pwm_regulator_get_voltage_sel(struct regulator_dev *rdev)
+static int pwm_regulator_get_voltage_sel(struct regulator_dev *dev)
 {
-	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+	struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
 
 	return drvdata->state;
 }
 
-static int pwm_regulator_set_voltage_sel(struct regulator_dev *rdev,
+static int pwm_regulator_set_voltage_sel(struct regulator_dev *dev,
 					 unsigned selector)
 {
-	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+	struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
 	unsigned int pwm_reg_period;
 	int dutycycle;
 	int ret;
@@ -53,27 +55,30 @@ static int pwm_regulator_set_voltage_sel(struct regulator_dev *rdev,
 
 	ret = pwm_config(drvdata->pwm, dutycycle, pwm_reg_period);
 	if (ret) {
-		dev_err(&rdev->dev, "Failed to configure PWM\n");
+		dev_err(&dev->dev, "Failed to configure PWM\n");
 		return ret;
 	}
 
 	drvdata->state = selector;
 
-	ret = pwm_enable(drvdata->pwm);
-	if (ret) {
-		dev_err(&rdev->dev, "Failed to enable PWM\n");
-		return ret;
+	if (!drvdata->enabled) {
+		ret = pwm_enable(drvdata->pwm);
+		if (ret) {
+			dev_err(&dev->dev, "Failed to enable PWM\n");
+			return ret;
+		}
+		drvdata->enabled = true;
 	}
 
 	return 0;
 }
 
-static int pwm_regulator_list_voltage(struct regulator_dev *rdev,
+static int pwm_regulator_list_voltage(struct regulator_dev *dev,
 				      unsigned selector)
 {
-	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+	struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
 
-	if (selector >= rdev->desc->n_voltages)
+	if (selector >= drvdata->desc.n_voltages)
 		return -EINVAL;
 
 	return drvdata->duty_cycle_table[selector].uV;
@@ -86,7 +91,7 @@ static struct regulator_ops pwm_regulator_voltage_ops = {
 	.map_voltage     = regulator_map_voltage_iterate,
 };
 
-static struct regulator_desc pwm_regulator_desc = {
+static const struct regulator_desc pwm_regulator_desc = {
 	.name		= "pwm-regulator",
 	.ops		= &pwm_regulator_voltage_ops,
 	.type		= REGULATOR_VOLTAGE,
@@ -112,6 +117,8 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 	if (!drvdata)
 		return -ENOMEM;
 
+	memcpy(&drvdata->desc, &pwm_regulator_desc, sizeof(pwm_regulator_desc));
+
 	/* determine the number of voltage-table */
 	prop = of_find_property(np, "voltage-table", &length);
 	if (!prop) {
@@ -126,7 +133,7 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	pwm_regulator_desc.n_voltages = length / sizeof(*drvdata->duty_cycle_table);
+	drvdata->desc.n_voltages = length / sizeof(*drvdata->duty_cycle_table);
 
 	drvdata->duty_cycle_table = devm_kzalloc(&pdev->dev,
 						 length, GFP_KERNEL);
@@ -143,7 +150,7 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 	}
 
 	config.init_data = of_get_regulator_init_data(&pdev->dev, np,
-						      &pwm_regulator_desc);
+						      &drvdata->desc);
 	if (!config.init_data)
 		return -ENOMEM;
 
@@ -158,10 +165,10 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 	}
 
 	regulator = devm_regulator_register(&pdev->dev,
-					    &pwm_regulator_desc, &config);
+					    &drvdata->desc, &config);
 	if (IS_ERR(regulator)) {
 		dev_err(&pdev->dev, "Failed to register regulator %s\n",
-			pwm_regulator_desc.name);
+			drvdata->desc.name);
 		return PTR_ERR(regulator);
 	}
 

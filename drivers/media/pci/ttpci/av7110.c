@@ -1172,7 +1172,7 @@ static int dvb_get_stc(struct dmx_demux *demux, unsigned int num,
  ******************************************************************************/
 
 
-static int av7110_set_tone(struct dvb_frontend *fe, enum fe_sec_tone_mode tone)
+static int av7110_set_tone(struct dvb_frontend* fe, fe_sec_tone_mode_t tone)
 {
 	struct av7110* av7110 = fe->dvb->priv;
 
@@ -1197,7 +1197,7 @@ static int av7110_diseqc_send_master_cmd(struct dvb_frontend* fe,
 }
 
 static int av7110_diseqc_send_burst(struct dvb_frontend* fe,
-				    enum fe_sec_mini_cmd minicmd)
+				    fe_sec_mini_cmd_t minicmd)
 {
 	struct av7110* av7110 = fe->dvb->priv;
 
@@ -1946,7 +1946,7 @@ static struct l64781_config grundig_29504_401_config = {
 
 
 
-static int av7110_fe_lock_fix(struct av7110 *av7110, enum fe_status status)
+static int av7110_fe_lock_fix(struct av7110* av7110, fe_status_t status)
 {
 	int ret = 0;
 	int synced = (status & FE_HAS_LOCK) ? 1 : 0;
@@ -2008,8 +2008,7 @@ static int av7110_fe_init(struct dvb_frontend* fe)
 	return ret;
 }
 
-static int av7110_fe_read_status(struct dvb_frontend *fe,
-				 enum fe_status *status)
+static int av7110_fe_read_status(struct dvb_frontend* fe, fe_status_t* status)
 {
 	struct av7110* av7110 = fe->dvb->priv;
 
@@ -2044,8 +2043,7 @@ static int av7110_fe_diseqc_send_master_cmd(struct dvb_frontend* fe,
 	return ret;
 }
 
-static int av7110_fe_diseqc_send_burst(struct dvb_frontend *fe,
-				       enum fe_sec_mini_cmd minicmd)
+static int av7110_fe_diseqc_send_burst(struct dvb_frontend* fe, fe_sec_mini_cmd_t minicmd)
 {
 	struct av7110* av7110 = fe->dvb->priv;
 
@@ -2057,8 +2055,7 @@ static int av7110_fe_diseqc_send_burst(struct dvb_frontend *fe,
 	return ret;
 }
 
-static int av7110_fe_set_tone(struct dvb_frontend *fe,
-			      enum fe_sec_tone_mode tone)
+static int av7110_fe_set_tone(struct dvb_frontend* fe, fe_sec_tone_mode_t tone)
 {
 	struct av7110* av7110 = fe->dvb->priv;
 
@@ -2070,8 +2067,7 @@ static int av7110_fe_set_tone(struct dvb_frontend *fe,
 	return ret;
 }
 
-static int av7110_fe_set_voltage(struct dvb_frontend *fe,
-				 enum fe_sec_voltage voltage)
+static int av7110_fe_set_voltage(struct dvb_frontend* fe, fe_sec_voltage_t voltage)
 {
 	struct av7110* av7110 = fe->dvb->priv;
 

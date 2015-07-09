@@ -132,7 +132,7 @@ struct s3c24xx_i2c {
 	unsigned int		sys_i2c_cfg;
 };
 
-static const struct platform_device_id s3c24xx_driver_ids[] = {
+static struct platform_device_id s3c24xx_driver_ids[] = {
 	{
 		.name		= "s3c2410-i2c",
 		.driver_data	= 0,

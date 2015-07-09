@@ -367,7 +367,7 @@ retry:
 	if (res)
 		goto out;
 
-	inode = d_backing_inode(path.dentry);
+	inode = path.dentry->d_inode;
 
 	if ((mode & MAY_EXEC) && S_ISREG(inode->i_mode)) {
 		/*

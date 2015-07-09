@@ -1,8 +1,3 @@
-# Some of the tools (perf) use same make variables
-# as in kernel build.
-export srctree=
-export objtree=
-
 include scripts/Makefile.include
 
 help:
@@ -23,7 +18,6 @@ help:
 	@echo '  vm         - misc vm tools'
 	@echo '  x86_energy_perf_policy - Intel energy policy tool'
 	@echo '  tmon       - thermal monitoring and tuning tool'
-	@echo '  freefall   - laptop accelerometer program for disk protection'
 	@echo ''
 	@echo 'You can do:'
 	@echo ' $$ make -C tools/ <tool>_install'
@@ -53,16 +47,11 @@ cgroup firewire hv guest usb virtio vm net: FORCE
 liblockdep: FORCE
 	$(call descend,lib/lockdep)
 
-libapi: FORCE
+libapikfs: FORCE
 	$(call descend,lib/api)
 
-# The perf build does not follow the descend function setup,
-# invoking it via it's own make rule.
-PERF_O   = $(if $(O),$(O)/tools/perf,)
-
-perf: FORCE
-	$(Q)mkdir -p $(PERF_O) .
-	$(Q)$(MAKE) --no-print-directory -C perf O=$(PERF_O) subdir=
+perf: libapikfs FORCE
+	$(call descend,$@)
 
 selftests: FORCE
 	$(call descend,testing/$@)
@@ -72,9 +61,6 @@ turbostat x86_energy_perf_policy: FORCE
 
 tmon: FORCE
 	$(call descend,thermal/$@)
-
-freefall: FORCE
-	$(call descend,laptop/$@)
 
 acpi_install:
 	$(call descend,power/$(@:_install=),install)
@@ -94,13 +80,10 @@ turbostat_install x86_energy_perf_policy_install:
 tmon_install:
 	$(call descend,thermal/$(@:_install=),install)
 
-freefall_install:
-	$(call descend,laptop/$(@:_install=),install)
-
 install: acpi_install cgroup_install cpupower_install hv_install firewire_install lguest_install \
 		perf_install selftests_install turbostat_install usb_install \
 		virtio_install vm_install net_install x86_energy_perf_policy_install \
-		tmon freefall_install
+	tmon
 
 acpi_clean:
 	$(call descend,power/acpi,clean)
@@ -114,10 +97,10 @@ cgroup_clean hv_clean firewire_clean lguest_clean usb_clean virtio_clean vm_clea
 liblockdep_clean:
 	$(call descend,lib/lockdep,clean)
 
-libapi_clean:
+libapikfs_clean:
 	$(call descend,lib/api,clean)
 
-perf_clean:
+perf_clean: libapikfs_clean
 	$(call descend,$(@:_clean=),clean)
 
 selftests_clean:
@@ -129,11 +112,8 @@ turbostat_clean x86_energy_perf_policy_clean:
 tmon_clean:
 	$(call descend,thermal/tmon,clean)
 
-freefall_clean:
-	$(call descend,laptop/freefall,clean)
-
 clean: acpi_clean cgroup_clean cpupower_clean hv_clean firewire_clean lguest_clean \
 		perf_clean selftests_clean turbostat_clean usb_clean virtio_clean \
-		vm_clean net_clean x86_energy_perf_policy_clean tmon_clean freefall_clean
+		vm_clean net_clean x86_energy_perf_policy_clean tmon_clean
 
 .PHONY: FORCE

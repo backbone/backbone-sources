@@ -331,15 +331,16 @@ error:
 
 /**
  * tipc_msg_bundle(): Append contents of a buffer to tail of an existing one
- * @skb: the buffer to append to ("bundle")
- * @msg:  message to be appended
+ * @bskb: the buffer to append to ("bundle")
+ * @skb:  buffer to be appended
  * @mtu:  max allowable size for the bundle buffer
  * Consumes buffer if successful
  * Returns true if bundling could be performed, otherwise false
  */
-bool tipc_msg_bundle(struct sk_buff *skb, struct tipc_msg *msg, u32 mtu)
+bool tipc_msg_bundle(struct sk_buff *bskb, struct sk_buff *skb, u32 mtu)
 {
 	struct tipc_msg *bmsg;
+	struct tipc_msg *msg = buf_msg(skb);
 	unsigned int bsz;
 	unsigned int msz = msg_size(msg);
 	u32 start, pad;
@@ -347,9 +348,9 @@ bool tipc_msg_bundle(struct sk_buff *skb, struct tipc_msg *msg, u32 mtu)
 
 	if (likely(msg_user(msg) == MSG_FRAGMENTER))
 		return false;
-	if (!skb)
+	if (!bskb)
 		return false;
-	bmsg = buf_msg(skb);
+	bmsg = buf_msg(bskb);
 	bsz = msg_size(bmsg);
 	start = align(bsz);
 	pad = start - bsz;
@@ -358,20 +359,18 @@ bool tipc_msg_bundle(struct sk_buff *skb, struct tipc_msg *msg, u32 mtu)
 		return false;
 	if (unlikely(msg_user(msg) == BCAST_PROTOCOL))
 		return false;
-	if (unlikely(msg_user(bmsg) != MSG_BUNDLER))
+	if (likely(msg_user(bmsg) != MSG_BUNDLER))
 		return false;
-	if (unlikely(skb_tailroom(skb) < (pad + msz)))
+	if (unlikely(skb_tailroom(bskb) < (pad + msz)))
 		return false;
 	if (unlikely(max < (start + msz)))
 		return false;
-	if ((msg_importance(msg) < TIPC_SYSTEM_IMPORTANCE) &&
-	    (msg_importance(bmsg) == TIPC_SYSTEM_IMPORTANCE))
-		return false;
 
-	skb_put(skb, pad + msz);
-	skb_copy_to_linear_data_offset(skb, start, msg, msz);
+	skb_put(bskb, pad + msz);
+	skb_copy_to_linear_data_offset(bskb, start, skb->data, msz);
 	msg_set_size(bmsg, start + msz);
 	msg_set_msgcnt(bmsg, msg_msgcnt(bmsg) + 1);
+	kfree_skb(skb);
 	return true;
 }
 
@@ -417,18 +416,18 @@ none:
 
 /**
  * tipc_msg_make_bundle(): Create bundle buf and append message to its tail
- * @list: the buffer chain, where head is the buffer to replace/append
- * @skb: buffer to be created, appended to and returned in case of success
- * @msg: message to be appended
+ * @list: the buffer chain
+ * @skb: buffer to be appended and replaced
  * @mtu: max allowable size for the bundle buffer, inclusive header
  * @dnode: destination node for message. (Not always present in header)
+ * Replaces buffer if successful
  * Returns true if success, otherwise false
  */
-bool tipc_msg_make_bundle(struct sk_buff **skb,  struct tipc_msg *msg,
-			  u32 mtu, u32 dnode)
+bool tipc_msg_make_bundle(struct sk_buff **skb, u32 mtu, u32 dnode)
 {
-	struct sk_buff *_skb;
+	struct sk_buff *bskb;
 	struct tipc_msg *bmsg;
+	struct tipc_msg *msg = buf_msg(*skb);
 	u32 msz = msg_size(msg);
 	u32 max = mtu - INT_H_SIZE;
 
@@ -441,23 +440,19 @@ bool tipc_msg_make_bundle(struct sk_buff **skb,  struct tipc_msg *msg,
 	if (msz > (max / 2))
 		return false;
 
-	_skb = tipc_buf_acquire(max);
-	if (!_skb)
+	bskb = tipc_buf_acquire(max);
+	if (!bskb)
 		return false;
 
-	skb_trim(_skb, INT_H_SIZE);
-	bmsg = buf_msg(_skb);
+	skb_trim(bskb, INT_H_SIZE);
+	bmsg = buf_msg(bskb);
 	tipc_msg_init(msg_prevnode(msg), bmsg, MSG_BUNDLER, 0,
 		      INT_H_SIZE, dnode);
-	if (msg_isdata(msg))
-		msg_set_importance(bmsg, TIPC_CRITICAL_IMPORTANCE);
-	else
-		msg_set_importance(bmsg, TIPC_SYSTEM_IMPORTANCE);
 	msg_set_seqno(bmsg, msg_seqno(msg));
 	msg_set_ack(bmsg, msg_ack(msg));
 	msg_set_bcast_ack(bmsg, msg_bcast_ack(msg));
-	tipc_msg_bundle(_skb, msg, mtu);
-	*skb = _skb;
+	tipc_msg_bundle(bskb, *skb, mtu);
+	*skb = bskb;
 	return true;
 }
 

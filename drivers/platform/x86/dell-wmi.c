@@ -35,7 +35,6 @@
 #include <linux/acpi.h>
 #include <linux/string.h>
 #include <linux/dmi.h>
-#include <acpi/video.h>
 
 MODULE_AUTHOR("Matthew Garrett <mjg@redhat.com>");
 MODULE_DESCRIPTION("Dell laptop WMI hotkeys driver");
@@ -398,7 +397,7 @@ static int __init dell_wmi_init(void)
 	}
 
 	dmi_walk(find_hk_type, NULL);
-	acpi_video = acpi_video_get_backlight_type() != acpi_backlight_vendor;
+	acpi_video = acpi_video_backlight_support();
 
 	err = dell_wmi_input_setup();
 	if (err)

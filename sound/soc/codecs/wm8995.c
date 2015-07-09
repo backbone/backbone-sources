@@ -721,7 +721,6 @@ static int configure_aif_clock(struct snd_soc_codec *codec, int aif)
 
 static int configure_clock(struct snd_soc_codec *codec)
 {
-	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
 	struct wm8995_priv *wm8995;
 	int change, new;
 
@@ -752,7 +751,7 @@ static int configure_clock(struct snd_soc_codec *codec)
 	if (!change)
 		return 0;
 
-	snd_soc_dapm_sync(dapm);
+	snd_soc_dapm_sync(&codec->dapm);
 
 	return 0;
 }
@@ -1930,7 +1929,7 @@ static int wm8995_set_dai_sysclk(struct snd_soc_dai *dai,
 			dai->id + 1, freq);
 		break;
 	case WM8995_SYSCLK_MCLK2:
-		wm8995->sysclk[dai->id] = WM8995_SYSCLK_MCLK2;
+		wm8995->sysclk[dai->id] = WM8995_SYSCLK_MCLK1;
 		wm8995->mclk[1] = freq;
 		dev_dbg(dai->dev, "AIF%d using MCLK2 at %uHz\n",
 			dai->id + 1, freq);
@@ -1966,7 +1965,7 @@ static int wm8995_set_bias_level(struct snd_soc_codec *codec,
 	case SND_SOC_BIAS_PREPARE:
 		break;
 	case SND_SOC_BIAS_STANDBY:
-		if (snd_soc_codec_get_bias_level(codec) == SND_SOC_BIAS_OFF) {
+		if (codec->dapm.bias_level == SND_SOC_BIAS_OFF) {
 			ret = regulator_bulk_enable(ARRAY_SIZE(wm8995->supplies),
 						    wm8995->supplies);
 			if (ret)
@@ -1991,6 +1990,7 @@ static int wm8995_set_bias_level(struct snd_soc_codec *codec,
 		break;
 	}
 
+	codec->dapm.bias_level = level;
 	return 0;
 }
 

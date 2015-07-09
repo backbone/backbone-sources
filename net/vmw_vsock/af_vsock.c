@@ -581,14 +581,13 @@ struct sock *__vsock_create(struct net *net,
 			    struct socket *sock,
 			    struct sock *parent,
 			    gfp_t priority,
-			    unsigned short type,
-			    int kern)
+			    unsigned short type)
 {
 	struct sock *sk;
 	struct vsock_sock *psk;
 	struct vsock_sock *vsk;
 
-	sk = sk_alloc(net, AF_VSOCK, priority, &vsock_proto, kern);
+	sk = sk_alloc(net, AF_VSOCK, priority, &vsock_proto);
 	if (!sk)
 		return NULL;
 
@@ -1867,7 +1866,7 @@ static int vsock_create(struct net *net, struct socket *sock,
 
 	sock->state = SS_UNCONNECTED;
 
-	return __vsock_create(net, sock, NULL, GFP_KERNEL, 0, kern) ? 0 : -ENOMEM;
+	return __vsock_create(net, sock, NULL, GFP_KERNEL, 0) ? 0 : -ENOMEM;
 }
 
 static const struct net_proto_family vsock_family_ops = {

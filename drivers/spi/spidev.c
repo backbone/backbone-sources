@@ -95,25 +95,37 @@ MODULE_PARM_DESC(bufsiz, "data bytes in biggest supported SPI message");
 
 /*-------------------------------------------------------------------------*/
 
+/*
+ * We can't use the standard synchronous wrappers for file I/O; we
+ * need to protect against async removal of the underlying spi_device.
+ */
+static void spidev_complete(void *arg)
+{
+	complete(arg);
+}
+
 static ssize_t
 spidev_sync(struct spidev_data *spidev, struct spi_message *message)
 {
 	DECLARE_COMPLETION_ONSTACK(done);
 	int status;
-	struct spi_device *spi;
+
+	message->complete = spidev_complete;
+	message->context = &done;
 
 	spin_lock_irq(&spidev->spi_lock);
-	spi = spidev->spi;
-	spin_unlock_irq(&spidev->spi_lock);
-
-	if (spi == NULL)
+	if (spidev->spi == NULL)
 		status = -ESHUTDOWN;
 	else
-		status = spi_sync(spi, message);
+		status = spi_async(spidev->spi, message);
+	spin_unlock_irq(&spidev->spi_lock);
 
-	if (status == 0)
-		status = message->actual_length;
-
+	if (status == 0) {
+		wait_for_completion(&done);
+		status = message->status;
+		if (status == 0)
+			status = message->actual_length;
+	}
 	return status;
 }
 
@@ -635,6 +647,7 @@ err_find_dev:
 static int spidev_release(struct inode *inode, struct file *filp)
 {
 	struct spidev_data	*spidev;
+	int			status = 0;
 
 	mutex_lock(&device_list_lock);
 	spidev = filp->private_data;
@@ -663,7 +676,7 @@ static int spidev_release(struct inode *inode, struct file *filp)
 	}
 	mutex_unlock(&device_list_lock);
 
-	return 0;
+	return status;
 }
 
 static const struct file_operations spidev_fops = {

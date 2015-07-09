@@ -558,7 +558,7 @@ int pinctrl_get_group_selector(struct pinctrl_dev *pctldev,
 }
 
 /**
- * pinctrl_request_gpio() - request a single pin to be used as GPIO
+ * pinctrl_request_gpio() - request a single pin to be used in as GPIO
  * @gpio: the GPIO pin number from the GPIO subsystem number space
  *
  * This function should *ONLY* be used from gpiolib-based GPIO drivers,
@@ -1115,7 +1115,7 @@ int pinctrl_register_map(struct pinctrl_map const *maps, unsigned num_maps,
 	int i, ret;
 	struct pinctrl_maps *maps_node;
 
-	pr_debug("add %u pinctrl maps\n", num_maps);
+	pr_debug("add %d pinmux maps\n", num_maps);
 
 	/* First sanity check the new mapping */
 	for (i = 0; i < num_maps; i++) {
@@ -1704,14 +1704,14 @@ struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
 	int ret;
 
 	if (!pctldesc)
-		return ERR_PTR(-EINVAL);
+		return NULL;
 	if (!pctldesc->name)
-		return ERR_PTR(-EINVAL);
+		return NULL;
 
 	pctldev = kzalloc(sizeof(*pctldev), GFP_KERNEL);
 	if (pctldev == NULL) {
 		dev_err(dev, "failed to alloc struct pinctrl_dev\n");
-		return ERR_PTR(-ENOMEM);
+		return NULL;
 	}
 
 	/* Initialize pin control device struct */
@@ -1724,23 +1724,20 @@ struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
 	mutex_init(&pctldev->mutex);
 
 	/* check core ops for sanity */
-	ret = pinctrl_check_ops(pctldev);
-	if (ret) {
+	if (pinctrl_check_ops(pctldev)) {
 		dev_err(dev, "pinctrl ops lacks necessary functions\n");
 		goto out_err;
 	}
 
 	/* If we're implementing pinmuxing, check the ops for sanity */
 	if (pctldesc->pmxops) {
-		ret = pinmux_check_ops(pctldev);
-		if (ret)
+		if (pinmux_check_ops(pctldev))
 			goto out_err;
 	}
 
 	/* If we're implementing pinconfig, check the ops for sanity */
 	if (pctldesc->confops) {
-		ret = pinconf_check_ops(pctldev);
-		if (ret)
+		if (pinconf_check_ops(pctldev))
 			goto out_err;
 	}
 
@@ -1786,7 +1783,7 @@ struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
 out_err:
 	mutex_destroy(&pctldev->mutex);
 	kfree(pctldev);
-	return ERR_PTR(ret);
+	return NULL;
 }
 EXPORT_SYMBOL_GPL(pinctrl_register);
 

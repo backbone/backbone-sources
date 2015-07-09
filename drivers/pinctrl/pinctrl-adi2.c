@@ -703,7 +703,6 @@ static struct pinmux_ops adi_pinmux_ops = {
 	.get_function_name = adi_pinmux_get_func_name,
 	.get_function_groups = adi_pinmux_get_groups,
 	.gpio_request_enable = adi_pinmux_request_gpio,
-	.strict = true,
 };
 
 
@@ -1070,9 +1069,9 @@ static int adi_pinctrl_probe(struct platform_device *pdev)
 
 	/* Now register the pin controller and all pins it handles */
 	pinctrl->pctl = pinctrl_register(&adi_pinmux_desc, &pdev->dev, pinctrl);
-	if (IS_ERR(pinctrl->pctl)) {
+	if (!pinctrl->pctl) {
 		dev_err(&pdev->dev, "could not register pinctrl ADI2 driver\n");
-		return PTR_ERR(pinctrl->pctl);
+		return -EINVAL;
 	}
 
 	platform_set_drvdata(pdev, pinctrl);

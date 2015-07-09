@@ -79,8 +79,11 @@ static __always_inline bool should_resched(void)
 #ifdef CONFIG_PREEMPT
 extern asmlinkage void preempt_schedule(void);
 #define __preempt_schedule() preempt_schedule()
-extern asmlinkage void preempt_schedule_notrace(void);
-#define __preempt_schedule_notrace() preempt_schedule_notrace()
+
+#ifdef CONFIG_CONTEXT_TRACKING
+extern asmlinkage void preempt_schedule_context(void);
+#define __preempt_schedule_context() preempt_schedule_context()
+#endif
 #endif /* CONFIG_PREEMPT */
 
 #endif /* __ASM_PREEMPT_H */

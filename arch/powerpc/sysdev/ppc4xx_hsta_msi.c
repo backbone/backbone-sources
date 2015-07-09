@@ -128,7 +128,6 @@ static int hsta_msi_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct resource *mem;
 	int irq, ret, irq_count;
-	struct pci_controller *phb;
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (IS_ERR(mem)) {
@@ -172,10 +171,8 @@ static int hsta_msi_probe(struct platform_device *pdev)
 		}
 	}
 
-	list_for_each_entry(phb, &hose_list, list_node) {
-		phb->controller_ops.setup_msi_irqs = hsta_setup_msi_irqs;
-		phb->controller_ops.teardown_msi_irqs = hsta_teardown_msi_irqs;
-	}
+	ppc_md.setup_msi_irqs = hsta_setup_msi_irqs;
+	ppc_md.teardown_msi_irqs = hsta_teardown_msi_irqs;
 	return 0;
 
 out2:

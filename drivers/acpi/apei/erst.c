@@ -35,7 +35,6 @@
 #include <linux/nmi.h>
 #include <linux/hardirq.h>
 #include <linux/pstore.h>
-#include <linux/vmalloc.h>
 #include <acpi/apei.h>
 
 #include "apei-internal.h"

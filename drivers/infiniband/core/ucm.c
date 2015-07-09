@@ -1253,7 +1253,8 @@ static void ib_ucm_add_one(struct ib_device *device)
 	dev_t base;
 	struct ib_ucm_device *ucm_dev;
 
-	if (!device->alloc_ucontext || !rdma_cap_ib_cm(device, 1))
+	if (!device->alloc_ucontext ||
+	    rdma_node_get_transport(device->node_type) != RDMA_TRANSPORT_IB)
 		return;
 
 	ucm_dev = kzalloc(sizeof *ucm_dev, GFP_KERNEL);

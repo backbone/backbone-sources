@@ -31,8 +31,8 @@ void __init detect_memory_memblock(void)
 	unsigned long addr, size;
 	int type;
 
-	rzm = sclp.rzm;
-	rnmax = sclp.rnmax;
+	rzm = sclp_get_rzm();
+	rnmax = sclp_get_rnmax();
 	memsize = rzm * rnmax;
 	if (!rzm)
 		rzm = 1ULL << 17;

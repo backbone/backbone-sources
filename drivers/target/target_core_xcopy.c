@@ -25,7 +25,8 @@
 #include <linux/spinlock.h>
 #include <linux/list.h>
 #include <linux/configfs.h>
-#include <scsi/scsi_proto.h>
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
 #include <asm/unaligned.h>
 
 #include <target/target_core_base.h>

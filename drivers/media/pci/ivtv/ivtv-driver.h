@@ -830,8 +830,7 @@ static inline int ivtv_raw_vbi(const struct ivtv *itv)
 	do {								\
 		struct v4l2_subdev *__sd;				\
 		__v4l2_device_call_subdevs_p(&(itv)->v4l2_dev, __sd,	\
-			 !(hw) ? true : (__sd->grp_id & (hw)),		\
-			 o, f, ##args);					\
+			!(hw) || (__sd->grp_id & (hw)), o, f , ##args);	\
 	} while (0)
 
 #define ivtv_call_all(itv, o, f, args...) ivtv_call_hw(itv, 0, o, f , ##args)
