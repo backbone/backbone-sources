@@ -50,6 +50,9 @@ struct kdbus_node {
 	unsigned int id;
 	struct kdbus_node *parent; /* may be NULL */
 
+	/* valid once linked until fully deactivated */
+	struct dentry *debugfs; /* may be NULL */
+
 	/* valid iff active */
 	struct mutex lock;
 	struct rb_node rb;
@@ -59,6 +62,7 @@ struct kdbus_node {
 #define kdbus_node_from_rb(_node) rb_entry((_node), struct kdbus_node, rb)
 
 extern struct ida kdbus_node_ida;
+extern struct dentry *kdbus_node_debugfs_root;
 
 void kdbus_node_init(struct kdbus_node *node, unsigned int type);
 
