@@ -591,7 +591,7 @@ static int eld_proc_new(struct hdmi_spec_per_pin *per_pin, int index)
 
 static void eld_proc_free(struct hdmi_spec_per_pin *per_pin)
 {
-	if (!per_pin->codec->bus->shutdown && per_pin->proc_entry) {
+	if (!per_pin->codec->bus->shutdown) {
 		snd_info_free_entry(per_pin->proc_entry);
 		per_pin->proc_entry = NULL;
 	}
@@ -3527,6 +3527,7 @@ static const struct hda_codec_preset snd_hda_preset_hdmi[] = {
 { .id = 0x80862807, .name = "Haswell HDMI",	.patch = patch_generic_hdmi },
 { .id = 0x80862808, .name = "Broadwell HDMI",	.patch = patch_generic_hdmi },
 { .id = 0x80862809, .name = "Skylake HDMI",	.patch = patch_generic_hdmi },
+{ .id = 0x8086280a, .name = "Broxton HDMI",	.patch = patch_generic_hdmi },
 { .id = 0x80862880, .name = "CedarTrail HDMI",	.patch = patch_generic_hdmi },
 { .id = 0x80862882, .name = "Valleyview2 HDMI",	.patch = patch_generic_hdmi },
 { .id = 0x80862883, .name = "Braswell HDMI",	.patch = patch_generic_hdmi },
@@ -3591,6 +3592,7 @@ MODULE_ALIAS("snd-hda-codec-id:80862806");
 MODULE_ALIAS("snd-hda-codec-id:80862807");
 MODULE_ALIAS("snd-hda-codec-id:80862808");
 MODULE_ALIAS("snd-hda-codec-id:80862809");
+MODULE_ALIAS("snd-hda-codec-id:8086280a");
 MODULE_ALIAS("snd-hda-codec-id:80862880");
 MODULE_ALIAS("snd-hda-codec-id:80862882");
 MODULE_ALIAS("snd-hda-codec-id:80862883");
