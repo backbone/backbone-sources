@@ -135,7 +135,6 @@ struct file *get_empty_filp(void)
 		return ERR_PTR(error);
 	}
 
-	INIT_LIST_HEAD(&f->f_u.fu_list);
 	atomic_long_set(&f->f_count, 1);
 	rwlock_init(&f->f_owner.lock);
 	spin_lock_init(&f->f_lock);
@@ -305,7 +304,6 @@ void fput(struct file *file)
 	if (atomic_long_dec_and_test(&file->f_count)) {
 		struct task_struct *task = current;
 
-		file_sb_list_del(file);
 		if (likely(!in_interrupt() && !(task->flags & PF_KTHREAD))) {
 			init_task_work(&file->f_u.fu_rcuhead, ____fput);
 			if (!task_work_add(task, &file->f_u.fu_rcuhead, true))
@@ -334,7 +332,6 @@ void __fput_sync(struct file *file)
 {
 	if (atomic_long_dec_and_test(&file->f_count)) {
 		struct task_struct *task = current;
-		file_sb_list_del(file);
 		BUG_ON(!(task->flags & PF_KTHREAD));
 		__fput(file);
 	}
@@ -346,7 +343,6 @@ void put_filp(struct file *file)
 {
 	if (atomic_long_dec_and_test(&file->f_count)) {
 		security_file_free(file);
-		file_sb_list_del(file);
 		file_free(file);
 	}
 }
@@ -487,6 +483,5 @@ void __init files_init(unsigned long mempages)
 	n = (mempages * (PAGE_SIZE / 1024)) / 10;
 	files_stat.max_files = max_t(unsigned long, n, NR_FILE);
 	files_defer_init();
-	lg_lock_init(&files_lglock, "files_lglock");
 	percpu_counter_init(&nr_files, 0);
 } 
