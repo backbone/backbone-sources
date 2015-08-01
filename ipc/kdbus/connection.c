@@ -613,9 +613,9 @@ bool kdbus_conn_has_name(struct kdbus_conn *conn, const char *name)
 }
 
 struct kdbus_quota {
-	uint32_t memory;
-	uint16_t msgs;
-	uint8_t fds;
+	u32 memory;
+	u16 msgs;
+	u8 fds;
 };
 
 /**
@@ -653,7 +653,7 @@ int kdbus_conn_quota_inc(struct kdbus_conn *c, struct kdbus_user *u,
 	 * allocation schemes. Furthermore, resource utilization should be
 	 * maximized, so only minimal resources stay reserved. However, we need
 	 * to adapt to a dynamic number of users, as we cannot know how many
-	 * users will talk to a connection. Therefore, the current allocations
+	 * users will talk to a connection. Therefore, the current allocation
 	 * works like this:
 	 * We limit the number of bytes in a destination's pool per sending
 	 * user. The space available for a user is 33% of the unused pool space
@@ -695,7 +695,7 @@ int kdbus_conn_quota_inc(struct kdbus_conn *c, struct kdbus_user *u,
 
 	/*
 	 * Pool owner slices are un-accounted slices; they can claim more
-	 * than 50% of the queue. However, the slice we're dealing with here
+	 * than 50% of the queue. However, the slices we're dealing with here
 	 * belong to the incoming queue, hence they are 'accounted' slices
 	 * to which the 50%-limit applies.
 	 */
