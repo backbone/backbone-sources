@@ -35,15 +35,20 @@ static int conn_is_name_owner(const struct kdbus_conn *conn,
 		struct kdbus_item *item;
 		const char *n = NULL;
 
-		KDBUS_ITEM_FOREACH(item, name, items)
-			if (item->type == KDBUS_ITEM_OWNED_NAME)
+		KDBUS_ITEM_FOREACH(item, name, items) {
+			if (item->type == KDBUS_ITEM_OWNED_NAME) {
 				n = item->name.name;
 
-		if (name->id == conn->id &&
-		    n && strcmp(needle, n) == 0) {
-			found = true;
-			break;
+				if (name->id == conn->id &&
+				    n && strcmp(needle, n) == 0) {
+					found = true;
+					break;
+				}
+			}
 		}
+
+		if (found)
+			break;
 	}
 
 	ret = kdbus_free(conn, cmd_list.offset);
@@ -137,10 +142,6 @@ int kdbus_test_name_conflict(struct kdbus_test_env *env)
 
 	ret = conn_is_name_owner(env->conn, name);
 	ASSERT_RETURN(ret == 0);
-
-	/* check that we can't acquire it again from the 1st connection */
-	ret = kdbus_name_acquire(env->conn, name, NULL);
-	ASSERT_RETURN(ret == -EALREADY);
 
 	/* check that we also can't acquire it again from the 2nd connection */
 	ret = kdbus_name_acquire(conn, name, NULL);
