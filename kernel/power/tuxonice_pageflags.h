@@ -30,9 +30,9 @@ void memory_bm_clear_bit_index(struct memory_bitmap *bm, int index, unsigned lon
 
 struct toi_module_ops;
 int memory_bm_write(struct memory_bitmap *bm, int (*rw_chunk)
-	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size));
+        (int rw, struct toi_module_ops *owner, char *buffer, int buffer_size));
 int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
-	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size));
+        (int rw, struct toi_module_ops *owner, char *buffer, int buffer_size));
 int memory_bm_space_needed(struct memory_bitmap *bm);
 
 extern struct memory_bitmap *pageset1_map;
@@ -45,60 +45,60 @@ extern struct memory_bitmap *free_map;
 extern struct memory_bitmap *compare_map;
 
 #define PagePageset1(page) \
-	(pageset1_map && memory_bm_test_bit(pageset1_map, smp_processor_id(), page_to_pfn(page)))
+        (pageset1_map && memory_bm_test_bit(pageset1_map, smp_processor_id(), page_to_pfn(page)))
 #define SetPagePageset1(page) \
-	(memory_bm_set_bit(pageset1_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_set_bit(pageset1_map, smp_processor_id(), page_to_pfn(page)))
 #define ClearPagePageset1(page) \
-	(memory_bm_clear_bit(pageset1_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_clear_bit(pageset1_map, smp_processor_id(), page_to_pfn(page)))
 
 #define PagePageset1Copy(page) \
-	(memory_bm_test_bit(pageset1_copy_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_test_bit(pageset1_copy_map, smp_processor_id(), page_to_pfn(page)))
 #define SetPagePageset1Copy(page) \
-	(memory_bm_set_bit(pageset1_copy_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_set_bit(pageset1_copy_map, smp_processor_id(), page_to_pfn(page)))
 #define ClearPagePageset1Copy(page) \
-	(memory_bm_clear_bit(pageset1_copy_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_clear_bit(pageset1_copy_map, smp_processor_id(), page_to_pfn(page)))
 
 #define PagePageset2(page) \
-	(memory_bm_test_bit(pageset2_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_test_bit(pageset2_map, smp_processor_id(), page_to_pfn(page)))
 #define SetPagePageset2(page) \
-	(memory_bm_set_bit(pageset2_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_set_bit(pageset2_map, smp_processor_id(), page_to_pfn(page)))
 #define ClearPagePageset2(page) \
-	(memory_bm_clear_bit(pageset2_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_clear_bit(pageset2_map, smp_processor_id(), page_to_pfn(page)))
 
 #define PageWasRW(page) \
-	(memory_bm_test_bit(pageset2_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_test_bit(pageset2_map, smp_processor_id(), page_to_pfn(page)))
 #define SetPageWasRW(page) \
-	(memory_bm_set_bit(pageset2_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_set_bit(pageset2_map, smp_processor_id(), page_to_pfn(page)))
 #define ClearPageWasRW(page) \
-	(memory_bm_clear_bit(pageset2_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_clear_bit(pageset2_map, smp_processor_id(), page_to_pfn(page)))
 
 #define PageResave(page) (page_resave_map ? \
-	memory_bm_test_bit(page_resave_map, smp_processor_id(), page_to_pfn(page)) : 0)
+        memory_bm_test_bit(page_resave_map, smp_processor_id(), page_to_pfn(page)) : 0)
 #define SetPageResave(page) \
-	(memory_bm_set_bit(page_resave_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_set_bit(page_resave_map, smp_processor_id(), page_to_pfn(page)))
 #define ClearPageResave(page) \
-	(memory_bm_clear_bit(page_resave_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_clear_bit(page_resave_map, smp_processor_id(), page_to_pfn(page)))
 
 #define PageNosave(page) (nosave_map ? \
-	memory_bm_test_bit(nosave_map, smp_processor_id(), page_to_pfn(page)) : 0)
+        memory_bm_test_bit(nosave_map, smp_processor_id(), page_to_pfn(page)) : 0)
 #define SetPageNosave(page) \
-	(mem_bm_set_bit_check(nosave_map, smp_processor_id(), page_to_pfn(page)))
+        (mem_bm_set_bit_check(nosave_map, smp_processor_id(), page_to_pfn(page)))
 #define ClearPageNosave(page) \
-	(memory_bm_clear_bit(nosave_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_clear_bit(nosave_map, smp_processor_id(), page_to_pfn(page)))
 
 #define PageNosaveFree(page) (free_map ? \
-		memory_bm_test_bit(free_map, smp_processor_id(), page_to_pfn(page)) : 0)
+                memory_bm_test_bit(free_map, smp_processor_id(), page_to_pfn(page)) : 0)
 #define SetPageNosaveFree(page) \
-	(memory_bm_set_bit(free_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_set_bit(free_map, smp_processor_id(), page_to_pfn(page)))
 #define ClearPageNosaveFree(page) \
-	(memory_bm_clear_bit(free_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_clear_bit(free_map, smp_processor_id(), page_to_pfn(page)))
 
 #define PageCompareChanged(page) (compare_map ? \
-		memory_bm_test_bit(compare_map, smp_processor_id(), page_to_pfn(page)) : 0)
+                memory_bm_test_bit(compare_map, smp_processor_id(), page_to_pfn(page)) : 0)
 #define SetPageCompareChanged(page) \
-	(memory_bm_set_bit(compare_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_set_bit(compare_map, smp_processor_id(), page_to_pfn(page)))
 #define ClearPageCompareChanged(page) \
-	(memory_bm_clear_bit(compare_map, smp_processor_id(), page_to_pfn(page)))
+        (memory_bm_clear_bit(compare_map, smp_processor_id(), page_to_pfn(page)))
 
 extern void save_pageflags(struct memory_bitmap *pagemap);
 extern int load_pageflags(struct memory_bitmap *pagemap);

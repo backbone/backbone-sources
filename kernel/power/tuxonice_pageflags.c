@@ -14,5 +14,5 @@
 
 int toi_pageflags_space_needed(void)
 {
-	return memory_bm_space_needed(pageset1_map);
+        return memory_bm_space_needed(pageset1_map);
 }

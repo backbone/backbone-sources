@@ -107,44 +107,44 @@ char tuxonice_signature[9] = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
 unsigned long boot_kernel_data_buffer;
 
 static char *result_strings[] = {
-	"Hibernation was aborted",
-	"The user requested that we cancel the hibernation",
-	"No storage was available",
-	"Insufficient storage was available",
-	"Freezing filesystems and/or tasks failed",
-	"A pre-existing image was used",
-	"We would free memory, but image size limit doesn't allow this",
-	"Unable to free enough memory to hibernate",
-	"Unable to obtain the Power Management Semaphore",
-	"A device suspend/resume returned an error",
-	"A system device suspend/resume returned an error",
-	"The extra pages allowance is too small",
-	"We were unable to successfully prepare an image",
-	"TuxOnIce module initialisation failed",
-	"TuxOnIce module cleanup failed",
-	"I/O errors were encountered",
-	"Ran out of memory",
-	"An error was encountered while reading the image",
-	"Platform preparation failed",
-	"CPU Hotplugging failed",
-	"Architecture specific preparation failed",
-	"Pages needed resaving, but we were told to abort if this happens",
-	"We can't hibernate at the moment (invalid resume= or filewriter "
-		"target?)",
-	"A hibernation preparation notifier chain member cancelled the "
-		"hibernation",
-	"Pre-snapshot preparation failed",
-	"Pre-restore preparation failed",
-	"Failed to disable usermode helpers",
-	"Can't resume from alternate image",
-	"Header reservation too small",
-	"Device Power Management Preparation failed",
+        "Hibernation was aborted",
+        "The user requested that we cancel the hibernation",
+        "No storage was available",
+        "Insufficient storage was available",
+        "Freezing filesystems and/or tasks failed",
+        "A pre-existing image was used",
+        "We would free memory, but image size limit doesn't allow this",
+        "Unable to free enough memory to hibernate",
+        "Unable to obtain the Power Management Semaphore",
+        "A device suspend/resume returned an error",
+        "A system device suspend/resume returned an error",
+        "The extra pages allowance is too small",
+        "We were unable to successfully prepare an image",
+        "TuxOnIce module initialisation failed",
+        "TuxOnIce module cleanup failed",
+        "I/O errors were encountered",
+        "Ran out of memory",
+        "An error was encountered while reading the image",
+        "Platform preparation failed",
+        "CPU Hotplugging failed",
+        "Architecture specific preparation failed",
+        "Pages needed resaving, but we were told to abort if this happens",
+        "We can't hibernate at the moment (invalid resume= or filewriter "
+                "target?)",
+        "A hibernation preparation notifier chain member cancelled the "
+                "hibernation",
+        "Pre-snapshot preparation failed",
+        "Pre-restore preparation failed",
+        "Failed to disable usermode helpers",
+        "Can't resume from alternate image",
+        "Header reservation too small",
+        "Device Power Management Preparation failed",
 };
 
 /**
  * toi_finish_anything - cleanup after doing anything
- * @hibernate_or_resume:	Whether finishing a cycle or attempt at
- *				resuming.
+ * @hibernate_or_resume:        Whether finishing a cycle or attempt at
+ *                                resuming.
  *
  * This is our basic clean-up routine, matching start_anything below. We
  * call cleanup routines, drop module references and restore process fs and
@@ -152,24 +152,24 @@ static char *result_strings[] = {
  **/
 void toi_finish_anything(int hibernate_or_resume)
 {
-	toi_running = 0;
-	toi_cleanup_modules(hibernate_or_resume);
-	toi_put_modules();
-	if (hibernate_or_resume) {
-		block_dump = block_dump_save;
-		set_cpus_allowed_ptr(current, cpu_all_mask);
-		toi_alloc_print_debug_stats();
-		atomic_inc(&snapshot_device_available);
+        toi_running = 0;
+        toi_cleanup_modules(hibernate_or_resume);
+        toi_put_modules();
+        if (hibernate_or_resume) {
+                block_dump = block_dump_save;
+                set_cpus_allowed_ptr(current, cpu_all_mask);
+                toi_alloc_print_debug_stats();
+                atomic_inc(&snapshot_device_available);
     unlock_system_sleep();
-	}
+        }
 
-	set_fs(oldfs);
-	mutex_unlock(&tuxonice_in_use);
+        set_fs(oldfs);
+        mutex_unlock(&tuxonice_in_use);
 }
 
 /**
  * toi_start_anything - basic initialisation for TuxOnIce
- * @toi_or_resume:	Whether starting a cycle or attempt at resuming.
+ * @toi_or_resume:        Whether starting a cycle or attempt at resuming.
  *
  * Our basic initialisation routine. Take references on modules, use the
  * kernel segment, recheck resume= if no active allocator is set, initialise
@@ -177,62 +177,62 @@ void toi_finish_anything(int hibernate_or_resume)
  **/
 int toi_start_anything(int hibernate_or_resume)
 {
-	mutex_lock(&tuxonice_in_use);
+        mutex_lock(&tuxonice_in_use);
 
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
+        oldfs = get_fs();
+        set_fs(KERNEL_DS);
 
         toi_trace_index = 0;
 
-	if (hibernate_or_resume) {
+        if (hibernate_or_resume) {
     lock_system_sleep();
 
-		if (!atomic_add_unless(&snapshot_device_available, -1, 0))
-			goto snapshotdevice_unavailable;
-	}
+                if (!atomic_add_unless(&snapshot_device_available, -1, 0))
+                        goto snapshotdevice_unavailable;
+        }
 
-	if (hibernate_or_resume == SYSFS_HIBERNATE)
-		toi_print_modules();
+        if (hibernate_or_resume == SYSFS_HIBERNATE)
+                toi_print_modules();
 
-	if (toi_get_modules()) {
-		printk(KERN_INFO "TuxOnIce: Get modules failed!\n");
-		goto prehibernate_err;
-	}
+        if (toi_get_modules()) {
+                printk(KERN_INFO "TuxOnIce: Get modules failed!\n");
+                goto prehibernate_err;
+        }
 
-	if (hibernate_or_resume) {
-		block_dump_save = block_dump;
-		block_dump = 0;
-		set_cpus_allowed_ptr(current,
-				cpumask_of(cpumask_first(cpu_online_mask)));
-	}
+        if (hibernate_or_resume) {
+                block_dump_save = block_dump;
+                block_dump = 0;
+                set_cpus_allowed_ptr(current,
+                                cpumask_of(cpumask_first(cpu_online_mask)));
+        }
 
-	if (toi_initialise_modules_early(hibernate_or_resume))
-		goto early_init_err;
+        if (toi_initialise_modules_early(hibernate_or_resume))
+                goto early_init_err;
 
-	if (!toiActiveAllocator)
-		toi_attempt_to_parse_resume_device(!hibernate_or_resume);
+        if (!toiActiveAllocator)
+                toi_attempt_to_parse_resume_device(!hibernate_or_resume);
 
         if (!toi_initialise_modules_late(hibernate_or_resume)) {
             toi_running = 1; /* For the swsusp code we use :< */
             return 0;
         }
 
-	toi_cleanup_modules(hibernate_or_resume);
+        toi_cleanup_modules(hibernate_or_resume);
 early_init_err:
-	if (hibernate_or_resume) {
-		block_dump_save = block_dump;
-		set_cpus_allowed_ptr(current, cpu_all_mask);
-	}
-	toi_put_modules();
+        if (hibernate_or_resume) {
+                block_dump_save = block_dump;
+                set_cpus_allowed_ptr(current, cpu_all_mask);
+        }
+        toi_put_modules();
 prehibernate_err:
-	if (hibernate_or_resume)
-		atomic_inc(&snapshot_device_available);
+        if (hibernate_or_resume)
+                atomic_inc(&snapshot_device_available);
 snapshotdevice_unavailable:
-	if (hibernate_or_resume)
-		mutex_unlock(&pm_mutex);
-	set_fs(oldfs);
-	mutex_unlock(&tuxonice_in_use);
-	return -EBUSY;
+        if (hibernate_or_resume)
+                mutex_unlock(&pm_mutex);
+        set_fs(oldfs);
+        mutex_unlock(&tuxonice_in_use);
+        return -EBUSY;
 }
 
 /*
@@ -250,16 +250,16 @@ snapshotdevice_unavailable:
  **/
 static void mark_nosave_pages(void)
 {
-	struct nosave_region *region;
+        struct nosave_region *region;
 
-	list_for_each_entry(region, &nosave_regions, list) {
-		unsigned long pfn;
+        list_for_each_entry(region, &nosave_regions, list) {
+                unsigned long pfn;
 
-		for (pfn = region->start_pfn; pfn < region->end_pfn; pfn++)
-			if (pfn_valid(pfn)) {
-				SetPageNosave(pfn_to_page(pfn));
+                for (pfn = region->start_pfn; pfn < region->end_pfn; pfn++)
+                        if (pfn_valid(pfn)) {
+                                SetPageNosave(pfn_to_page(pfn));
                         }
-	}
+        }
 }
 
 /**
@@ -270,17 +270,17 @@ static void mark_nosave_pages(void)
  **/
 static int allocate_bitmaps(void)
 {
-	if (toi_alloc_bitmap(&pageset1_map) ||
-	    toi_alloc_bitmap(&pageset1_copy_map) ||
-	    toi_alloc_bitmap(&pageset2_map) ||
-	    toi_alloc_bitmap(&io_map) ||
-	    toi_alloc_bitmap(&nosave_map) ||
-	    toi_alloc_bitmap(&free_map) ||
-	    toi_alloc_bitmap(&compare_map) ||
-	    toi_alloc_bitmap(&page_resave_map))
-		return 1;
+        if (toi_alloc_bitmap(&pageset1_map) ||
+            toi_alloc_bitmap(&pageset1_copy_map) ||
+            toi_alloc_bitmap(&pageset2_map) ||
+            toi_alloc_bitmap(&io_map) ||
+            toi_alloc_bitmap(&nosave_map) ||
+            toi_alloc_bitmap(&free_map) ||
+            toi_alloc_bitmap(&compare_map) ||
+            toi_alloc_bitmap(&page_resave_map))
+                return 1;
 
-	return 0;
+        return 0;
 }
 
 /**
@@ -291,106 +291,106 @@ static int allocate_bitmaps(void)
  **/
 static void free_bitmaps(void)
 {
-	toi_free_bitmap(&pageset1_map);
-	toi_free_bitmap(&pageset1_copy_map);
-	toi_free_bitmap(&pageset2_map);
-	toi_free_bitmap(&io_map);
-	toi_free_bitmap(&nosave_map);
-	toi_free_bitmap(&free_map);
-	toi_free_bitmap(&compare_map);
-	toi_free_bitmap(&page_resave_map);
+        toi_free_bitmap(&pageset1_map);
+        toi_free_bitmap(&pageset1_copy_map);
+        toi_free_bitmap(&pageset2_map);
+        toi_free_bitmap(&io_map);
+        toi_free_bitmap(&nosave_map);
+        toi_free_bitmap(&free_map);
+        toi_free_bitmap(&compare_map);
+        toi_free_bitmap(&page_resave_map);
 }
 
 /**
  * io_MB_per_second - return the number of MB/s read or written
- * @write:	Whether to return the speed at which we wrote.
+ * @write:        Whether to return the speed at which we wrote.
  *
  * Calculate the number of megabytes per second that were read or written.
  **/
 static int io_MB_per_second(int write)
 {
-	return (toi_bkd.toi_io_time[write][1]) ?
-		MB((unsigned long) toi_bkd.toi_io_time[write][0]) * HZ /
-		toi_bkd.toi_io_time[write][1] : 0;
+        return (toi_bkd.toi_io_time[write][1]) ?
+                MB((unsigned long) toi_bkd.toi_io_time[write][0]) * HZ /
+                toi_bkd.toi_io_time[write][1] : 0;
 }
 
-#define SNPRINTF(a...) 	do { len += scnprintf(((char *) buffer) + len, \
-		count - len - 1, ## a); } while (0)
+#define SNPRINTF(a...)         do { len += scnprintf(((char *) buffer) + len, \
+                count - len - 1, ## a); } while (0)
 
 /**
  * get_debug_info - fill a buffer with debugging information
- * @buffer:	The buffer to be filled.
- * @count:	The size of the buffer, in bytes.
+ * @buffer:        The buffer to be filled.
+ * @count:        The size of the buffer, in bytes.
  *
  * Fill a (usually PAGE_SIZEd) buffer with the debugging info that we will
  * either printk or return via sysfs.
  **/
 static int get_toi_debug_info(const char *buffer, int count)
 {
-	int len = 0, i, first_result = 1;
+        int len = 0, i, first_result = 1;
 
-	SNPRINTF("TuxOnIce debugging info:\n");
-	SNPRINTF("- TuxOnIce core  : " TOI_CORE_VERSION "\n");
-	SNPRINTF("- Kernel Version : " UTS_RELEASE "\n");
-	SNPRINTF("- Compiler vers. : %d.%d\n", __GNUC__, __GNUC_MINOR__);
-	SNPRINTF("- Attempt number : %d\n", nr_hibernates);
-	SNPRINTF("- Parameters     : %ld %ld %ld %d %ld %ld\n",
-			toi_result,
-			toi_bkd.toi_action,
-			toi_bkd.toi_debug_state,
-			toi_bkd.toi_default_console_level,
-			image_size_limit,
-			toi_poweroff_method);
-	SNPRINTF("- Overall expected compression percentage: %d.\n",
-			100 - toi_expected_compression_ratio());
-	len += toi_print_module_debug_info(((char *) buffer) + len,
-			count - len - 1);
-	if (toi_bkd.toi_io_time[0][1]) {
-		if ((io_MB_per_second(0) < 5) || (io_MB_per_second(1) < 5)) {
-			SNPRINTF("- I/O speed: Write %ld KB/s",
-			  (KB((unsigned long) toi_bkd.toi_io_time[0][0]) * HZ /
-			  toi_bkd.toi_io_time[0][1]));
-			if (toi_bkd.toi_io_time[1][1])
-				SNPRINTF(", Read %ld KB/s",
-				  (KB((unsigned long)
-				      toi_bkd.toi_io_time[1][0]) * HZ /
-				  toi_bkd.toi_io_time[1][1]));
-		} else {
-			SNPRINTF("- I/O speed: Write %ld MB/s",
-			 (MB((unsigned long) toi_bkd.toi_io_time[0][0]) * HZ /
-			  toi_bkd.toi_io_time[0][1]));
-			if (toi_bkd.toi_io_time[1][1])
-				SNPRINTF(", Read %ld MB/s",
-				 (MB((unsigned long)
-				     toi_bkd.toi_io_time[1][0]) * HZ /
-				  toi_bkd.toi_io_time[1][1]));
-		}
-		SNPRINTF(".\n");
-	} else
-		SNPRINTF("- No I/O speed stats available.\n");
-	SNPRINTF("- Extra pages    : %lu used/%lu.\n",
-			extra_pd1_pages_used, extra_pd1_pages_allowance);
+        SNPRINTF("TuxOnIce debugging info:\n");
+        SNPRINTF("- TuxOnIce core  : " TOI_CORE_VERSION "\n");
+        SNPRINTF("- Kernel Version : " UTS_RELEASE "\n");
+        SNPRINTF("- Compiler vers. : %d.%d\n", __GNUC__, __GNUC_MINOR__);
+        SNPRINTF("- Attempt number : %d\n", nr_hibernates);
+        SNPRINTF("- Parameters     : %ld %ld %ld %d %ld %ld\n",
+                        toi_result,
+                        toi_bkd.toi_action,
+                        toi_bkd.toi_debug_state,
+                        toi_bkd.toi_default_console_level,
+                        image_size_limit,
+                        toi_poweroff_method);
+        SNPRINTF("- Overall expected compression percentage: %d.\n",
+                        100 - toi_expected_compression_ratio());
+        len += toi_print_module_debug_info(((char *) buffer) + len,
+                        count - len - 1);
+        if (toi_bkd.toi_io_time[0][1]) {
+                if ((io_MB_per_second(0) < 5) || (io_MB_per_second(1) < 5)) {
+                        SNPRINTF("- I/O speed: Write %ld KB/s",
+                          (KB((unsigned long) toi_bkd.toi_io_time[0][0]) * HZ /
+                          toi_bkd.toi_io_time[0][1]));
+                        if (toi_bkd.toi_io_time[1][1])
+                                SNPRINTF(", Read %ld KB/s",
+                                  (KB((unsigned long)
+                                      toi_bkd.toi_io_time[1][0]) * HZ /
+                                  toi_bkd.toi_io_time[1][1]));
+                } else {
+                        SNPRINTF("- I/O speed: Write %ld MB/s",
+                         (MB((unsigned long) toi_bkd.toi_io_time[0][0]) * HZ /
+                          toi_bkd.toi_io_time[0][1]));
+                        if (toi_bkd.toi_io_time[1][1])
+                                SNPRINTF(", Read %ld MB/s",
+                                 (MB((unsigned long)
+                                     toi_bkd.toi_io_time[1][0]) * HZ /
+                                  toi_bkd.toi_io_time[1][1]));
+                }
+                SNPRINTF(".\n");
+        } else
+                SNPRINTF("- No I/O speed stats available.\n");
+        SNPRINTF("- Extra pages    : %lu used/%lu.\n",
+                        extra_pd1_pages_used, extra_pd1_pages_allowance);
 
-	for (i = 0; i < TOI_NUM_RESULT_STATES; i++)
-		if (test_result_state(i)) {
-			SNPRINTF("%s: %s.\n", first_result ?
-					"- Result         " :
-					"                 ",
-					result_strings[i]);
-			first_result = 0;
-		}
-	if (first_result)
-		SNPRINTF("- Result         : %s.\n", nr_hibernates ?
-			"Succeeded" :
-			"No hibernation attempts so far");
-	return len;
+        for (i = 0; i < TOI_NUM_RESULT_STATES; i++)
+                if (test_result_state(i)) {
+                        SNPRINTF("%s: %s.\n", first_result ?
+                                        "- Result         " :
+                                        "                 ",
+                                        result_strings[i]);
+                        first_result = 0;
+                }
+        if (first_result)
+                SNPRINTF("- Result         : %s.\n", nr_hibernates ?
+                        "Succeeded" :
+                        "No hibernation attempts so far");
+        return len;
 }
 
 #ifdef CONFIG_TOI_INCREMENTAL
 /**
  * get_toi_page_state - fill a buffer with page state information
- * @buffer:	The buffer to be filled.
- * @count:	The size of the buffer, in bytes.
+ * @buffer:        The buffer to be filled.
+ * @count:        The size of the buffer, in bytes.
  *
  * Fill a (usually PAGE_SIZEd) buffer with the debugging info that we will
  * either printk or return via sysfs.
@@ -476,63 +476,63 @@ static int get_toi_page_state(const char *buffer, int count)
 
 /**
  * do_cleanup - cleanup after attempting to hibernate or resume
- * @get_debug_info:	Whether to allocate and return debugging info.
+ * @get_debug_info:        Whether to allocate and return debugging info.
  *
  * Cleanup after attempting to hibernate or resume, possibly getting
  * debugging info as we do so.
  **/
 static void do_cleanup(int get_debug_info, int restarting)
 {
-	int i = 0;
-	char *buffer = NULL;
+        int i = 0;
+        char *buffer = NULL;
 
-	trap_non_toi_io = 0;
+        trap_non_toi_io = 0;
 
-	if (get_debug_info)
-		toi_prepare_status(DONT_CLEAR_BAR, "Cleaning up...");
+        if (get_debug_info)
+                toi_prepare_status(DONT_CLEAR_BAR, "Cleaning up...");
 
-	free_checksum_pages();
+        free_checksum_pages();
 
         toi_cbw_restore();
         toi_free_cbw_data();
 
-	if (get_debug_info)
-		buffer = (char *) toi_get_zeroed_page(20, TOI_ATOMIC_GFP);
+        if (get_debug_info)
+                buffer = (char *) toi_get_zeroed_page(20, TOI_ATOMIC_GFP);
 
-	if (buffer)
-		i = get_toi_debug_info(buffer, PAGE_SIZE);
+        if (buffer)
+                i = get_toi_debug_info(buffer, PAGE_SIZE);
 
-	toi_free_extra_pagedir_memory();
+        toi_free_extra_pagedir_memory();
 
-	pagedir1.size = 0;
-	pagedir2.size = 0;
-	set_highmem_size(pagedir1, 0);
-	set_highmem_size(pagedir2, 0);
+        pagedir1.size = 0;
+        pagedir2.size = 0;
+        set_highmem_size(pagedir1, 0);
+        set_highmem_size(pagedir2, 0);
 
-	if (boot_kernel_data_buffer) {
-		if (!test_toi_state(TOI_BOOT_KERNEL))
-			toi_free_page(37, boot_kernel_data_buffer);
-		boot_kernel_data_buffer = 0;
-	}
+        if (boot_kernel_data_buffer) {
+                if (!test_toi_state(TOI_BOOT_KERNEL))
+                        toi_free_page(37, boot_kernel_data_buffer);
+                boot_kernel_data_buffer = 0;
+        }
 
-	if (test_toi_state(TOI_DEVICE_HOTPLUG_LOCKED)) {
-		unlock_device_hotplug();
-		clear_toi_state(TOI_DEVICE_HOTPLUG_LOCKED);
-	}
+        if (test_toi_state(TOI_DEVICE_HOTPLUG_LOCKED)) {
+                unlock_device_hotplug();
+                clear_toi_state(TOI_DEVICE_HOTPLUG_LOCKED);
+        }
 
-	clear_toi_state(TOI_BOOT_KERNEL);
-	if (current->flags & PF_SUSPEND_TASK)
-		thaw_processes();
+        clear_toi_state(TOI_BOOT_KERNEL);
+        if (current->flags & PF_SUSPEND_TASK)
+                thaw_processes();
 
-	if (!restarting)
-		toi_stop_other_threads();
+        if (!restarting)
+                toi_stop_other_threads();
 
-	if (toi_keeping_image &&
-	    !test_result_state(TOI_ABORTED)) {
-		toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
-			"TuxOnIce: Not invalidating the image due "
-			"to Keep Image or Incremental Image being enabled.");
-		set_result_state(TOI_KEPT_IMAGE);
+        if (toi_keeping_image &&
+            !test_result_state(TOI_ABORTED)) {
+                toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
+                        "TuxOnIce: Not invalidating the image due "
+                        "to Keep Image or Incremental Image being enabled.");
+                set_result_state(TOI_KEPT_IMAGE);
 
                 /*
                  * For an incremental image, free unused storage so
@@ -541,37 +541,37 @@ static void do_cleanup(int get_debug_info, int restarting)
                  */
 
                 toiActiveAllocator->free_unused_storage();
-	} else
-		if (toiActiveAllocator)
-			toiActiveAllocator->remove_image();
+        } else
+                if (toiActiveAllocator)
+                        toiActiveAllocator->remove_image();
 
-	free_bitmaps();
-	usermodehelper_enable();
+        free_bitmaps();
+        usermodehelper_enable();
 
-	if (test_toi_state(TOI_NOTIFIERS_PREPARE)) {
-		pm_notifier_call_chain(PM_POST_HIBERNATION);
-		clear_toi_state(TOI_NOTIFIERS_PREPARE);
-	}
+        if (test_toi_state(TOI_NOTIFIERS_PREPARE)) {
+                pm_notifier_call_chain(PM_POST_HIBERNATION);
+                clear_toi_state(TOI_NOTIFIERS_PREPARE);
+        }
 
-	if (buffer && i) {
-		/* Printk can only handle 1023 bytes, including
-		 * its level mangling. */
-		for (i = 0; i < 3; i++)
-			printk(KERN_ERR "%s", buffer + (1023 * i));
-		toi_free_page(20, (unsigned long) buffer);
-	}
+        if (buffer && i) {
+                /* Printk can only handle 1023 bytes, including
+                 * its level mangling. */
+                for (i = 0; i < 3; i++)
+                        printk(KERN_ERR "%s", buffer + (1023 * i));
+                toi_free_page(20, (unsigned long) buffer);
+        }
 
-	if (!restarting)
-		toi_cleanup_console();
+        if (!restarting)
+                toi_cleanup_console();
 
-	free_attention_list();
+        free_attention_list();
 
-	if (!restarting)
-		toi_deactivate_storage(0);
+        if (!restarting)
+                toi_deactivate_storage(0);
 
-	clear_toi_state(TOI_IGNORE_LOGLEVEL);
-	clear_toi_state(TOI_TRYING_TO_RESUME);
-	clear_toi_state(TOI_NOW_RESUMING);
+        clear_toi_state(TOI_IGNORE_LOGLEVEL);
+        clear_toi_state(TOI_TRYING_TO_RESUME);
+        clear_toi_state(TOI_NOW_RESUMING);
 }
 
 /**
@@ -617,58 +617,58 @@ static int check_still_keeping_image(void)
  **/
 static int toi_init(int restarting)
 {
-	int result, i, j;
+        int result, i, j;
 
-	toi_result = 0;
+        toi_result = 0;
 
-	printk(KERN_INFO "Initiating a hibernation cycle.\n");
+        printk(KERN_INFO "Initiating a hibernation cycle.\n");
 
-	nr_hibernates++;
+        nr_hibernates++;
 
-	for (i = 0; i < 2; i++)
-		for (j = 0; j < 2; j++)
-			toi_bkd.toi_io_time[i][j] = 0;
+        for (i = 0; i < 2; i++)
+                for (j = 0; j < 2; j++)
+                        toi_bkd.toi_io_time[i][j] = 0;
 
-	if (!test_toi_state(TOI_CAN_HIBERNATE) ||
-	    allocate_bitmaps())
-		return 1;
+        if (!test_toi_state(TOI_CAN_HIBERNATE) ||
+            allocate_bitmaps())
+                return 1;
 
-	mark_nosave_pages();
+        mark_nosave_pages();
 
-	if (!restarting)
-		toi_prepare_console();
+        if (!restarting)
+                toi_prepare_console();
 
-	result = pm_notifier_call_chain(PM_HIBERNATION_PREPARE);
-	if (result) {
-		set_result_state(TOI_NOTIFIERS_PREPARE_FAILED);
-		return 1;
-	}
-	set_toi_state(TOI_NOTIFIERS_PREPARE);
+        result = pm_notifier_call_chain(PM_HIBERNATION_PREPARE);
+        if (result) {
+                set_result_state(TOI_NOTIFIERS_PREPARE_FAILED);
+                return 1;
+        }
+        set_toi_state(TOI_NOTIFIERS_PREPARE);
 
-	if (!restarting) {
-		printk(KERN_ERR "Starting other threads.");
-		toi_start_other_threads();
-	}
+        if (!restarting) {
+                printk(KERN_ERR "Starting other threads.");
+                toi_start_other_threads();
+        }
 
-	result = usermodehelper_disable();
-	if (result) {
-		printk(KERN_ERR "TuxOnIce: Failed to disable usermode "
-				"helpers\n");
-		set_result_state(TOI_USERMODE_HELPERS_ERR);
-		return 1;
-	}
+        result = usermodehelper_disable();
+        if (result) {
+                printk(KERN_ERR "TuxOnIce: Failed to disable usermode "
+                                "helpers\n");
+                set_result_state(TOI_USERMODE_HELPERS_ERR);
+                return 1;
+        }
 
-	boot_kernel_data_buffer = toi_get_zeroed_page(37, TOI_ATOMIC_GFP);
-	if (!boot_kernel_data_buffer) {
-		printk(KERN_ERR "TuxOnIce: Failed to allocate "
-				"boot_kernel_data_buffer.\n");
-		set_result_state(TOI_OUT_OF_MEMORY);
-		return 1;
-	}
+        boot_kernel_data_buffer = toi_get_zeroed_page(37, TOI_ATOMIC_GFP);
+        if (!boot_kernel_data_buffer) {
+                printk(KERN_ERR "TuxOnIce: Failed to allocate "
+                                "boot_kernel_data_buffer.\n");
+                set_result_state(TOI_OUT_OF_MEMORY);
+                return 1;
+        }
 
         toi_allocate_cbw_data();
 
-	return 0;
+        return 0;
 }
 
 /**
@@ -680,31 +680,31 @@ static int toi_init(int restarting)
  **/
 static int can_hibernate(void)
 {
-	if (!test_toi_state(TOI_CAN_HIBERNATE))
-		toi_attempt_to_parse_resume_device(0);
+        if (!test_toi_state(TOI_CAN_HIBERNATE))
+                toi_attempt_to_parse_resume_device(0);
 
-	if (!test_toi_state(TOI_CAN_HIBERNATE)) {
-		printk(KERN_INFO "TuxOnIce: Hibernation is disabled.\n"
-			"This may be because you haven't put something along "
-			"the lines of\n\nresume=swap:/dev/hda1\n\n"
-			"in lilo.conf or equivalent. (Where /dev/hda1 is your "
-			"swap partition).\n");
-		set_abort_result(TOI_CANT_SUSPEND);
-		return 0;
-	}
+        if (!test_toi_state(TOI_CAN_HIBERNATE)) {
+                printk(KERN_INFO "TuxOnIce: Hibernation is disabled.\n"
+                        "This may be because you haven't put something along "
+                        "the lines of\n\nresume=swap:/dev/hda1\n\n"
+                        "in lilo.conf or equivalent. (Where /dev/hda1 is your "
+                        "swap partition).\n");
+                set_abort_result(TOI_CANT_SUSPEND);
+                return 0;
+        }
 
-	if (strlen(alt_resume_param)) {
-		attempt_to_parse_alt_resume_param();
+        if (strlen(alt_resume_param)) {
+                attempt_to_parse_alt_resume_param();
 
-		if (!strlen(alt_resume_param)) {
-			printk(KERN_INFO "Alternate resume parameter now "
-					"invalid. Aborting.\n");
-			set_abort_result(TOI_CANT_USE_ALT_RESUME);
-			return 0;
-		}
-	}
+                if (!strlen(alt_resume_param)) {
+                        printk(KERN_INFO "Alternate resume parameter now "
+                                        "invalid. Aborting.\n");
+                        set_abort_result(TOI_CANT_USE_ALT_RESUME);
+                        return 0;
+                }
+        }
 
-	return 1;
+        return 1;
 }
 
 /**
@@ -716,15 +716,15 @@ static int can_hibernate(void)
  **/
 static int do_post_image_write(void)
 {
-	/* If switching images fails, do normal powerdown */
-	if (alt_resume_param[0])
-		do_toi_step(STEP_RESUME_ALT_IMAGE);
+        /* If switching images fails, do normal powerdown */
+        if (alt_resume_param[0])
+                do_toi_step(STEP_RESUME_ALT_IMAGE);
 
-	toi_power_down();
+        toi_power_down();
 
-	barrier();
-	mb();
-	return 0;
+        barrier();
+        mb();
+        return 0;
 }
 
 /**
@@ -739,120 +739,120 @@ static int do_post_image_write(void)
  **/
 static int __save_image(void)
 {
-	int temp_result, did_copy = 0;
+        int temp_result, did_copy = 0;
 
-	toi_prepare_status(DONT_CLEAR_BAR, "Starting to save the image..");
+        toi_prepare_status(DONT_CLEAR_BAR, "Starting to save the image..");
 
-	toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
-		" - Final values: %d and %d.",
-		pagedir1.size, pagedir2.size);
+        toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
+                " - Final values: %d and %d.",
+                pagedir1.size, pagedir2.size);
 
-	toi_cond_pause(1, "About to write pagedir2.");
+        toi_cond_pause(1, "About to write pagedir2.");
 
-	temp_result = write_pageset(&pagedir2);
+        temp_result = write_pageset(&pagedir2);
 
-	if (temp_result == -1 || test_result_state(TOI_ABORTED))
-		return 1;
+        if (temp_result == -1 || test_result_state(TOI_ABORTED))
+                return 1;
 
-	toi_cond_pause(1, "About to copy pageset 1.");
+        toi_cond_pause(1, "About to copy pageset 1.");
 
-	if (test_result_state(TOI_ABORTED))
-		return 1;
+        if (test_result_state(TOI_ABORTED))
+                return 1;
 
-	toi_deactivate_storage(1);
+        toi_deactivate_storage(1);
 
-	toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy/restore.");
+        toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy/restore.");
 
-	toi_in_hibernate = 1;
+        toi_in_hibernate = 1;
 
-	if (toi_go_atomic(PMSG_FREEZE, 1))
-		goto Failed;
+        if (toi_go_atomic(PMSG_FREEZE, 1))
+                goto Failed;
 
-	temp_result = toi_hibernate();
+        temp_result = toi_hibernate();
 
 #ifdef CONFIG_KGDB
-	if (test_action_state(TOI_POST_RESUME_BREAKPOINT))
-		kgdb_breakpoint();
+        if (test_action_state(TOI_POST_RESUME_BREAKPOINT))
+                kgdb_breakpoint();
 #endif
 
-	if (!temp_result)
-		did_copy = 1;
+        if (!temp_result)
+                did_copy = 1;
 
-	/* We return here at resume time too! */
-	toi_end_atomic(ATOMIC_ALL_STEPS, toi_in_hibernate, temp_result);
+        /* We return here at resume time too! */
+        toi_end_atomic(ATOMIC_ALL_STEPS, toi_in_hibernate, temp_result);
 
 Failed:
-	if (toi_activate_storage(1))
-		panic("Failed to reactivate our storage.");
+        if (toi_activate_storage(1))
+                panic("Failed to reactivate our storage.");
 
-	/* Resume time? */
-	if (!toi_in_hibernate) {
-		copyback_post();
-		return 0;
-	}
+        /* Resume time? */
+        if (!toi_in_hibernate) {
+                copyback_post();
+                return 0;
+        }
 
-	/* Nope. Hibernating. So, see if we can save the image... */
+        /* Nope. Hibernating. So, see if we can save the image... */
 
-	if (temp_result || test_result_state(TOI_ABORTED)) {
-		if (did_copy)
-			goto abort_reloading_pagedir_two;
-		else
-			return 1;
-	}
+        if (temp_result || test_result_state(TOI_ABORTED)) {
+                if (did_copy)
+                        goto abort_reloading_pagedir_two;
+                else
+                        return 1;
+        }
 
-	toi_update_status(pagedir2.size, pagedir1.size + pagedir2.size,
-			NULL);
+        toi_update_status(pagedir2.size, pagedir1.size + pagedir2.size,
+                        NULL);
 
-	if (test_result_state(TOI_ABORTED))
-		goto abort_reloading_pagedir_two;
+        if (test_result_state(TOI_ABORTED))
+                goto abort_reloading_pagedir_two;
 
-	toi_cond_pause(1, "About to write pageset1.");
+        toi_cond_pause(1, "About to write pageset1.");
 
-	toi_message(TOI_ANY_SECTION, TOI_LOW, 1, "-- Writing pageset1");
+        toi_message(TOI_ANY_SECTION, TOI_LOW, 1, "-- Writing pageset1");
 
-	temp_result = write_pageset(&pagedir1);
+        temp_result = write_pageset(&pagedir1);
 
-	/* We didn't overwrite any memory, so no reread needs to be done. */
-	if (test_action_state(TOI_TEST_FILTER_SPEED) ||
-	    test_action_state(TOI_TEST_BIO))
-		return 1;
+        /* We didn't overwrite any memory, so no reread needs to be done. */
+        if (test_action_state(TOI_TEST_FILTER_SPEED) ||
+            test_action_state(TOI_TEST_BIO))
+                return 1;
 
-	if (temp_result == 1 || test_result_state(TOI_ABORTED))
-		goto abort_reloading_pagedir_two;
+        if (temp_result == 1 || test_result_state(TOI_ABORTED))
+                goto abort_reloading_pagedir_two;
 
-	toi_cond_pause(1, "About to write header.");
+        toi_cond_pause(1, "About to write header.");
 
-	if (test_result_state(TOI_ABORTED))
-		goto abort_reloading_pagedir_two;
+        if (test_result_state(TOI_ABORTED))
+                goto abort_reloading_pagedir_two;
 
-	temp_result = write_image_header();
+        temp_result = write_image_header();
 
-	if (!temp_result && !test_result_state(TOI_ABORTED))
-		return 0;
+        if (!temp_result && !test_result_state(TOI_ABORTED))
+                return 0;
 
 abort_reloading_pagedir_two:
-	temp_result = read_pageset2(1);
+        temp_result = read_pageset2(1);
 
-	/* If that failed, we're sunk. Panic! */
-	if (temp_result)
-		panic("Attempt to reload pagedir 2 while aborting "
-				"a hibernate failed.");
+        /* If that failed, we're sunk. Panic! */
+        if (temp_result)
+                panic("Attempt to reload pagedir 2 while aborting "
+                                "a hibernate failed.");
 
-	return 1;
+        return 1;
 }
 
 static void map_ps2_pages(int enable)
 {
-	unsigned long pfn = 0;
+        unsigned long pfn = 0;
 
         memory_bm_position_reset(pageset2_map);
-	pfn = memory_bm_next_pfn(pageset2_map, 0);
+        pfn = memory_bm_next_pfn(pageset2_map, 0);
 
-	while (pfn != BM_END_OF_MAP) {
-		struct page *page = pfn_to_page(pfn);
-		kernel_map_pages(page, 1, enable);
-		pfn = memory_bm_next_pfn(pageset2_map, 0);
-	}
+        while (pfn != BM_END_OF_MAP) {
+                struct page *page = pfn_to_page(pfn);
+                kernel_map_pages(page, 1, enable);
+                pfn = memory_bm_next_pfn(pageset2_map, 0);
+        }
 }
 
 /**
@@ -863,11 +863,11 @@ static void map_ps2_pages(int enable)
  **/
 static int do_save_image(void)
 {
-	int result;
-	map_ps2_pages(0);
-	result = __save_image();
-	map_ps2_pages(1);
-	return result;
+        int result;
+        map_ps2_pages(0);
+        result = __save_image();
+        map_ps2_pages(1);
+        return result;
 }
 
 /**
@@ -878,30 +878,30 @@ static int do_save_image(void)
  **/
 static int do_prepare_image(void)
 {
-	int restarting = test_result_state(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL);
+        int restarting = test_result_state(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL);
 
-	if (!restarting && toi_activate_storage(0))
-		return 1;
+        if (!restarting && toi_activate_storage(0))
+                return 1;
 
-	/*
+        /*
          * If kept image and still keeping image and hibernating to RAM, (non
          * incremental image case) we will return 1 after hibernating and
          * resuming (provided the power doesn't run out. In that case, we skip
          * directly to cleaning up and exiting.
-	 */
+         */
 
-	if (!can_hibernate() ||
-	    (test_result_state(TOI_KEPT_IMAGE) &&
-	     check_still_keeping_image()))
-		return 1;
+        if (!can_hibernate() ||
+            (test_result_state(TOI_KEPT_IMAGE) &&
+             check_still_keeping_image()))
+                return 1;
 
-	if (toi_init(restarting) || toi_prepare_image() ||
-			test_result_state(TOI_ABORTED))
-		return 1;
+        if (toi_init(restarting) || toi_prepare_image() ||
+                        test_result_state(TOI_ABORTED))
+                return 1;
 
-	trap_non_toi_io = 1;
+        trap_non_toi_io = 1;
 
-	return 0;
+        return 0;
 }
 
 /**
@@ -913,19 +913,19 @@ static int do_prepare_image(void)
  **/
 int do_check_can_resume(void)
 {
-	int result = -1;
+        int result = -1;
 
-	if (toi_activate_storage(0))
-		return -1;
+        if (toi_activate_storage(0))
+                return -1;
 
-	if (!test_toi_state(TOI_RESUME_DEVICE_OK))
-		toi_attempt_to_parse_resume_device(1);
+        if (!test_toi_state(TOI_RESUME_DEVICE_OK))
+                toi_attempt_to_parse_resume_device(1);
 
-	if (toiActiveAllocator)
-		result = toiActiveAllocator->image_exists(1);
+        if (toiActiveAllocator)
+                result = toiActiveAllocator->image_exists(1);
 
-	toi_deactivate_storage(0);
-	return result;
+        toi_deactivate_storage(0);
+        return result;
 }
 
 /**
@@ -940,55 +940,55 @@ int do_check_can_resume(void)
  **/
 static int do_load_atomic_copy(void)
 {
-	int read_image_result = 0;
+        int read_image_result = 0;
 
-	if (sizeof(swp_entry_t) != sizeof(long)) {
-		printk(KERN_WARNING "TuxOnIce: The size of swp_entry_t != size"
-			" of long. Please report this!\n");
-		return 1;
-	}
+        if (sizeof(swp_entry_t) != sizeof(long)) {
+                printk(KERN_WARNING "TuxOnIce: The size of swp_entry_t != size"
+                        " of long. Please report this!\n");
+                return 1;
+        }
 
-	if (!resume_file[0])
-		printk(KERN_WARNING "TuxOnIce: "
-			"You need to use a resume= command line parameter to "
-			"tell TuxOnIce where to look for an image.\n");
+        if (!resume_file[0])
+                printk(KERN_WARNING "TuxOnIce: "
+                        "You need to use a resume= command line parameter to "
+                        "tell TuxOnIce where to look for an image.\n");
 
-	toi_activate_storage(0);
+        toi_activate_storage(0);
 
-	if (!(test_toi_state(TOI_RESUME_DEVICE_OK)) &&
-		!toi_attempt_to_parse_resume_device(0)) {
-		/*
-		 * Without a usable storage device we can do nothing -
-		 * even if noresume is given
-		 */
+        if (!(test_toi_state(TOI_RESUME_DEVICE_OK)) &&
+                !toi_attempt_to_parse_resume_device(0)) {
+                /*
+                 * Without a usable storage device we can do nothing -
+                 * even if noresume is given
+                 */
 
-		if (!toiNumAllocators)
-			printk(KERN_ALERT "TuxOnIce: "
-			  "No storage allocators have been registered.\n");
-		else
-			printk(KERN_ALERT "TuxOnIce: "
-				"Missing or invalid storage location "
-				"(resume= parameter). Please correct and "
-				"rerun lilo (or equivalent) before "
-				"hibernating.\n");
-		toi_deactivate_storage(0);
-		return 1;
-	}
+                if (!toiNumAllocators)
+                        printk(KERN_ALERT "TuxOnIce: "
+                          "No storage allocators have been registered.\n");
+                else
+                        printk(KERN_ALERT "TuxOnIce: "
+                                "Missing or invalid storage location "
+                                "(resume= parameter). Please correct and "
+                                "rerun lilo (or equivalent) before "
+                                "hibernating.\n");
+                toi_deactivate_storage(0);
+                return 1;
+        }
 
-	if (allocate_bitmaps())
-		return 1;
+        if (allocate_bitmaps())
+                return 1;
 
-	read_image_result = read_pageset1(); /* non fatal error ignored */
+        read_image_result = read_pageset1(); /* non fatal error ignored */
 
-	if (test_toi_state(TOI_NORESUME_SPECIFIED))
-		clear_toi_state(TOI_NORESUME_SPECIFIED);
+        if (test_toi_state(TOI_NORESUME_SPECIFIED))
+                clear_toi_state(TOI_NORESUME_SPECIFIED);
 
-	toi_deactivate_storage(0);
+        toi_deactivate_storage(0);
 
-	if (read_image_result)
-		return 1;
+        if (read_image_result)
+                return 1;
 
-	return 0;
+        return 0;
 }
 
 /**
@@ -998,23 +998,23 @@ static int do_load_atomic_copy(void)
  **/
 static void prepare_restore_load_alt_image(int prepare)
 {
-	static struct memory_bitmap *pageset1_map_save, *pageset1_copy_map_save;
+        static struct memory_bitmap *pageset1_map_save, *pageset1_copy_map_save;
 
-	if (prepare) {
-		pageset1_map_save = pageset1_map;
-		pageset1_map = NULL;
-		pageset1_copy_map_save = pageset1_copy_map;
-		pageset1_copy_map = NULL;
-		set_toi_state(TOI_LOADING_ALT_IMAGE);
-		toi_reset_alt_image_pageset2_pfn();
-	} else {
-		toi_free_bitmap(&pageset1_map);
-		pageset1_map = pageset1_map_save;
-		toi_free_bitmap(&pageset1_copy_map);
-		pageset1_copy_map = pageset1_copy_map_save;
-		clear_toi_state(TOI_NOW_RESUMING);
-		clear_toi_state(TOI_LOADING_ALT_IMAGE);
-	}
+        if (prepare) {
+                pageset1_map_save = pageset1_map;
+                pageset1_map = NULL;
+                pageset1_copy_map_save = pageset1_copy_map;
+                pageset1_copy_map = NULL;
+                set_toi_state(TOI_LOADING_ALT_IMAGE);
+                toi_reset_alt_image_pageset2_pfn();
+        } else {
+                toi_free_bitmap(&pageset1_map);
+                pageset1_map = pageset1_map_save;
+                toi_free_bitmap(&pageset1_copy_map);
+                pageset1_copy_map = pageset1_copy_map_save;
+                clear_toi_state(TOI_NOW_RESUMING);
+                clear_toi_state(TOI_LOADING_ALT_IMAGE);
+        }
 }
 
 /**
@@ -1026,50 +1026,50 @@ static void prepare_restore_load_alt_image(int prepare)
  **/
 int do_toi_step(int step)
 {
-	switch (step) {
-	case STEP_HIBERNATE_PREPARE_IMAGE:
-		return do_prepare_image();
-	case STEP_HIBERNATE_SAVE_IMAGE:
-		return do_save_image();
-	case STEP_HIBERNATE_POWERDOWN:
-		return do_post_image_write();
-	case STEP_RESUME_CAN_RESUME:
-		return do_check_can_resume();
-	case STEP_RESUME_LOAD_PS1:
-		return do_load_atomic_copy();
-	case STEP_RESUME_DO_RESTORE:
-		/*
-		 * If we succeed, this doesn't return.
-		 * Instead, we return from do_save_image() in the
-		 * hibernated kernel.
-		 */
-		return toi_atomic_restore();
-	case STEP_RESUME_ALT_IMAGE:
-		printk(KERN_INFO "Trying to resume alternate image.\n");
-		toi_in_hibernate = 0;
-		save_restore_alt_param(SAVE, NOQUIET);
-		prepare_restore_load_alt_image(1);
-		if (!do_check_can_resume()) {
-			printk(KERN_INFO "Nothing to resume from.\n");
-			goto out;
-		}
-		if (!do_load_atomic_copy())
-			toi_atomic_restore();
+        switch (step) {
+        case STEP_HIBERNATE_PREPARE_IMAGE:
+                return do_prepare_image();
+        case STEP_HIBERNATE_SAVE_IMAGE:
+                return do_save_image();
+        case STEP_HIBERNATE_POWERDOWN:
+                return do_post_image_write();
+        case STEP_RESUME_CAN_RESUME:
+                return do_check_can_resume();
+        case STEP_RESUME_LOAD_PS1:
+                return do_load_atomic_copy();
+        case STEP_RESUME_DO_RESTORE:
+                /*
+                 * If we succeed, this doesn't return.
+                 * Instead, we return from do_save_image() in the
+                 * hibernated kernel.
+                 */
+                return toi_atomic_restore();
+        case STEP_RESUME_ALT_IMAGE:
+                printk(KERN_INFO "Trying to resume alternate image.\n");
+                toi_in_hibernate = 0;
+                save_restore_alt_param(SAVE, NOQUIET);
+                prepare_restore_load_alt_image(1);
+                if (!do_check_can_resume()) {
+                        printk(KERN_INFO "Nothing to resume from.\n");
+                        goto out;
+                }
+                if (!do_load_atomic_copy())
+                        toi_atomic_restore();
 
-		printk(KERN_INFO "Failed to load image.\n");
+                printk(KERN_INFO "Failed to load image.\n");
 out:
-		prepare_restore_load_alt_image(0);
-		save_restore_alt_param(RESTORE, NOQUIET);
-		break;
-	case STEP_CLEANUP:
-		do_cleanup(1, 0);
-		break;
-	case STEP_QUIET_CLEANUP:
-		do_cleanup(0, 0);
-		break;
-	}
+                prepare_restore_load_alt_image(0);
+                save_restore_alt_param(RESTORE, NOQUIET);
+                break;
+        case STEP_CLEANUP:
+                do_cleanup(1, 0);
+                break;
+        case STEP_QUIET_CLEANUP:
+                do_cleanup(0, 0);
+                break;
+        }
 
-	return 0;
+        return 0;
 }
 
 /* -- Functions for kickstarting a hibernate or resume --- */
@@ -1082,24 +1082,24 @@ out:
  **/
 void toi_try_resume(void)
 {
-	set_toi_state(TOI_TRYING_TO_RESUME);
-	resume_attempted = 1;
+        set_toi_state(TOI_TRYING_TO_RESUME);
+        resume_attempted = 1;
 
-	current->flags |= PF_MEMALLOC;
-	toi_start_other_threads();
+        current->flags |= PF_MEMALLOC;
+        toi_start_other_threads();
 
-	if (do_toi_step(STEP_RESUME_CAN_RESUME) &&
-			!do_toi_step(STEP_RESUME_LOAD_PS1))
-		do_toi_step(STEP_RESUME_DO_RESTORE);
+        if (do_toi_step(STEP_RESUME_CAN_RESUME) &&
+                        !do_toi_step(STEP_RESUME_LOAD_PS1))
+                do_toi_step(STEP_RESUME_DO_RESTORE);
 
-	toi_stop_other_threads();
-	do_cleanup(0, 0);
+        toi_stop_other_threads();
+        do_cleanup(0, 0);
 
-	current->flags &= ~PF_MEMALLOC;
+        current->flags &= ~PF_MEMALLOC;
 
-	clear_toi_state(TOI_IGNORE_LOGLEVEL);
-	clear_toi_state(TOI_TRYING_TO_RESUME);
-	clear_toi_state(TOI_NOW_RESUMING);
+        clear_toi_state(TOI_IGNORE_LOGLEVEL);
+        clear_toi_state(TOI_TRYING_TO_RESUME);
+        clear_toi_state(TOI_NOW_RESUMING);
 }
 
 /**
@@ -1110,30 +1110,30 @@ void toi_try_resume(void)
  **/
 static void toi_sys_power_disk_try_resume(void)
 {
-	resume_attempted = 1;
+        resume_attempted = 1;
 
-	/*
-	 * There's a comment in kernel/power/disk.c that indicates
-	 * we should be able to use mutex_lock_nested below. That
-	 * doesn't seem to cut it, though, so let's just turn lockdep
-	 * off for now.
-	 */
-	lockdep_off();
+        /*
+         * There's a comment in kernel/power/disk.c that indicates
+         * we should be able to use mutex_lock_nested below. That
+         * doesn't seem to cut it, though, so let's just turn lockdep
+         * off for now.
+         */
+        lockdep_off();
 
-	if (toi_start_anything(SYSFS_RESUMING))
-		goto out;
+        if (toi_start_anything(SYSFS_RESUMING))
+                goto out;
 
-	toi_try_resume();
+        toi_try_resume();
 
-	/*
-	 * For initramfs, we have to clear the boot time
-	 * flag after trying to resume
-	 */
-	clear_toi_state(TOI_BOOT_TIME);
+        /*
+         * For initramfs, we have to clear the boot time
+         * flag after trying to resume
+         */
+        clear_toi_state(TOI_BOOT_TIME);
 
-	toi_finish_anything(SYSFS_RESUMING);
+        toi_finish_anything(SYSFS_RESUMING);
 out:
-	lockdep_on();
+        lockdep_on();
 }
 
 /**
@@ -1151,141 +1151,141 @@ out:
  **/
 int toi_try_hibernate(void)
 {
-	int result = 0, sys_power_disk = 0, retries = 0;
+        int result = 0, sys_power_disk = 0, retries = 0;
 
-	if (!mutex_is_locked(&tuxonice_in_use)) {
-		/* Came in via /sys/power/disk */
-		if (toi_start_anything(SYSFS_HIBERNATING))
-			return -EBUSY;
-		sys_power_disk = 1;
-	}
+        if (!mutex_is_locked(&tuxonice_in_use)) {
+                /* Came in via /sys/power/disk */
+                if (toi_start_anything(SYSFS_HIBERNATING))
+                        return -EBUSY;
+                sys_power_disk = 1;
+        }
 
-	current->flags |= PF_MEMALLOC;
+        current->flags |= PF_MEMALLOC;
 
-	if (test_toi_state(TOI_CLUSTER_MODE)) {
-		toi_initiate_cluster_hibernate();
-		goto out;
-	}
+        if (test_toi_state(TOI_CLUSTER_MODE)) {
+                toi_initiate_cluster_hibernate();
+                goto out;
+        }
 
 prepare:
-	result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE);
+        result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE);
 
-	if (result)
-		goto out;
+        if (result)
+                goto out;
 
-	if (test_action_state(TOI_FREEZER_TEST))
-		goto out_restore_gfp_mask;
+        if (test_action_state(TOI_FREEZER_TEST))
+                goto out_restore_gfp_mask;
 
-	result = do_toi_step(STEP_HIBERNATE_SAVE_IMAGE);
+        result = do_toi_step(STEP_HIBERNATE_SAVE_IMAGE);
 
-	if (test_result_state(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL)) {
-		if (retries < 2) {
-			do_cleanup(0, 1);
-			retries++;
-			clear_result_state(TOI_ABORTED);
-			extra_pd1_pages_allowance = extra_pd1_pages_used + 500;
-			printk(KERN_INFO "Automatically adjusting the extra"
-				" pages allowance to %ld and restarting.\n",
-				extra_pd1_pages_allowance);
-			pm_restore_gfp_mask();
-			goto prepare;
-		}
+        if (test_result_state(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL)) {
+                if (retries < 2) {
+                        do_cleanup(0, 1);
+                        retries++;
+                        clear_result_state(TOI_ABORTED);
+                        extra_pd1_pages_allowance = extra_pd1_pages_used + 500;
+                        printk(KERN_INFO "Automatically adjusting the extra"
+                                " pages allowance to %ld and restarting.\n",
+                                extra_pd1_pages_allowance);
+                        pm_restore_gfp_mask();
+                        goto prepare;
+                }
 
-		printk(KERN_INFO "Adjusted extra pages allowance twice and "
-			"still couldn't hibernate successfully. Giving up.");
-	}
+                printk(KERN_INFO "Adjusted extra pages allowance twice and "
+                        "still couldn't hibernate successfully. Giving up.");
+        }
 
-	/* This code runs at resume time too! */
-	if (!result && toi_in_hibernate)
-		result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
+        /* This code runs at resume time too! */
+        if (!result && toi_in_hibernate)
+                result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
 
 out_restore_gfp_mask:
-	pm_restore_gfp_mask();
+        pm_restore_gfp_mask();
 out:
-	do_cleanup(1, 0);
-	current->flags &= ~PF_MEMALLOC;
+        do_cleanup(1, 0);
+        current->flags &= ~PF_MEMALLOC;
 
-	if (sys_power_disk)
-		toi_finish_anything(SYSFS_HIBERNATING);
+        if (sys_power_disk)
+                toi_finish_anything(SYSFS_HIBERNATING);
 
-	return result;
+        return result;
 }
 
 /*
  * channel_no: If !0, -c <channel_no> is added to args (userui).
  */
 int toi_launch_userspace_program(char *command, int channel_no,
-		int wait, int debug)
+                int wait, int debug)
 {
-	int retval;
-	static char *envp[] = {
-			"HOME=/",
-			"TERM=linux",
-			"PATH=/sbin:/usr/sbin:/bin:/usr/bin",
-			NULL };
-	static char *argv[] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
-		};
-	char *channel = NULL;
-	int arg = 0, size;
-	char test_read[255];
-	char *orig_posn = command;
+        int retval;
+        static char *envp[] = {
+                        "HOME=/",
+                        "TERM=linux",
+                        "PATH=/sbin:/usr/sbin:/bin:/usr/bin",
+                        NULL };
+        static char *argv[] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+                };
+        char *channel = NULL;
+        int arg = 0, size;
+        char test_read[255];
+        char *orig_posn = command;
 
-	if (!strlen(orig_posn))
-		return 1;
+        if (!strlen(orig_posn))
+                return 1;
 
-	if (channel_no) {
-		channel = toi_kzalloc(4, 6, GFP_KERNEL);
-		if (!channel) {
-			printk(KERN_INFO "Failed to allocate memory in "
-				"preparing to launch userspace program.\n");
-			return 1;
-		}
-	}
+        if (channel_no) {
+                channel = toi_kzalloc(4, 6, GFP_KERNEL);
+                if (!channel) {
+                        printk(KERN_INFO "Failed to allocate memory in "
+                                "preparing to launch userspace program.\n");
+                        return 1;
+                }
+        }
 
-	/* Up to 6 args supported */
-	while (arg < 6) {
-		sscanf(orig_posn, "%s", test_read);
-		size = strlen(test_read);
-		if (!(size))
-			break;
-		argv[arg] = toi_kzalloc(5, size + 1, TOI_ATOMIC_GFP);
-		strcpy(argv[arg], test_read);
-		orig_posn += size + 1;
-		*test_read = 0;
-		arg++;
-	}
+        /* Up to 6 args supported */
+        while (arg < 6) {
+                sscanf(orig_posn, "%s", test_read);
+                size = strlen(test_read);
+                if (!(size))
+                        break;
+                argv[arg] = toi_kzalloc(5, size + 1, TOI_ATOMIC_GFP);
+                strcpy(argv[arg], test_read);
+                orig_posn += size + 1;
+                *test_read = 0;
+                arg++;
+        }
 
-	if (channel_no) {
-		sprintf(channel, "-c%d", channel_no);
-		argv[arg] = channel;
-	} else
-		arg--;
+        if (channel_no) {
+                sprintf(channel, "-c%d", channel_no);
+                argv[arg] = channel;
+        } else
+                arg--;
 
-	if (debug) {
-		argv[++arg] = toi_kzalloc(5, 8, TOI_ATOMIC_GFP);
-		strcpy(argv[arg], "--debug");
-	}
+        if (debug) {
+                argv[++arg] = toi_kzalloc(5, 8, TOI_ATOMIC_GFP);
+                strcpy(argv[arg], "--debug");
+        }
 
-	retval = call_usermodehelper(argv[0], argv, envp, wait);
+        retval = call_usermodehelper(argv[0], argv, envp, wait);
 
-	/*
-	 * If the program reports an error, retval = 256. Don't complain
-	 * about that here.
-	 */
-	if (retval && retval != 256)
-		printk(KERN_ERR "Failed to launch userspace program '%s': "
-				"Error %d\n", command, retval);
+        /*
+         * If the program reports an error, retval = 256. Don't complain
+         * about that here.
+         */
+        if (retval && retval != 256)
+                printk(KERN_ERR "Failed to launch userspace program '%s': "
+                                "Error %d\n", command, retval);
 
-	{
-		int i;
-		for (i = 0; i < arg; i++)
-			if (argv[i] && argv[i] != channel)
-				toi_kfree(5, argv[i], sizeof(*argv[i]));
-	}
+        {
+                int i;
+                for (i = 0; i < arg; i++)
+                        if (argv[i] && argv[i] != channel)
+                                toi_kfree(5, argv[i], sizeof(*argv[i]));
+        }
 
-	toi_kfree(4, channel, sizeof(*channel));
+        toi_kfree(4, channel, sizeof(*channel));
 
-	return retval;
+        return retval;
 }
 
 /*
@@ -1293,74 +1293,74 @@ int toi_launch_userspace_program(char *command, int channel_no,
  * boot. Modules and the console code register their own entries separately.
  */
 static struct toi_sysfs_data sysfs_params[] = {
-	SYSFS_LONG("extra_pages_allowance", SYSFS_RW,
-			&extra_pd1_pages_allowance, 0, LONG_MAX, 0),
-	SYSFS_CUSTOM("image_exists", SYSFS_RW, image_exists_read,
-			image_exists_write, SYSFS_NEEDS_SM_FOR_BOTH, NULL),
-	SYSFS_STRING("resume", SYSFS_RW, resume_file, 255,
-			SYSFS_NEEDS_SM_FOR_WRITE,
-			attempt_to_parse_resume_device2),
-	SYSFS_STRING("alt_resume_param", SYSFS_RW, alt_resume_param, 255,
-			SYSFS_NEEDS_SM_FOR_WRITE,
-			attempt_to_parse_alt_resume_param),
-	SYSFS_CUSTOM("debug_info", SYSFS_READONLY, get_toi_debug_info, NULL, 0,
-			NULL),
-	SYSFS_BIT("ignore_rootfs", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_IGNORE_ROOTFS, 0),
-	SYSFS_LONG("image_size_limit", SYSFS_RW, &image_size_limit, -2,
-			INT_MAX, 0),
-	SYSFS_UL("last_result", SYSFS_RW, &toi_result, 0, 0, 0),
-	SYSFS_BIT("no_multithreaded_io", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_NO_MULTITHREADED_IO, 0),
-	SYSFS_BIT("no_flusher_thread", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_NO_FLUSHER_THREAD, 0),
-	SYSFS_BIT("full_pageset2", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_PAGESET2_FULL, 0),
-	SYSFS_BIT("reboot", SYSFS_RW, &toi_bkd.toi_action, TOI_REBOOT, 0),
-	SYSFS_BIT("replace_swsusp", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_REPLACE_SWSUSP, 0),
-	SYSFS_STRING("resume_commandline", SYSFS_RW,
-			toi_bkd.toi_nosave_commandline, COMMAND_LINE_SIZE, 0,
-			NULL),
-	SYSFS_STRING("version", SYSFS_READONLY, TOI_CORE_VERSION, 0, 0, NULL),
-	SYSFS_BIT("freezer_test", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_FREEZER_TEST, 0),
-	SYSFS_BIT("test_bio", SYSFS_RW, &toi_bkd.toi_action, TOI_TEST_BIO, 0),
-	SYSFS_BIT("test_filter_speed", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_TEST_FILTER_SPEED, 0),
-	SYSFS_BIT("no_pageset2", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_NO_PAGESET2, 0),
-	SYSFS_BIT("no_pageset2_if_unneeded", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_NO_PS2_IF_UNNEEDED, 0),
-	SYSFS_STRING("binary_signature", SYSFS_READONLY,
-			tuxonice_signature, 9, 0, NULL),
-	SYSFS_INT("max_workers", SYSFS_RW, &toi_max_workers, 0, NR_CPUS, 0,
-			NULL),
+        SYSFS_LONG("extra_pages_allowance", SYSFS_RW,
+                        &extra_pd1_pages_allowance, 0, LONG_MAX, 0),
+        SYSFS_CUSTOM("image_exists", SYSFS_RW, image_exists_read,
+                        image_exists_write, SYSFS_NEEDS_SM_FOR_BOTH, NULL),
+        SYSFS_STRING("resume", SYSFS_RW, resume_file, 255,
+                        SYSFS_NEEDS_SM_FOR_WRITE,
+                        attempt_to_parse_resume_device2),
+        SYSFS_STRING("alt_resume_param", SYSFS_RW, alt_resume_param, 255,
+                        SYSFS_NEEDS_SM_FOR_WRITE,
+                        attempt_to_parse_alt_resume_param),
+        SYSFS_CUSTOM("debug_info", SYSFS_READONLY, get_toi_debug_info, NULL, 0,
+                        NULL),
+        SYSFS_BIT("ignore_rootfs", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_IGNORE_ROOTFS, 0),
+        SYSFS_LONG("image_size_limit", SYSFS_RW, &image_size_limit, -2,
+                        INT_MAX, 0),
+        SYSFS_UL("last_result", SYSFS_RW, &toi_result, 0, 0, 0),
+        SYSFS_BIT("no_multithreaded_io", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_NO_MULTITHREADED_IO, 0),
+        SYSFS_BIT("no_flusher_thread", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_NO_FLUSHER_THREAD, 0),
+        SYSFS_BIT("full_pageset2", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_PAGESET2_FULL, 0),
+        SYSFS_BIT("reboot", SYSFS_RW, &toi_bkd.toi_action, TOI_REBOOT, 0),
+        SYSFS_BIT("replace_swsusp", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_REPLACE_SWSUSP, 0),
+        SYSFS_STRING("resume_commandline", SYSFS_RW,
+                        toi_bkd.toi_nosave_commandline, COMMAND_LINE_SIZE, 0,
+                        NULL),
+        SYSFS_STRING("version", SYSFS_READONLY, TOI_CORE_VERSION, 0, 0, NULL),
+        SYSFS_BIT("freezer_test", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_FREEZER_TEST, 0),
+        SYSFS_BIT("test_bio", SYSFS_RW, &toi_bkd.toi_action, TOI_TEST_BIO, 0),
+        SYSFS_BIT("test_filter_speed", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_TEST_FILTER_SPEED, 0),
+        SYSFS_BIT("no_pageset2", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_NO_PAGESET2, 0),
+        SYSFS_BIT("no_pageset2_if_unneeded", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_NO_PS2_IF_UNNEEDED, 0),
+        SYSFS_STRING("binary_signature", SYSFS_READONLY,
+                        tuxonice_signature, 9, 0, NULL),
+        SYSFS_INT("max_workers", SYSFS_RW, &toi_max_workers, 0, NR_CPUS, 0,
+                        NULL),
 #ifdef CONFIG_KGDB
-	SYSFS_BIT("post_resume_breakpoint", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_POST_RESUME_BREAKPOINT, 0),
+        SYSFS_BIT("post_resume_breakpoint", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_POST_RESUME_BREAKPOINT, 0),
 #endif
-	SYSFS_BIT("no_readahead", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_NO_READAHEAD, 0),
-	SYSFS_BIT("trace_debug_on", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_TRACE_DEBUG_ON, 0),
+        SYSFS_BIT("no_readahead", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_NO_READAHEAD, 0),
+        SYSFS_BIT("trace_debug_on", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_TRACE_DEBUG_ON, 0),
 #ifdef CONFIG_TOI_KEEP_IMAGE
-	SYSFS_BIT("keep_image", SYSFS_RW , &toi_bkd.toi_action, TOI_KEEP_IMAGE,
-			0),
+        SYSFS_BIT("keep_image", SYSFS_RW , &toi_bkd.toi_action, TOI_KEEP_IMAGE,
+                        0),
 #endif
 #ifdef CONFIG_TOI_INCREMENTAL
-	SYSFS_CUSTOM("pagestate", SYSFS_READONLY, get_toi_page_state, NULL, 0,
-			NULL),
-	SYSFS_BIT("incremental", SYSFS_RW, &toi_bkd.toi_action,
-			TOI_INCREMENTAL_IMAGE, 1),
+        SYSFS_CUSTOM("pagestate", SYSFS_READONLY, get_toi_page_state, NULL, 0,
+                        NULL),
+        SYSFS_BIT("incremental", SYSFS_RW, &toi_bkd.toi_action,
+                        TOI_INCREMENTAL_IMAGE, 1),
 #endif
 };
 
 static struct toi_core_fns my_fns = {
-	.get_nonconflicting_page = __toi_get_nonconflicting_page,
-	.post_context_save = __toi_post_context_save,
-	.try_hibernate = toi_try_hibernate,
-	.try_resume = toi_sys_power_disk_try_resume,
+        .get_nonconflicting_page = __toi_get_nonconflicting_page,
+        .post_context_save = __toi_post_context_save,
+        .try_hibernate = toi_try_hibernate,
+        .try_resume = toi_sys_power_disk_try_resume,
 };
 
 /**
@@ -1372,11 +1372,11 @@ static struct toi_core_fns my_fns = {
  **/
 static __init int core_load(void)
 {
-	int i,
-	    numfiles = sizeof(sysfs_params) / sizeof(struct toi_sysfs_data);
+        int i,
+            numfiles = sizeof(sysfs_params) / sizeof(struct toi_sysfs_data);
 
-	printk(KERN_INFO "TuxOnIce " TOI_CORE_VERSION
-			" (http://tuxonice.net)\n");
+        printk(KERN_INFO "TuxOnIce " TOI_CORE_VERSION
+                        " (http://tuxonice.net)\n");
 
         if (!hibernation_available()) {
           printk(KERN_INFO "TuxOnIce disabled due to request for hibernation"
@@ -1384,30 +1384,30 @@ static __init int core_load(void)
           return 1;
         }
 
-	if (toi_sysfs_init())
-		return 1;
+        if (toi_sysfs_init())
+                return 1;
 
-	for (i = 0; i < numfiles; i++)
-		toi_register_sysfs_file(tuxonice_kobj, &sysfs_params[i]);
+        for (i = 0; i < numfiles; i++)
+                toi_register_sysfs_file(tuxonice_kobj, &sysfs_params[i]);
 
-	toi_core_fns = &my_fns;
+        toi_core_fns = &my_fns;
 
-	if (toi_alloc_init())
-		return 1;
-	if (toi_checksum_init())
-		return 1;
-	if (toi_usm_init())
-		return 1;
-	if (toi_ui_init())
-		return 1;
-	if (toi_poweroff_init())
-		return 1;
-	if (toi_cluster_init())
-		return 1;
-	if (toi_cbw_init())
-		return 1;
+        if (toi_alloc_init())
+                return 1;
+        if (toi_checksum_init())
+                return 1;
+        if (toi_usm_init())
+                return 1;
+        if (toi_ui_init())
+                return 1;
+        if (toi_poweroff_init())
+                return 1;
+        if (toi_cluster_init())
+                return 1;
+        if (toi_cbw_init())
+                return 1;
 
-	return 0;
+        return 0;
 }
 
 late_initcall(core_load);

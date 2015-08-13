@@ -24,7 +24,7 @@ extern void free_attention_list(void);
 #ifdef CONFIG_HIGHMEM
 #define real_nr_free_high_pages() (real_nr_free_pages(1 << ZONE_HIGHMEM))
 #define real_nr_free_low_pages() (real_nr_free_pages(all_zones_mask - \
-						(1 << ZONE_HIGHMEM)))
+                                                (1 << ZONE_HIGHMEM)))
 #else
 #define real_nr_free_high_pages() (0)
 #define real_nr_free_low_pages() (real_nr_free_pages(all_zones_mask))

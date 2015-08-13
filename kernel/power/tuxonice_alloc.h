@@ -16,7 +16,7 @@ extern void *toi_kzalloc(int fail_num, size_t size, gfp_t flags);
 extern void toi_kfree(int fail_num, const void *arg, int size);
 
 extern unsigned long toi_get_free_pages(int fail_num, gfp_t mask,
-		unsigned int order);
+                unsigned int order);
 #define toi_get_free_page(FAIL_NUM, MASK) toi_get_free_pages(FAIL_NUM, MASK, 0)
 extern unsigned long toi_get_zeroed_page(int fail_num, gfp_t mask);
 extern void toi_free_page(int fail_num, unsigned long buf);
@@ -42,7 +42,7 @@ extern void toi_alloc_print_debug_stats(void);
 #define toi_alloc_page(FAIL, MASK) alloc_page(MASK)
 static inline int toi_alloc_init(void)
 {
-	return 0;
+        return 0;
 }
 
 static inline void toi_alloc_exit(void) { }

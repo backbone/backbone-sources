@@ -20,12 +20,12 @@ static inline void toi_usm_exit(void) { }
 
 static inline int toi_activate_storage(int force)
 {
-	return 0;
+        return 0;
 }
 
 static inline int toi_deactivate_storage(int force)
 {
-	return 0;
+        return 0;
 }
 
 static inline int toi_prepare_usm(void) { return 0; }
@@ -33,13 +33,13 @@ static inline void toi_cleanup_usm(void) { }
 #endif
 
 enum {
-	USM_MSG_BASE = 0x10,
+        USM_MSG_BASE = 0x10,
 
-	/* Kernel -> Userspace */
-	USM_MSG_CONNECT = 0x30,
-	USM_MSG_DISCONNECT = 0x31,
-	USM_MSG_SUCCESS = 0x40,
-	USM_MSG_FAILED = 0x41,
+        /* Kernel -> Userspace */
+        USM_MSG_CONNECT = 0x30,
+        USM_MSG_DISCONNECT = 0x31,
+        USM_MSG_SUCCESS = 0x40,
+        USM_MSG_FAILED = 0x41,
 
-	USM_MSG_MAX,
+        USM_MSG_MAX,
 };

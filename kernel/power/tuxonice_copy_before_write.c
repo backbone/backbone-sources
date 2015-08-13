@@ -217,24 +217,24 @@ static int toi_cbw_test_read(const char *buffer, int count)
  * boot. Modules and the console code register their own entries separately.
  */
 static struct toi_sysfs_data sysfs_params[] = {
-	SYSFS_CUSTOM("test", SYSFS_RW, toi_cbw_test_read,
-			NULL, SYSFS_NEEDS_SM_FOR_READ, NULL),
+        SYSFS_CUSTOM("test", SYSFS_RW, toi_cbw_test_read,
+                        NULL, SYSFS_NEEDS_SM_FOR_READ, NULL),
 };
 
 static struct toi_module_ops toi_cbw_ops = {
-	.type					= MISC_HIDDEN_MODULE,
-	.name					= "copy_before_write debugging",
-	.directory				= "cbw",
-	.module					= THIS_MODULE,
-	.early					= 1,
+        .type                                        = MISC_HIDDEN_MODULE,
+        .name                                        = "copy_before_write debugging",
+        .directory                                = "cbw",
+        .module                                        = THIS_MODULE,
+        .early                                        = 1,
 
-	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) /
-		sizeof(struct toi_sysfs_data),
+        .sysfs_data                = sysfs_params,
+        .num_sysfs_entries        = sizeof(sysfs_params) /
+                sizeof(struct toi_sysfs_data),
 };
 
 int toi_cbw_init(void)
 {
-	int result = toi_register_module(&toi_cbw_ops);
-	return result;
+        int result = toi_register_module(&toi_cbw_ops);
+        return result;
 }

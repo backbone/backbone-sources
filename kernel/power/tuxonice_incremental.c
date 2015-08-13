@@ -77,34 +77,34 @@ static void note_page(void *addr)
 
 static void walk_pte_level(pmd_t addr)
 {
-	int i;
-	pte_t *start;
+        int i;
+        pte_t *start;
 
-	start = (pte_t *) pmd_page_vaddr(addr);
-	for (i = 0; i < PTRS_PER_PTE; i++) {
-		note_page(start);
-		start++;
-	}
+        start = (pte_t *) pmd_page_vaddr(addr);
+        for (i = 0; i < PTRS_PER_PTE; i++) {
+                note_page(start);
+                start++;
+        }
 }
 
 #if PTRS_PER_PMD > 1
 
 static void walk_pmd_level(pud_t addr)
 {
-	int i;
-	pmd_t *start;
+        int i;
+        pmd_t *start;
 
-	start = (pmd_t *) pud_page_vaddr(addr);
-	for (i = 0; i < PTRS_PER_PMD; i++) {
-		if (!pmd_none(*start)) {
-			if (pmd_large(*start) || !pmd_present(*start))
-				note_page(start);
-			else
-				walk_pte_level(*start);
-		} else
-			note_page(start);
-		start++;
-	}
+        start = (pmd_t *) pud_page_vaddr(addr);
+        for (i = 0; i < PTRS_PER_PMD; i++) {
+                if (!pmd_none(*start)) {
+                        if (pmd_large(*start) || !pmd_present(*start))
+                                note_page(start);
+                        else
+                                walk_pte_level(*start);
+                } else
+                        note_page(start);
+                start++;
+        }
 }
 
 #else
@@ -117,22 +117,22 @@ static void walk_pmd_level(pud_t addr)
 
 static void walk_pud_level(pgd_t addr)
 {
-	int i;
-	pud_t *start;
+        int i;
+        pud_t *start;
 
-	start = (pud_t *) pgd_page_vaddr(addr);
+        start = (pud_t *) pgd_page_vaddr(addr);
 
-	for (i = 0; i < PTRS_PER_PUD; i++) {
-		if (!pud_none(*start)) {
-			if (pud_large(*start) || !pud_present(*start))
-				note_page(start);
-			else
-				walk_pmd_level(*start);
-		} else
-			note_page(start);
+        for (i = 0; i < PTRS_PER_PUD; i++) {
+                if (!pud_none(*start)) {
+                        if (pud_large(*start) || !pud_present(*start))
+                                note_page(start);
+                        else
+                                walk_pmd_level(*start);
+                } else
+                        note_page(start);
 
-		start++;
-	}
+                start++;
+        }
 }
 
 #else
@@ -147,29 +147,29 @@ static void walk_pud_level(pgd_t addr)
 static void toi_ptdump_walk_pgd_level(pgd_t *pgd)
 {
 #ifdef CONFIG_X86_64
-	pgd_t *start = (pgd_t *) &init_level4_pgt;
+        pgd_t *start = (pgd_t *) &init_level4_pgt;
 #else
-	pgd_t *start = swapper_pg_dir;
+        pgd_t *start = swapper_pg_dir;
 #endif
-	int i;
-	if (pgd) {
-		start = pgd;
-	}
+        int i;
+        if (pgd) {
+                start = pgd;
+        }
 
-	for (i = 0; i < PTRS_PER_PGD; i++) {
-		if (!pgd_none(*start)) {
-			if (pgd_large(*start) || !pgd_present(*start))
-				note_page(start);
-			else
-				walk_pud_level(*start);
-		} else
-			note_page(start);
+        for (i = 0; i < PTRS_PER_PGD; i++) {
+                if (!pgd_none(*start)) {
+                        if (pgd_large(*start) || !pgd_present(*start))
+                                note_page(start);
+                        else
+                                walk_pud_level(*start);
+                } else
+                        note_page(start);
 
-		start++;
-	}
+                start++;
+        }
 
-	/* Flush out the last page */
-	note_page(start);
+        /* Flush out the last page */
+        note_page(start);
 }
 
 #ifdef CONFIG_PARAVIRT
@@ -312,8 +312,8 @@ void toi_reset_dirtiness_one(unsigned long pfn, int verbose)
 
 int toi_reset_dirtiness(int verbose)
 {
-	struct zone *zone;
-	unsigned long loop;
+        struct zone *zone;
+        unsigned long loop;
         int allocated_map = 0;
 
         toi_generate_untracked_map();
@@ -324,7 +324,7 @@ int toi_reset_dirtiness(int verbose)
             allocated_map = 1;
         }
 
-	toi_generate_free_page_map();
+        toi_generate_free_page_map();
 
         pr_debug(KERN_EMERG "Reset dirtiness.\n");
         for_each_populated_zone(zone) {
@@ -392,11 +392,11 @@ early_initcall(toi_reset_dirtiness_initcall);
 
 static int __init toi_incremental_initcall_setup(char *str)
 {
-	int value;
+        int value;
 
-	if (sscanf(str, "=%d", &value) && value)
-		toi_do_incremental_initcall = value;
+        if (sscanf(str, "=%d", &value) && value)
+                toi_do_incremental_initcall = value;
 
-	return 1;
+        return 1;
 }
 __setup("toi_incremental_initcall", toi_incremental_initcall_setup);

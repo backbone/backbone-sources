@@ -17,10 +17,10 @@
  */
 
 struct pagedir {
-	int id;
-	unsigned long size;
+        int id;
+        unsigned long size;
 #ifdef CONFIG_HIGHMEM
-	unsigned long size_high;
+        unsigned long size_high;
 #endif
 };
 

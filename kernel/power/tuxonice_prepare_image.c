@@ -41,15 +41,15 @@
 #include "tuxonice_builtin.h"
 
 static unsigned long num_nosave, main_storage_allocated, storage_limit,
-	    header_storage_needed;
+            header_storage_needed;
 unsigned long extra_pd1_pages_allowance =
-	CONFIG_TOI_DEFAULT_EXTRA_PAGES_ALLOWANCE;
+        CONFIG_TOI_DEFAULT_EXTRA_PAGES_ALLOWANCE;
 long image_size_limit = CONFIG_TOI_DEFAULT_IMAGE_SIZE_LIMIT;
 static int no_ps2_needed;
 
 struct attention_list {
-	struct task_struct *task;
-	struct attention_list *next;
+        struct task_struct *task;
+        struct attention_list *next;
 };
 
 static struct attention_list *attention_list;
@@ -59,81 +59,81 @@ static struct attention_list *attention_list;
 
 void free_attention_list(void)
 {
-	struct attention_list *last = NULL;
+        struct attention_list *last = NULL;
 
-	while (attention_list) {
-		last = attention_list;
-		attention_list = attention_list->next;
-		toi_kfree(6, last, sizeof(*last));
-	}
+        while (attention_list) {
+                last = attention_list;
+                attention_list = attention_list->next;
+                toi_kfree(6, last, sizeof(*last));
+        }
 }
 
 static int build_attention_list(void)
 {
-	int i, task_count = 0;
-	struct task_struct *p;
-	struct attention_list *next;
+        int i, task_count = 0;
+        struct task_struct *p;
+        struct attention_list *next;
 
-	/*
-	 * Count all userspace process (with task->mm) marked PF_NOFREEZE.
-	 */
-	toi_read_lock_tasklist();
-	for_each_process(p)
-		if ((p->flags & PF_NOFREEZE) || p == current)
-			task_count++;
-	toi_read_unlock_tasklist();
+        /*
+         * Count all userspace process (with task->mm) marked PF_NOFREEZE.
+         */
+        toi_read_lock_tasklist();
+        for_each_process(p)
+                if ((p->flags & PF_NOFREEZE) || p == current)
+                        task_count++;
+        toi_read_unlock_tasklist();
 
-	/*
-	 * Allocate attention list structs.
-	 */
-	for (i = 0; i < task_count; i++) {
-		struct attention_list *this =
-			toi_kzalloc(6, sizeof(struct attention_list),
-					TOI_WAIT_GFP);
-		if (!this) {
-			printk(KERN_INFO "Failed to allocate slab for "
-					"attention list.\n");
-			free_attention_list();
-			return 1;
-		}
-		this->next = NULL;
-		if (attention_list)
-			this->next = attention_list;
-		attention_list = this;
-	}
+        /*
+         * Allocate attention list structs.
+         */
+        for (i = 0; i < task_count; i++) {
+                struct attention_list *this =
+                        toi_kzalloc(6, sizeof(struct attention_list),
+                                        TOI_WAIT_GFP);
+                if (!this) {
+                        printk(KERN_INFO "Failed to allocate slab for "
+                                        "attention list.\n");
+                        free_attention_list();
+                        return 1;
+                }
+                this->next = NULL;
+                if (attention_list)
+                        this->next = attention_list;
+                attention_list = this;
+        }
 
-	next = attention_list;
-	toi_read_lock_tasklist();
-	for_each_process(p)
-		if ((p->flags & PF_NOFREEZE) || p == current) {
-			next->task = p;
-			next = next->next;
-		}
-	toi_read_unlock_tasklist();
-	return 0;
+        next = attention_list;
+        toi_read_lock_tasklist();
+        for_each_process(p)
+                if ((p->flags & PF_NOFREEZE) || p == current) {
+                        next->task = p;
+                        next = next->next;
+                }
+        toi_read_unlock_tasklist();
+        return 0;
 }
 
 static void pageset2_full(void)
 {
-	struct zone *zone;
-	struct page *page;
-	unsigned long flags;
-	int i;
+        struct zone *zone;
+        struct page *page;
+        unsigned long flags;
+        int i;
 
         toi_trace_index++;
 
-	for_each_populated_zone(zone) {
-		spin_lock_irqsave(&zone->lru_lock, flags);
-		for_each_lru(i) {
-			if (!zone_page_state(zone, NR_LRU_BASE + i))
-				continue;
+        for_each_populated_zone(zone) {
+                spin_lock_irqsave(&zone->lru_lock, flags);
+                for_each_lru(i) {
+                        if (!zone_page_state(zone, NR_LRU_BASE + i))
+                                continue;
 
-			list_for_each_entry(page, &zone->lruvec.lists[i], lru) {
-				struct address_space *mapping;
+                        list_for_each_entry(page, &zone->lruvec.lists[i], lru) {
+                                struct address_space *mapping;
 
-				mapping = page_mapping(page);
-				if (!mapping || !mapping->host ||
-				    !(mapping->host->i_flags & S_ATOMIC_COPY)) {
+                                mapping = page_mapping(page);
+                                if (!mapping || !mapping->host ||
+                                    !(mapping->host->i_flags & S_ATOMIC_COPY)) {
                                     if (PageTOI_RO(page) && test_result_state(TOI_KEPT_IMAGE)) {
                                         TOI_TRACE_DEBUG(page_to_pfn(page), "_Pageset2 unmodified.");
                                     } else {
@@ -141,123 +141,123 @@ static void pageset2_full(void)
                                         SetPagePageset2(page);
                                     }
                                 }
-			}
-		}
-		spin_unlock_irqrestore(&zone->lru_lock, flags);
-	}
+                        }
+                }
+                spin_unlock_irqrestore(&zone->lru_lock, flags);
+        }
 }
 
 /*
  * toi_mark_task_as_pageset
  * Functionality   : Marks all the saveable pages belonging to a given process
- * 		     as belonging to a particular pageset.
+ *                      as belonging to a particular pageset.
  */
 
 static void toi_mark_task_as_pageset(struct task_struct *t, int pageset2)
 {
-	struct vm_area_struct *vma;
-	struct mm_struct *mm;
+        struct vm_area_struct *vma;
+        struct mm_struct *mm;
 
-	mm = t->active_mm;
+        mm = t->active_mm;
 
-	if (!mm || !mm->mmap)
-		return;
+        if (!mm || !mm->mmap)
+                return;
 
         toi_trace_index++;
 
-	if (!irqs_disabled())
-		down_read(&mm->mmap_sem);
+        if (!irqs_disabled())
+                down_read(&mm->mmap_sem);
 
-	for (vma = mm->mmap; vma; vma = vma->vm_next) {
-		unsigned long posn;
+        for (vma = mm->mmap; vma; vma = vma->vm_next) {
+                unsigned long posn;
 
-		if (!vma->vm_start ||
-		    vma->vm_flags & VM_PFNMAP)
-			continue;
+                if (!vma->vm_start ||
+                    vma->vm_flags & VM_PFNMAP)
+                        continue;
 
-		for (posn = vma->vm_start; posn < vma->vm_end;
-				posn += PAGE_SIZE) {
-			struct page *page = follow_page(vma, posn, 0);
-			struct address_space *mapping;
+                for (posn = vma->vm_start; posn < vma->vm_end;
+                                posn += PAGE_SIZE) {
+                        struct page *page = follow_page(vma, posn, 0);
+                        struct address_space *mapping;
 
-			if (!page || !pfn_valid(page_to_pfn(page)))
-				continue;
+                        if (!page || !pfn_valid(page_to_pfn(page)))
+                                continue;
 
-			mapping = page_mapping(page);
-			if (mapping && mapping->host &&
-			    mapping->host->i_flags & S_ATOMIC_COPY && pageset2)
-				continue;
+                        mapping = page_mapping(page);
+                        if (mapping && mapping->host &&
+                            mapping->host->i_flags & S_ATOMIC_COPY && pageset2)
+                                continue;
 
                         if (PageTOI_RO(page) && test_result_state(TOI_KEPT_IMAGE)) {
                                 TOI_TRACE_DEBUG(page_to_pfn(page), "_Unmodified %d", pageset2 ? 1 : 2);
                                 continue;
                         }
 
-			if (pageset2) {
+                        if (pageset2) {
                                 TOI_TRACE_DEBUG(page_to_pfn(page), "_MarkTaskAsPageset 1");
-				SetPagePageset2(page);
+                                SetPagePageset2(page);
                         } else {
                                 TOI_TRACE_DEBUG(page_to_pfn(page), "_MarkTaskAsPageset 2");
-				ClearPagePageset2(page);
-				SetPagePageset1(page);
-			}
-		}
-	}
+                                ClearPagePageset2(page);
+                                SetPagePageset1(page);
+                        }
+                }
+        }
 
-	if (!irqs_disabled())
-		up_read(&mm->mmap_sem);
+        if (!irqs_disabled())
+                up_read(&mm->mmap_sem);
 }
 
 static void mark_tasks(int pageset)
 {
-	struct task_struct *p;
+        struct task_struct *p;
 
-	toi_read_lock_tasklist();
-	for_each_process(p) {
-		if (!p->mm)
-			continue;
+        toi_read_lock_tasklist();
+        for_each_process(p) {
+                if (!p->mm)
+                        continue;
 
-		if (p->flags & PF_KTHREAD)
-			continue;
+                if (p->flags & PF_KTHREAD)
+                        continue;
 
-		toi_mark_task_as_pageset(p, pageset);
-	}
-	toi_read_unlock_tasklist();
+                toi_mark_task_as_pageset(p, pageset);
+        }
+        toi_read_unlock_tasklist();
 
 }
 
 /* mark_pages_for_pageset2
  *
- * Description:	Mark unshared pages in processes not needed for hibernate as
- * 		being able to be written out in a separate pagedir.
- * 		HighMem pages are simply marked as pageset2. They won't be
- * 		needed during hibernate.
+ * Description:        Mark unshared pages in processes not needed for hibernate as
+ *                 being able to be written out in a separate pagedir.
+ *                 HighMem pages are simply marked as pageset2. They won't be
+ *                 needed during hibernate.
  */
 
 static void toi_mark_pages_for_pageset2(void)
 {
-	struct attention_list *this = attention_list;
+        struct attention_list *this = attention_list;
 
-	memory_bm_clear(pageset2_map);
+        memory_bm_clear(pageset2_map);
 
-	if (test_action_state(TOI_NO_PAGESET2) || no_ps2_needed)
-		return;
+        if (test_action_state(TOI_NO_PAGESET2) || no_ps2_needed)
+                return;
 
-	if (test_action_state(TOI_PAGESET2_FULL))
-		pageset2_full();
-	else
-		mark_tasks(PAGESET2);
+        if (test_action_state(TOI_PAGESET2_FULL))
+                pageset2_full();
+        else
+                mark_tasks(PAGESET2);
 
-	/*
-	 * Because the tasks in attention_list are ones related to hibernating,
-	 * we know that they won't go away under us.
-	 */
+        /*
+         * Because the tasks in attention_list are ones related to hibernating,
+         * we know that they won't go away under us.
+         */
 
-	while (this) {
-		if (!test_result_state(TOI_ABORTED))
-			toi_mark_task_as_pageset(this->task, PAGESET1);
-		this = this->next;
-	}
+        while (this) {
+                if (!test_result_state(TOI_ABORTED))
+                        toi_mark_task_as_pageset(this->task, PAGESET1);
+                this = this->next;
+        }
 }
 
 /*
@@ -271,98 +271,98 @@ static void toi_mark_pages_for_pageset2(void)
 static unsigned long extra_pages_allocated;
 
 struct extras {
-	struct page *page;
-	int order;
-	struct extras *next;
+        struct page *page;
+        int order;
+        struct extras *next;
 };
 
 static struct extras *extras_list;
 
 /* toi_free_extra_pagedir_memory
  *
- * Description:	Free previously allocated extra pagedir memory.
+ * Description:        Free previously allocated extra pagedir memory.
  */
 void toi_free_extra_pagedir_memory(void)
 {
-	/* Free allocated pages */
-	while (extras_list) {
-		struct extras *this = extras_list;
-		int i;
+        /* Free allocated pages */
+        while (extras_list) {
+                struct extras *this = extras_list;
+                int i;
 
-		extras_list = this->next;
+                extras_list = this->next;
 
-		for (i = 0; i < (1 << this->order); i++)
-			ClearPageNosave(this->page + i);
+                for (i = 0; i < (1 << this->order); i++)
+                        ClearPageNosave(this->page + i);
 
-		toi_free_pages(9, this->page, this->order);
-		toi_kfree(7, this, sizeof(*this));
-	}
+                toi_free_pages(9, this->page, this->order);
+                toi_kfree(7, this, sizeof(*this));
+        }
 
-	extra_pages_allocated = 0;
+        extra_pages_allocated = 0;
 }
 
 /* toi_allocate_extra_pagedir_memory
  *
- * Description:	Allocate memory for making the atomic copy of pagedir1 in the
- * 		case where it is bigger than pagedir2.
- * Arguments:	int	num_to_alloc: Number of extra pages needed.
- * Result:	int. 	Number of extra pages we now have allocated.
+ * Description:        Allocate memory for making the atomic copy of pagedir1 in the
+ *                 case where it is bigger than pagedir2.
+ * Arguments:        int        num_to_alloc: Number of extra pages needed.
+ * Result:        int.         Number of extra pages we now have allocated.
  */
 static int toi_allocate_extra_pagedir_memory(int extra_pages_needed)
 {
-	int j, order, num_to_alloc = extra_pages_needed - extra_pages_allocated;
-	gfp_t flags = TOI_ATOMIC_GFP;
+        int j, order, num_to_alloc = extra_pages_needed - extra_pages_allocated;
+        gfp_t flags = TOI_ATOMIC_GFP;
 
-	if (num_to_alloc < 1)
-		return 0;
+        if (num_to_alloc < 1)
+                return 0;
 
-	order = fls(num_to_alloc);
-	if (order >= MAX_ORDER)
-		order = MAX_ORDER - 1;
+        order = fls(num_to_alloc);
+        if (order >= MAX_ORDER)
+                order = MAX_ORDER - 1;
 
-	while (num_to_alloc) {
-		struct page *newpage;
-		unsigned long virt;
-		struct extras *extras_entry;
+        while (num_to_alloc) {
+                struct page *newpage;
+                unsigned long virt;
+                struct extras *extras_entry;
 
-		while ((1 << order) > num_to_alloc)
-			order--;
+                while ((1 << order) > num_to_alloc)
+                        order--;
 
-		extras_entry = (struct extras *) toi_kzalloc(7,
-			sizeof(struct extras), TOI_ATOMIC_GFP);
+                extras_entry = (struct extras *) toi_kzalloc(7,
+                        sizeof(struct extras), TOI_ATOMIC_GFP);
 
-		if (!extras_entry)
-			return extra_pages_allocated;
+                if (!extras_entry)
+                        return extra_pages_allocated;
 
-		virt = toi_get_free_pages(9, flags, order);
-		while (!virt && order) {
-			order--;
-			virt = toi_get_free_pages(9, flags, order);
-		}
+                virt = toi_get_free_pages(9, flags, order);
+                while (!virt && order) {
+                        order--;
+                        virt = toi_get_free_pages(9, flags, order);
+                }
 
-		if (!virt) {
-			toi_kfree(7, extras_entry, sizeof(*extras_entry));
-			return extra_pages_allocated;
-		}
+                if (!virt) {
+                        toi_kfree(7, extras_entry, sizeof(*extras_entry));
+                        return extra_pages_allocated;
+                }
 
-		newpage = virt_to_page(virt);
+                newpage = virt_to_page(virt);
 
-		extras_entry->page = newpage;
-		extras_entry->order = order;
-		extras_entry->next = extras_list;
+                extras_entry->page = newpage;
+                extras_entry->order = order;
+                extras_entry->next = extras_list;
 
-		extras_list = extras_entry;
+                extras_list = extras_entry;
 
-		for (j = 0; j < (1 << order); j++) {
-			SetPageNosave(newpage + j);
-			SetPagePageset1Copy(newpage + j);
-		}
+                for (j = 0; j < (1 << order); j++) {
+                        SetPageNosave(newpage + j);
+                        SetPagePageset1Copy(newpage + j);
+                }
 
-		extra_pages_allocated += (1 << order);
-		num_to_alloc -= (1 << order);
-	}
+                extra_pages_allocated += (1 << order);
+                num_to_alloc -= (1 << order);
+        }
 
-	return extra_pages_allocated;
+        return extra_pages_allocated;
 }
 
 /*
@@ -371,24 +371,24 @@ static int toi_allocate_extra_pagedir_memory(int extra_pages_needed)
  */
 unsigned long real_nr_free_pages(unsigned long zone_idx_mask)
 {
-	struct zone *zone;
-	int result = 0, cpu;
+        struct zone *zone;
+        int result = 0, cpu;
 
-	/* PCP lists */
-	for_each_populated_zone(zone) {
-		if (!(zone_idx_mask & (1 << zone_idx(zone))))
-			continue;
+        /* PCP lists */
+        for_each_populated_zone(zone) {
+                if (!(zone_idx_mask & (1 << zone_idx(zone))))
+                        continue;
 
-		for_each_online_cpu(cpu) {
-			struct per_cpu_pageset *pset =
-				per_cpu_ptr(zone->pageset, cpu);
-			struct per_cpu_pages *pcp = &pset->pcp;
-			result += pcp->count;
-		}
+                for_each_online_cpu(cpu) {
+                        struct per_cpu_pageset *pset =
+                                per_cpu_ptr(zone->pageset, cpu);
+                        struct per_cpu_pages *pcp = &pset->pcp;
+                        result += pcp->count;
+                }
 
-		result += zone_page_state(zone, NR_FREE_PAGES);
-	}
-	return result;
+                result += zone_page_state(zone, NR_FREE_PAGES);
+        }
+        return result;
 }
 
 /*
@@ -398,19 +398,19 @@ unsigned long real_nr_free_pages(unsigned long zone_idx_mask)
  */
 static void get_extra_pd1_allowance(void)
 {
-	unsigned long orig_num_free = real_nr_free_pages(all_zones_mask), final;
+        unsigned long orig_num_free = real_nr_free_pages(all_zones_mask), final;
 
-	toi_prepare_status(CLEAR_BAR, "Finding allowance for drivers.");
+        toi_prepare_status(CLEAR_BAR, "Finding allowance for drivers.");
 
-	if (toi_go_atomic(PMSG_FREEZE, 1))
-		return;
+        if (toi_go_atomic(PMSG_FREEZE, 1))
+                return;
 
-	final = real_nr_free_pages(all_zones_mask);
-	toi_end_atomic(ATOMIC_ALL_STEPS, 1, 0);
+        final = real_nr_free_pages(all_zones_mask);
+        toi_end_atomic(ATOMIC_ALL_STEPS, 1, 0);
 
-	extra_pd1_pages_allowance = (orig_num_free > final) ?
-		orig_num_free - final + MIN_EXTRA_PAGES_ALLOWANCE :
-		MIN_EXTRA_PAGES_ALLOWANCE;
+        extra_pd1_pages_allowance = (orig_num_free > final) ?
+                orig_num_free - final + MIN_EXTRA_PAGES_ALLOWANCE :
+                MIN_EXTRA_PAGES_ALLOWANCE;
 }
 
 /*
@@ -419,11 +419,11 @@ static void get_extra_pd1_allowance(void)
  * allowance for extra pages.
  */
 static unsigned long main_storage_needed(int use_ecr,
-		int ignore_extra_pd1_allow)
+                int ignore_extra_pd1_allow)
 {
-	return (pagedir1.size + pagedir2.size +
-	  (ignore_extra_pd1_allow ? 0 : extra_pd1_pages_allowance)) *
-	 (use_ecr ? toi_expected_compression_ratio() : 100) / 100;
+        return (pagedir1.size + pagedir2.size +
+          (ignore_extra_pd1_allow ? 0 : extra_pd1_pages_allowance)) *
+         (use_ecr ? toi_expected_compression_ratio() : 100) / 100;
 }
 
 /*
@@ -431,12 +431,12 @@ static unsigned long main_storage_needed(int use_ecr,
  */
 unsigned long get_header_storage_needed(void)
 {
-	unsigned long bytes = sizeof(struct toi_header) +
-			toi_header_storage_for_modules() +
-			toi_pageflags_space_needed() +
-			fs_info_space_needed();
+        unsigned long bytes = sizeof(struct toi_header) +
+                        toi_header_storage_for_modules() +
+                        toi_pageflags_space_needed() +
+                        fs_info_space_needed();
 
-	return DIV_ROUND_UP(bytes, PAGE_SIZE);
+        return DIV_ROUND_UP(bytes, PAGE_SIZE);
 }
 
 /*
@@ -460,74 +460,74 @@ unsigned long get_header_storage_needed(void)
 
 static unsigned long lowpages_usable_for_highmem_copy(void)
 {
-	unsigned long needed = get_lowmem_size(pagedir1) +
-			extra_pd1_pages_allowance + MIN_FREE_RAM +
-			toi_memory_for_modules(0),
-		available = get_lowmem_size(pagedir2) +
-			 real_nr_free_low_pages() + extra_pages_allocated;
+        unsigned long needed = get_lowmem_size(pagedir1) +
+                        extra_pd1_pages_allowance + MIN_FREE_RAM +
+                        toi_memory_for_modules(0),
+                available = get_lowmem_size(pagedir2) +
+                         real_nr_free_low_pages() + extra_pages_allocated;
 
-	return available > needed ? available - needed : 0;
+        return available > needed ? available - needed : 0;
 }
 
 static unsigned long highpages_ps1_to_free(void)
 {
-	unsigned long need = get_highmem_size(pagedir1),
-		      available = get_highmem_size(pagedir2) +
-			      real_nr_free_high_pages() +
-			      lowpages_usable_for_highmem_copy();
+        unsigned long need = get_highmem_size(pagedir1),
+                      available = get_highmem_size(pagedir2) +
+                              real_nr_free_high_pages() +
+                              lowpages_usable_for_highmem_copy();
 
-	return need > available ? DIV_ROUND_UP(need - available, 2) : 0;
+        return need > available ? DIV_ROUND_UP(need - available, 2) : 0;
 }
 
 static unsigned long lowpages_ps1_to_free(void)
 {
-	unsigned long needed = get_lowmem_size(pagedir1) +
-			extra_pd1_pages_allowance + MIN_FREE_RAM +
-			toi_memory_for_modules(0),
-		available = get_lowmem_size(pagedir2) +
-			 real_nr_free_low_pages() + extra_pages_allocated;
+        unsigned long needed = get_lowmem_size(pagedir1) +
+                        extra_pd1_pages_allowance + MIN_FREE_RAM +
+                        toi_memory_for_modules(0),
+                available = get_lowmem_size(pagedir2) +
+                         real_nr_free_low_pages() + extra_pages_allocated;
 
-	return needed > available ? DIV_ROUND_UP(needed - available, 2) : 0;
+        return needed > available ? DIV_ROUND_UP(needed - available, 2) : 0;
 }
 
 static unsigned long current_image_size(void)
 {
-	return pagedir1.size + pagedir2.size + header_storage_needed;
+        return pagedir1.size + pagedir2.size + header_storage_needed;
 }
 
 static unsigned long storage_still_required(void)
 {
-	unsigned long needed = main_storage_needed(1, 1);
-	return needed > storage_limit ? needed - storage_limit : 0;
+        unsigned long needed = main_storage_needed(1, 1);
+        return needed > storage_limit ? needed - storage_limit : 0;
 }
 
 static unsigned long ram_still_required(void)
 {
-	unsigned long needed = MIN_FREE_RAM + toi_memory_for_modules(0) +
-		2 * extra_pd1_pages_allowance,
-		  available = real_nr_free_low_pages() + extra_pages_allocated;
-	return needed > available ? needed - available : 0;
+        unsigned long needed = MIN_FREE_RAM + toi_memory_for_modules(0) +
+                2 * extra_pd1_pages_allowance,
+                  available = real_nr_free_low_pages() + extra_pages_allocated;
+        return needed > available ? needed - available : 0;
 }
 
 unsigned long any_to_free(int use_image_size_limit)
 {
-	int use_soft_limit = use_image_size_limit && image_size_limit > 0;
-	unsigned long current_size = current_image_size(),
-		      soft_limit = use_soft_limit ? (image_size_limit << 8) : 0,
-		      to_free = use_soft_limit ? (current_size > soft_limit ?
-				      current_size - soft_limit : 0) : 0,
-		      storage_limit = storage_still_required(),
-		      ram_limit = ram_still_required(),
-		      first_max = max(to_free, storage_limit);
+        int use_soft_limit = use_image_size_limit && image_size_limit > 0;
+        unsigned long current_size = current_image_size(),
+                      soft_limit = use_soft_limit ? (image_size_limit << 8) : 0,
+                      to_free = use_soft_limit ? (current_size > soft_limit ?
+                                      current_size - soft_limit : 0) : 0,
+                      storage_limit = storage_still_required(),
+                      ram_limit = ram_still_required(),
+                      first_max = max(to_free, storage_limit);
 
-	return max(first_max, ram_limit);
+        return max(first_max, ram_limit);
 }
 
 static int need_pageset2(void)
 {
-	return (real_nr_free_low_pages() + extra_pages_allocated -
-		2 * extra_pd1_pages_allowance - MIN_FREE_RAM -
-		 toi_memory_for_modules(0) - pagedir1.size) < pagedir2.size;
+        return (real_nr_free_low_pages() + extra_pages_allocated -
+                2 * extra_pd1_pages_allowance - MIN_FREE_RAM -
+                 toi_memory_for_modules(0) - pagedir1.size) < pagedir2.size;
 }
 
 /* amount_needed
@@ -537,128 +537,128 @@ static int need_pageset2(void)
  */
 static unsigned long amount_needed(int use_image_size_limit)
 {
-	return max(highpages_ps1_to_free() + lowpages_ps1_to_free(),
-			any_to_free(use_image_size_limit));
+        return max(highpages_ps1_to_free() + lowpages_ps1_to_free(),
+                        any_to_free(use_image_size_limit));
 }
 
 static int image_not_ready(int use_image_size_limit)
 {
-	toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
-		"Amount still needed (%lu) > 0:%u,"
-		" Storage allocd: %lu < %lu: %u.\n",
-			amount_needed(use_image_size_limit),
-			(amount_needed(use_image_size_limit) > 0),
-			main_storage_allocated,
-			main_storage_needed(1, 1),
-			main_storage_allocated < main_storage_needed(1, 1));
+        toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
+                "Amount still needed (%lu) > 0:%u,"
+                " Storage allocd: %lu < %lu: %u.\n",
+                        amount_needed(use_image_size_limit),
+                        (amount_needed(use_image_size_limit) > 0),
+                        main_storage_allocated,
+                        main_storage_needed(1, 1),
+                        main_storage_allocated < main_storage_needed(1, 1));
 
-	toi_cond_pause(0, NULL);
+        toi_cond_pause(0, NULL);
 
-	return (amount_needed(use_image_size_limit) > 0) ||
-		 main_storage_allocated < main_storage_needed(1, 1);
+        return (amount_needed(use_image_size_limit) > 0) ||
+                 main_storage_allocated < main_storage_needed(1, 1);
 }
 
 static void display_failure_reason(int tries_exceeded)
 {
-	unsigned long storage_required = storage_still_required(),
-	    ram_required = ram_still_required(),
-	    high_ps1 = highpages_ps1_to_free(),
-	    low_ps1 = lowpages_ps1_to_free();
+        unsigned long storage_required = storage_still_required(),
+            ram_required = ram_still_required(),
+            high_ps1 = highpages_ps1_to_free(),
+            low_ps1 = lowpages_ps1_to_free();
 
-	printk(KERN_INFO "Failed to prepare the image because...\n");
+        printk(KERN_INFO "Failed to prepare the image because...\n");
 
-	if (!storage_limit) {
-		printk(KERN_INFO "- You need some storage available to be "
-				"able to hibernate.\n");
-		return;
-	}
+        if (!storage_limit) {
+                printk(KERN_INFO "- You need some storage available to be "
+                                "able to hibernate.\n");
+                return;
+        }
 
-	if (tries_exceeded)
-		printk(KERN_INFO "- The maximum number of iterations was "
-				"reached without successfully preparing the "
-				"image.\n");
+        if (tries_exceeded)
+                printk(KERN_INFO "- The maximum number of iterations was "
+                                "reached without successfully preparing the "
+                                "image.\n");
 
-	if (storage_required) {
-		printk(KERN_INFO " - We need at least %lu pages of storage "
-				"(ignoring the header), but only have %lu.\n",
-				main_storage_needed(1, 1),
-				main_storage_allocated);
-		set_abort_result(TOI_INSUFFICIENT_STORAGE);
-	}
+        if (storage_required) {
+                printk(KERN_INFO " - We need at least %lu pages of storage "
+                                "(ignoring the header), but only have %lu.\n",
+                                main_storage_needed(1, 1),
+                                main_storage_allocated);
+                set_abort_result(TOI_INSUFFICIENT_STORAGE);
+        }
 
-	if (ram_required) {
-		printk(KERN_INFO " - We need %lu more free pages of low "
-				"memory.\n", ram_required);
-		printk(KERN_INFO "     Minimum free     : %8d\n", MIN_FREE_RAM);
-		printk(KERN_INFO "   + Reqd. by modules : %8lu\n",
-				toi_memory_for_modules(0));
-		printk(KERN_INFO "   + 2 * extra allow  : %8lu\n",
-				2 * extra_pd1_pages_allowance);
-		printk(KERN_INFO "   - Currently free   : %8lu\n",
-				real_nr_free_low_pages());
-		printk(KERN_INFO "   - Pages allocd     : %8lu\n",
-				extra_pages_allocated);
-		printk(KERN_INFO "                      : ========\n");
-		printk(KERN_INFO "     Still needed     : %8lu\n",
-				ram_required);
+        if (ram_required) {
+                printk(KERN_INFO " - We need %lu more free pages of low "
+                                "memory.\n", ram_required);
+                printk(KERN_INFO "     Minimum free     : %8d\n", MIN_FREE_RAM);
+                printk(KERN_INFO "   + Reqd. by modules : %8lu\n",
+                                toi_memory_for_modules(0));
+                printk(KERN_INFO "   + 2 * extra allow  : %8lu\n",
+                                2 * extra_pd1_pages_allowance);
+                printk(KERN_INFO "   - Currently free   : %8lu\n",
+                                real_nr_free_low_pages());
+                printk(KERN_INFO "   - Pages allocd     : %8lu\n",
+                                extra_pages_allocated);
+                printk(KERN_INFO "                      : ========\n");
+                printk(KERN_INFO "     Still needed     : %8lu\n",
+                                ram_required);
 
-		/* Print breakdown of memory needed for modules */
-		toi_memory_for_modules(1);
-		set_abort_result(TOI_UNABLE_TO_FREE_ENOUGH_MEMORY);
-	}
+                /* Print breakdown of memory needed for modules */
+                toi_memory_for_modules(1);
+                set_abort_result(TOI_UNABLE_TO_FREE_ENOUGH_MEMORY);
+        }
 
-	if (high_ps1) {
-		printk(KERN_INFO "- We need to free %lu highmem pageset 1 "
-				"pages.\n", high_ps1);
-		set_abort_result(TOI_UNABLE_TO_FREE_ENOUGH_MEMORY);
-	}
+        if (high_ps1) {
+                printk(KERN_INFO "- We need to free %lu highmem pageset 1 "
+                                "pages.\n", high_ps1);
+                set_abort_result(TOI_UNABLE_TO_FREE_ENOUGH_MEMORY);
+        }
 
-	if (low_ps1) {
-		printk(KERN_INFO " - We need to free %ld lowmem pageset 1 "
-				"pages.\n", low_ps1);
-		set_abort_result(TOI_UNABLE_TO_FREE_ENOUGH_MEMORY);
-	}
+        if (low_ps1) {
+                printk(KERN_INFO " - We need to free %ld lowmem pageset 1 "
+                                "pages.\n", low_ps1);
+                set_abort_result(TOI_UNABLE_TO_FREE_ENOUGH_MEMORY);
+        }
 }
 
 static void display_stats(int always, int sub_extra_pd1_allow)
 {
-	char buffer[255];
-	snprintf(buffer, 254,
-		"Free:%lu(%lu). Sets:%lu(%lu),%lu(%lu). "
-		"Nosave:%lu-%lu=%lu. Storage:%lu/%lu(%lu=>%lu). "
-		"Needed:%lu,%lu,%lu(%u,%lu,%lu,%ld) (PS2:%s)\n",
+        char buffer[255];
+        snprintf(buffer, 254,
+                "Free:%lu(%lu). Sets:%lu(%lu),%lu(%lu). "
+                "Nosave:%lu-%lu=%lu. Storage:%lu/%lu(%lu=>%lu). "
+                "Needed:%lu,%lu,%lu(%u,%lu,%lu,%ld) (PS2:%s)\n",
 
-		/* Free */
-		real_nr_free_pages(all_zones_mask),
-		real_nr_free_low_pages(),
+                /* Free */
+                real_nr_free_pages(all_zones_mask),
+                real_nr_free_low_pages(),
 
-		/* Sets */
-		pagedir1.size, pagedir1.size - get_highmem_size(pagedir1),
-		pagedir2.size, pagedir2.size - get_highmem_size(pagedir2),
+                /* Sets */
+                pagedir1.size, pagedir1.size - get_highmem_size(pagedir1),
+                pagedir2.size, pagedir2.size - get_highmem_size(pagedir2),
 
-		/* Nosave */
-		num_nosave, extra_pages_allocated,
-		num_nosave - extra_pages_allocated,
+                /* Nosave */
+                num_nosave, extra_pages_allocated,
+                num_nosave - extra_pages_allocated,
 
-		/* Storage */
-		main_storage_allocated,
-		storage_limit,
-		main_storage_needed(1, sub_extra_pd1_allow),
-		main_storage_needed(1, 1),
+                /* Storage */
+                main_storage_allocated,
+                storage_limit,
+                main_storage_needed(1, sub_extra_pd1_allow),
+                main_storage_needed(1, 1),
 
-		/* Needed */
-		lowpages_ps1_to_free(), highpages_ps1_to_free(),
-		any_to_free(1),
-		MIN_FREE_RAM, toi_memory_for_modules(0),
-		extra_pd1_pages_allowance,
-		image_size_limit,
+                /* Needed */
+                lowpages_ps1_to_free(), highpages_ps1_to_free(),
+                any_to_free(1),
+                MIN_FREE_RAM, toi_memory_for_modules(0),
+                extra_pd1_pages_allowance,
+                image_size_limit,
 
-		need_pageset2() ? "yes" : "no");
+                need_pageset2() ? "yes" : "no");
 
-	if (always)
-		printk("%s", buffer);
-	else
-		toi_message(TOI_EAT_MEMORY, TOI_MEDIUM, 1, buffer);
+        if (always)
+                printk("%s", buffer);
+        else
+                toi_message(TOI_EAT_MEMORY, TOI_MEDIUM, 1, buffer);
 }
 
 /* flag_image_pages
@@ -670,42 +670,42 @@ static void display_stats(int always, int sub_extra_pd1_allow)
  */
 static void flag_image_pages(int atomic_copy)
 {
-	int num_free = 0, num_unmodified = 0;
-	unsigned long loop;
-	struct zone *zone;
+        int num_free = 0, num_unmodified = 0;
+        unsigned long loop;
+        struct zone *zone;
 
-	pagedir1.size = 0;
-	pagedir2.size = 0;
+        pagedir1.size = 0;
+        pagedir2.size = 0;
 
-	set_highmem_size(pagedir1, 0);
-	set_highmem_size(pagedir2, 0);
+        set_highmem_size(pagedir1, 0);
+        set_highmem_size(pagedir2, 0);
 
-	num_nosave = 0;
+        num_nosave = 0;
         toi_trace_index++;
 
-	memory_bm_clear(pageset1_map);
+        memory_bm_clear(pageset1_map);
 
-	toi_generate_free_page_map();
+        toi_generate_free_page_map();
 
-	/*
-	 * Pages not to be saved are marked Nosave irrespective of being
-	 * reserved.
-	 */
-	for_each_populated_zone(zone) {
-		int highmem = is_highmem(zone);
+        /*
+         * Pages not to be saved are marked Nosave irrespective of being
+         * reserved.
+         */
+        for_each_populated_zone(zone) {
+                int highmem = is_highmem(zone);
 
-		for (loop = 0; loop < zone->spanned_pages; loop++) {
-			unsigned long pfn = zone->zone_start_pfn + loop;
-			struct page *page;
-			int chunk_size;
+                for (loop = 0; loop < zone->spanned_pages; loop++) {
+                        unsigned long pfn = zone->zone_start_pfn + loop;
+                        struct page *page;
+                        int chunk_size;
 
-			if (!pfn_valid(pfn)) {
+                        if (!pfn_valid(pfn)) {
                             TOI_TRACE_DEBUG(pfn, "_Flag Invalid");
                             continue;
                         }
 
-			chunk_size = toi_size_of_free_region(zone, pfn);
-			if (chunk_size) {
+                        chunk_size = toi_size_of_free_region(zone, pfn);
+                        if (chunk_size) {
                             unsigned long y;
                             for (y = pfn; y < pfn + chunk_size; y++) {
                                 page = pfn_to_page(y);
@@ -713,28 +713,28 @@ static void flag_image_pages(int atomic_copy)
                                 ClearPagePageset1(page);
                                 ClearPagePageset2(page);
                             }
-				num_free += chunk_size;
-				loop += chunk_size - 1;
-				continue;
-			}
+                                num_free += chunk_size;
+                                loop += chunk_size - 1;
+                                continue;
+                        }
 
-			page = pfn_to_page(pfn);
+                        page = pfn_to_page(pfn);
 
-			if (PageNosave(page)) {
+                        if (PageNosave(page)) {
                             char *desc = PagePageset1Copy(page) ? "Pageset1Copy" : "NoSave";
                             TOI_TRACE_DEBUG(pfn, "_Flag %s", desc);
                             num_nosave++;
                             continue;
                         }
 
-			page = highmem ? saveable_highmem_page(zone, pfn) :
-				saveable_page(zone, pfn);
+                        page = highmem ? saveable_highmem_page(zone, pfn) :
+                                saveable_page(zone, pfn);
 
-			if (!page) {
+                        if (!page) {
                                 TOI_TRACE_DEBUG(pfn, "_Flag Nosave2");
-				num_nosave++;
-				continue;
-			}
+                                num_nosave++;
+                                continue;
+                        }
 
                         if (PageTOI_RO(page) && test_result_state(TOI_KEPT_IMAGE)) {
                             TOI_TRACE_DEBUG(pfn, "_Unmodified");
@@ -742,74 +742,74 @@ static void flag_image_pages(int atomic_copy)
                             continue;
                         }
 
-			if (PagePageset2(page)) {
-				pagedir2.size++;
+                        if (PagePageset2(page)) {
+                                pagedir2.size++;
                                 TOI_TRACE_DEBUG(pfn, "_Flag PS2");
-				if (PageHighMem(page))
-					inc_highmem_size(pagedir2);
-				else
-					SetPagePageset1Copy(page);
-				if (PageResave(page)) {
-					SetPagePageset1(page);
-					ClearPagePageset1Copy(page);
-					pagedir1.size++;
-					if (PageHighMem(page))
-						inc_highmem_size(pagedir1);
-				}
-			} else {
-				pagedir1.size++;
+                                if (PageHighMem(page))
+                                        inc_highmem_size(pagedir2);
+                                else
+                                        SetPagePageset1Copy(page);
+                                if (PageResave(page)) {
+                                        SetPagePageset1(page);
+                                        ClearPagePageset1Copy(page);
+                                        pagedir1.size++;
+                                        if (PageHighMem(page))
+                                                inc_highmem_size(pagedir1);
+                                }
+                        } else {
+                                pagedir1.size++;
                                 TOI_TRACE_DEBUG(pfn, "_Flag PS1");
-				SetPagePageset1(page);
-				if (PageHighMem(page))
-					inc_highmem_size(pagedir1);
-			}
-		}
-	}
+                                SetPagePageset1(page);
+                                if (PageHighMem(page))
+                                        inc_highmem_size(pagedir1);
+                        }
+                }
+        }
 
-	if (!atomic_copy)
-		toi_message(TOI_EAT_MEMORY, TOI_MEDIUM, 0,
-			"Count data pages: Set1 (%d) + Set2 (%d) + Nosave (%ld)"
-				    " + Unmodified (%d) + NumFree (%d) = %d.\n",
-			pagedir1.size, pagedir2.size, num_nosave, num_unmodified,
+        if (!atomic_copy)
+                toi_message(TOI_EAT_MEMORY, TOI_MEDIUM, 0,
+                        "Count data pages: Set1 (%d) + Set2 (%d) + Nosave (%ld)"
+                                    " + Unmodified (%d) + NumFree (%d) = %d.\n",
+                        pagedir1.size, pagedir2.size, num_nosave, num_unmodified,
                         num_free, pagedir1.size + pagedir2.size + num_nosave + num_free);
 }
 
 void toi_recalculate_image_contents(int atomic_copy)
 {
-	memory_bm_clear(pageset1_map);
-	if (!atomic_copy) {
-		unsigned long pfn;
-		memory_bm_position_reset(pageset2_map);
-		for (pfn = memory_bm_next_pfn(pageset2_map, 0);
-				pfn != BM_END_OF_MAP;
-				pfn = memory_bm_next_pfn(pageset2_map, 0))
-			ClearPagePageset1Copy(pfn_to_page(pfn));
-		/* Need to call this before getting pageset1_size! */
-		toi_mark_pages_for_pageset2();
-	}
+        memory_bm_clear(pageset1_map);
+        if (!atomic_copy) {
+                unsigned long pfn;
+                memory_bm_position_reset(pageset2_map);
+                for (pfn = memory_bm_next_pfn(pageset2_map, 0);
+                                pfn != BM_END_OF_MAP;
+                                pfn = memory_bm_next_pfn(pageset2_map, 0))
+                        ClearPagePageset1Copy(pfn_to_page(pfn));
+                /* Need to call this before getting pageset1_size! */
+                toi_mark_pages_for_pageset2();
+        }
         memory_bm_position_reset(pageset2_map);
-	flag_image_pages(atomic_copy);
+        flag_image_pages(atomic_copy);
 
-	if (!atomic_copy) {
-		storage_limit = toiActiveAllocator->storage_available();
-		display_stats(0, 0);
-	}
+        if (!atomic_copy) {
+                storage_limit = toiActiveAllocator->storage_available();
+                display_stats(0, 0);
+        }
 }
 
 int try_allocate_extra_memory(void)
 {
-	unsigned long wanted = pagedir1.size +  extra_pd1_pages_allowance -
-		get_lowmem_size(pagedir2);
-	if (wanted > extra_pages_allocated) {
-		unsigned long got = toi_allocate_extra_pagedir_memory(wanted);
-		if (wanted < got) {
-			toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
-				"Want %d extra pages for pageset1, got %d.\n",
-				wanted, got);
-			return 1;
-		}
-	}
-	return 0;
+        unsigned long wanted = pagedir1.size +  extra_pd1_pages_allowance -
+                get_lowmem_size(pagedir2);
+        if (wanted > extra_pages_allocated) {
+                unsigned long got = toi_allocate_extra_pagedir_memory(wanted);
+                if (wanted < got) {
+                        toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
+                                "Want %d extra pages for pageset1, got %d.\n",
+                                wanted, got);
+                        return 1;
+                }
+        }
+        return 0;
 }
 
 /* update_image
@@ -818,55 +818,55 @@ int try_allocate_extra_memory(void)
  */
 static void update_image(int ps2_recalc)
 {
-	int old_header_req;
-	unsigned long seek;
+        int old_header_req;
+        unsigned long seek;
 
-	if (try_allocate_extra_memory())
-		return;
+        if (try_allocate_extra_memory())
+                return;
 
-	if (ps2_recalc)
-		goto recalc;
+        if (ps2_recalc)
+                goto recalc;
 
-	thaw_kernel_threads();
+        thaw_kernel_threads();
 
-	/*
-	 * Allocate remaining storage space, if possible, up to the
-	 * maximum we know we'll need. It's okay to allocate the
-	 * maximum if the writer is the swapwriter, but
-	 * we don't want to grab all available space on an NFS share.
-	 * We therefore ignore the expected compression ratio here,
-	 * thereby trying to allocate the maximum image size we could
-	 * need (assuming compression doesn't expand the image), but
-	 * don't complain if we can't get the full amount we're after.
-	 */
+        /*
+         * Allocate remaining storage space, if possible, up to the
+         * maximum we know we'll need. It's okay to allocate the
+         * maximum if the writer is the swapwriter, but
+         * we don't want to grab all available space on an NFS share.
+         * We therefore ignore the expected compression ratio here,
+         * thereby trying to allocate the maximum image size we could
+         * need (assuming compression doesn't expand the image), but
+         * don't complain if we can't get the full amount we're after.
+         */
 
-	do {
-		int result;
+        do {
+                int result;
 
-		old_header_req = header_storage_needed;
-		toiActiveAllocator->reserve_header_space(header_storage_needed);
+                old_header_req = header_storage_needed;
+                toiActiveAllocator->reserve_header_space(header_storage_needed);
 
-		/* How much storage is free with the reservation applied? */
-		storage_limit = toiActiveAllocator->storage_available();
-		seek = min(storage_limit, main_storage_needed(0, 0));
+                /* How much storage is free with the reservation applied? */
+                storage_limit = toiActiveAllocator->storage_available();
+                seek = min(storage_limit, main_storage_needed(0, 0));
 
-		result = toiActiveAllocator->allocate_storage(seek);
-		if (result)
-			printk("Failed to allocate storage (%d).\n", result);
+                result = toiActiveAllocator->allocate_storage(seek);
+                if (result)
+                        printk("Failed to allocate storage (%d).\n", result);
 
-		main_storage_allocated =
-			toiActiveAllocator->storage_allocated();
+                main_storage_allocated =
+                        toiActiveAllocator->storage_allocated();
 
-		/* Need more header because more storage allocated? */
-		header_storage_needed = get_header_storage_needed();
+                /* Need more header because more storage allocated? */
+                header_storage_needed = get_header_storage_needed();
 
-	} while (header_storage_needed > old_header_req);
+        } while (header_storage_needed > old_header_req);
 
-	if (freeze_kernel_threads())
-		set_abort_result(TOI_FREEZING_FAILED);
+        if (freeze_kernel_threads())
+                set_abort_result(TOI_FREEZING_FAILED);
 
 recalc:
-	toi_recalculate_image_contents(0);
+        toi_recalculate_image_contents(0);
 }
 
 /* attempt_to_freeze
@@ -876,22 +876,22 @@ recalc:
 
 static int attempt_to_freeze(void)
 {
-	int result;
+        int result;
 
-	/* Stop processes before checking again */
-	toi_prepare_status(CLEAR_BAR, "Freezing processes & syncing "
-			"filesystems.");
-	result = freeze_processes();
+        /* Stop processes before checking again */
+        toi_prepare_status(CLEAR_BAR, "Freezing processes & syncing "
+                        "filesystems.");
+        result = freeze_processes();
 
-	if (result)
-		set_abort_result(TOI_FREEZING_FAILED);
+        if (result)
+                set_abort_result(TOI_FREEZING_FAILED);
 
-	result = freeze_kernel_threads();
+        result = freeze_kernel_threads();
 
-	if (result)
-		set_abort_result(TOI_FREEZING_FAILED);
+        if (result)
+                set_abort_result(TOI_FREEZING_FAILED);
 
-	return result;
+        return result;
 }
 
 /* eat_memory
@@ -909,81 +909,81 @@ static int attempt_to_freeze(void)
  */
 static void eat_memory(void)
 {
-	unsigned long amount_wanted = 0;
-	int did_eat_memory = 0;
+        unsigned long amount_wanted = 0;
+        int did_eat_memory = 0;
 
-	/*
-	 * Note that if we have enough storage space and enough free memory, we
-	 * may exit without eating anything. We give up when the last 10
-	 * iterations ate no extra pages because we're not going to get much
-	 * more anyway, but the few pages we get will take a lot of time.
-	 *
-	 * We freeze processes before beginning, and then unfreeze them if we
-	 * need to eat memory until we think we have enough. If our attempts
-	 * to freeze fail, we give up and abort.
-	 */
+        /*
+         * Note that if we have enough storage space and enough free memory, we
+         * may exit without eating anything. We give up when the last 10
+         * iterations ate no extra pages because we're not going to get much
+         * more anyway, but the few pages we get will take a lot of time.
+         *
+         * We freeze processes before beginning, and then unfreeze them if we
+         * need to eat memory until we think we have enough. If our attempts
+         * to freeze fail, we give up and abort.
+         */
 
-	amount_wanted = amount_needed(1);
+        amount_wanted = amount_needed(1);
 
-	switch (image_size_limit) {
-	case -1: /* Don't eat any memory */
-		if (amount_wanted > 0) {
-			set_abort_result(TOI_WOULD_EAT_MEMORY);
-			return;
-		}
-		break;
-	case -2:  /* Free caches only */
-		drop_pagecache();
-		toi_recalculate_image_contents(0);
-		amount_wanted = amount_needed(1);
-		break;
-	default:
-		break;
-	}
+        switch (image_size_limit) {
+        case -1: /* Don't eat any memory */
+                if (amount_wanted > 0) {
+                        set_abort_result(TOI_WOULD_EAT_MEMORY);
+                        return;
+                }
+                break;
+        case -2:  /* Free caches only */
+                drop_pagecache();
+                toi_recalculate_image_contents(0);
+                amount_wanted = amount_needed(1);
+                break;
+        default:
+                break;
+        }
 
-	if (amount_wanted > 0 && !test_result_state(TOI_ABORTED) &&
-			image_size_limit != -1) {
-		unsigned long request = amount_wanted;
-		unsigned long high_req = max(highpages_ps1_to_free(),
-				any_to_free(1));
-		unsigned long low_req = lowpages_ps1_to_free();
-		unsigned long got = 0;
+        if (amount_wanted > 0 && !test_result_state(TOI_ABORTED) &&
+                        image_size_limit != -1) {
+                unsigned long request = amount_wanted;
+                unsigned long high_req = max(highpages_ps1_to_free(),
+                                any_to_free(1));
+                unsigned long low_req = lowpages_ps1_to_free();
+                unsigned long got = 0;
 
-		toi_prepare_status(CLEAR_BAR,
-				"Seeking to free %ldMB of memory.",
-				MB(amount_wanted));
+                toi_prepare_status(CLEAR_BAR,
+                                "Seeking to free %ldMB of memory.",
+                                MB(amount_wanted));
 
-		thaw_kernel_threads();
+                thaw_kernel_threads();
 
-		/*
-		 * Ask for too many because shrink_memory_mask doesn't
-		 * currently return enough most of the time.
-		 */
-		
-		if (low_req)
-			got = shrink_memory_mask(low_req, GFP_KERNEL);
-		if (high_req)
-			shrink_memory_mask(high_req - got, GFP_HIGHUSER);
+                /*
+                 * Ask for too many because shrink_memory_mask doesn't
+                 * currently return enough most of the time.
+                 */
+                
+                if (low_req)
+                        got = shrink_memory_mask(low_req, GFP_KERNEL);
+                if (high_req)
+                        shrink_memory_mask(high_req - got, GFP_HIGHUSER);
 
-		did_eat_memory = 1;
+                did_eat_memory = 1;
 
-		toi_recalculate_image_contents(0);
+                toi_recalculate_image_contents(0);
 
-		amount_wanted = amount_needed(1);
+                amount_wanted = amount_needed(1);
 
-		printk(KERN_DEBUG "Asked shrink_memory_mask for %ld low pages &"
-				" %ld pages from anywhere, got %ld.\n",
-				high_req, low_req,
-				request - amount_wanted);
+                printk(KERN_DEBUG "Asked shrink_memory_mask for %ld low pages &"
+                                " %ld pages from anywhere, got %ld.\n",
+                                high_req, low_req,
+                                request - amount_wanted);
 
-		toi_cond_pause(0, NULL);
+                toi_cond_pause(0, NULL);
 
-		if (freeze_kernel_threads())
-			set_abort_result(TOI_FREEZING_FAILED);
-	}
+                if (freeze_kernel_threads())
+                        set_abort_result(TOI_FREEZING_FAILED);
+        }
 
-	if (did_eat_memory)
-		toi_recalculate_image_contents(0);
+        if (did_eat_memory)
+                toi_recalculate_image_contents(0);
 }
 
 /* toi_prepare_image
@@ -1004,77 +1004,77 @@ static void eat_memory(void)
 #define MAX_TRIES 2
 int toi_prepare_image(void)
 {
-	int result = 1, tries = 1;
+        int result = 1, tries = 1;
 
-	main_storage_allocated = 0;
-	no_ps2_needed = 0;
+        main_storage_allocated = 0;
+        no_ps2_needed = 0;
 
-	if (attempt_to_freeze())
-		return 1;
+        if (attempt_to_freeze())
+                return 1;
 
-	lock_device_hotplug();
-	set_toi_state(TOI_DEVICE_HOTPLUG_LOCKED);
+        lock_device_hotplug();
+        set_toi_state(TOI_DEVICE_HOTPLUG_LOCKED);
 
-	if (!extra_pd1_pages_allowance)
-		get_extra_pd1_allowance();
+        if (!extra_pd1_pages_allowance)
+                get_extra_pd1_allowance();
 
-	storage_limit = toiActiveAllocator->storage_available();
+        storage_limit = toiActiveAllocator->storage_available();
 
-	if (!storage_limit) {
-		printk(KERN_INFO "No storage available. Didn't try to prepare "
-				"an image.\n");
-		display_failure_reason(0);
-		set_abort_result(TOI_NOSTORAGE_AVAILABLE);
-		return 1;
-	}
+        if (!storage_limit) {
+                printk(KERN_INFO "No storage available. Didn't try to prepare "
+                                "an image.\n");
+                display_failure_reason(0);
+                set_abort_result(TOI_NOSTORAGE_AVAILABLE);
+                return 1;
+        }
 
-	if (build_attention_list()) {
-		abort_hibernate(TOI_UNABLE_TO_PREPARE_IMAGE,
-				"Unable to successfully prepare the image.\n");
-		return 1;
-	}
+        if (build_attention_list()) {
+                abort_hibernate(TOI_UNABLE_TO_PREPARE_IMAGE,
+                                "Unable to successfully prepare the image.\n");
+                return 1;
+        }
 
-	toi_recalculate_image_contents(0);
+        toi_recalculate_image_contents(0);
 
-	do {
-		toi_prepare_status(CLEAR_BAR,
-				"Preparing Image. Try %d.", tries);
+        do {
+                toi_prepare_status(CLEAR_BAR,
+                                "Preparing Image. Try %d.", tries);
 
-		eat_memory();
+                eat_memory();
 
-		if (test_result_state(TOI_ABORTED))
-			break;
+                if (test_result_state(TOI_ABORTED))
+                        break;
 
-		update_image(0);
+                update_image(0);
 
-		tries++;
+                tries++;
 
-	} while (image_not_ready(1) && tries <= MAX_TRIES &&
-			!test_result_state(TOI_ABORTED));
+        } while (image_not_ready(1) && tries <= MAX_TRIES &&
+                        !test_result_state(TOI_ABORTED));
 
-	result = image_not_ready(0);
+        result = image_not_ready(0);
 
         /* TODO: Handle case where need to remove existing image and resave
          * instead of adding to incremental image. */
 
-	if (!test_result_state(TOI_ABORTED)) {
-		if (result) {
-			display_stats(1, 0);
-			display_failure_reason(tries > MAX_TRIES);
-			abort_hibernate(TOI_UNABLE_TO_PREPARE_IMAGE,
-				"Unable to successfully prepare the image.\n");
-		} else {
-			/* Pageset 2 needed? */
-			if (!need_pageset2() &&
-				  test_action_state(TOI_NO_PS2_IF_UNNEEDED)) {
-				no_ps2_needed = 1;
-				toi_recalculate_image_contents(0);
-				update_image(1);
-			}
+        if (!test_result_state(TOI_ABORTED)) {
+                if (result) {
+                        display_stats(1, 0);
+                        display_failure_reason(tries > MAX_TRIES);
+                        abort_hibernate(TOI_UNABLE_TO_PREPARE_IMAGE,
+                                "Unable to successfully prepare the image.\n");
+                } else {
+                        /* Pageset 2 needed? */
+                        if (!need_pageset2() &&
+                                  test_action_state(TOI_NO_PS2_IF_UNNEEDED)) {
+                                no_ps2_needed = 1;
+                                toi_recalculate_image_contents(0);
+                                update_image(1);
+                        }
 
-			toi_cond_pause(1, "Image preparation complete.");
-		}
-	}
+                        toi_cond_pause(1, "Image preparation complete.");
+                }
+        }
 
-	return result ? result : allocate_checksum_pages();
+        return result ? result : allocate_checksum_pages();
 }

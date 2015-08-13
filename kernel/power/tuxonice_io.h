@@ -14,34 +14,34 @@
 
 /* Non-module data saved in our image header */
 struct toi_header {
-	/*
-	 * Mirror struct swsusp_info, but without
-	 * the page aligned attribute
-	 */
-	struct new_utsname uts;
-	u32 version_code;
-	unsigned long num_physpages;
-	int cpus;
-	unsigned long image_pages;
-	unsigned long pages;
-	unsigned long size;
+        /*
+         * Mirror struct swsusp_info, but without
+         * the page aligned attribute
+         */
+        struct new_utsname uts;
+        u32 version_code;
+        unsigned long num_physpages;
+        int cpus;
+        unsigned long image_pages;
+        unsigned long pages;
+        unsigned long size;
 
-	/* Our own data */
-	unsigned long orig_mem_free;
-	int page_size;
-	int pageset_2_size;
-	int param0;
-	int param1;
-	int param2;
-	int param3;
-	int progress0;
-	int progress1;
-	int progress2;
-	int progress3;
-	int io_time[2][2];
-	struct pagedir pagedir;
-	dev_t root_fs;
-	unsigned long bkd; /* Boot kernel data locn */
+        /* Our own data */
+        unsigned long orig_mem_free;
+        int page_size;
+        int pageset_2_size;
+        int param0;
+        int param1;
+        int param2;
+        int param3;
+        int progress0;
+        int progress1;
+        int progress2;
+        int progress3;
+        int io_time[2][2];
+        struct pagedir pagedir;
+        dev_t root_fs;
+        unsigned long bkd; /* Boot kernel data locn */
 };
 
 extern int write_pageset(struct pagedir *pagedir);

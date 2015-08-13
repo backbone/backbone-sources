@@ -17,29 +17,29 @@
 #define EXTENT_H
 
 struct hibernate_extent {
-	unsigned long start, end;
-	struct hibernate_extent *next;
+        unsigned long start, end;
+        struct hibernate_extent *next;
 };
 
 struct hibernate_extent_chain {
-	unsigned long size; /* size of the chain ie sum (max-min+1) */
-	int num_extents;
-	struct hibernate_extent *first, *last_touched;
-	struct hibernate_extent *current_extent;
-	unsigned long current_offset;
+        unsigned long size; /* size of the chain ie sum (max-min+1) */
+        int num_extents;
+        struct hibernate_extent *first, *last_touched;
+        struct hibernate_extent *current_extent;
+        unsigned long current_offset;
 };
 
 /* Simplify iterating through all the values in an extent chain */
 #define toi_extent_for_each(extent_chain, extentpointer, value) \
 if ((extent_chain)->first) \
-	for ((extentpointer) = (extent_chain)->first, (value) = \
-			(extentpointer)->start; \
-	     ((extentpointer) && ((extentpointer)->next || (value) <= \
-				 (extentpointer)->end)); \
-	     (((value) == (extentpointer)->end) ? \
-		((extentpointer) = (extentpointer)->next, (value) = \
-		 ((extentpointer) ? (extentpointer)->start : 0)) : \
-			(value)++))
+        for ((extentpointer) = (extent_chain)->first, (value) = \
+                        (extentpointer)->start; \
+             ((extentpointer) && ((extentpointer)->next || (value) <= \
+                                 (extentpointer)->end)); \
+             (((value) == (extentpointer)->end) ? \
+                ((extentpointer) = (extentpointer)->next, (value) = \
+                 ((extentpointer) ? (extentpointer)->start : 0)) : \
+                        (value)++))
 
 extern void toi_put_extent_chain_from(struct hibernate_extent_chain *chain, unsigned long from);
 #endif
