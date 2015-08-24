@@ -12,7 +12,6 @@
  */
 
 #define pr_fmt(fmt)    KBUILD_MODNAME ": " fmt
-#include <linux/debugfs.h>
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -76,20 +75,13 @@
  *  '» struct kdbus_ep *ep (owned)
  */
 
-/* kdbus mount-point /sys/fs/kdbus */
-static struct kobject *kdbus_dir;
-
 static int __init kdbus_init(void)
 {
 	int ret;
 
-	kdbus_dir = kobject_create_and_add(KBUILD_MODNAME, fs_kobj);
-	if (!kdbus_dir)
-		return -ENOMEM;
-
-	kdbus_node_debugfs_root = debugfs_create_dir(KBUILD_MODNAME, NULL);
-	if (!kdbus_node_debugfs_root)
-		pr_warn("cannot create debugfs root\n");
+	ret = sysfs_create_mount_point(fs_kobj, KBUILD_MODNAME);
+	if (ret)
+		return ret;
 
 	ret = kdbus_fs_init();
 	if (ret < 0) {
@@ -101,16 +93,14 @@ static int __init kdbus_init(void)
 	return 0;
 
 exit_dir:
-	debugfs_remove(kdbus_node_debugfs_root);
-	kobject_put(kdbus_dir);
+	sysfs_remove_mount_point(fs_kobj, KBUILD_MODNAME);
 	return ret;
 }
 
 static void __exit kdbus_exit(void)
 {
 	kdbus_fs_exit();
-	debugfs_remove(kdbus_node_debugfs_root);
-	kobject_put(kdbus_dir);
+	sysfs_remove_mount_point(fs_kobj, KBUILD_MODNAME);
 	ida_destroy(&kdbus_node_ida);
 }
 
