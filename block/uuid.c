@@ -142,12 +142,12 @@ static int null_uuid(const char *uuid)
 }
 
 
-static void uuid_end_bio(struct bio *bio, int err)
+static void uuid_end_bio(struct bio *bio)
 {
 	struct page *page = bio->bi_io_vec[0].bv_page;
 
-	if(!test_bit(BIO_UPTODATE, &bio->bi_flags))
-		SetPageError(page);
+        if (bio->bi_error)
+            SetPageError(page);
 
 	unlock_page(page);
 	bio_put(bio);

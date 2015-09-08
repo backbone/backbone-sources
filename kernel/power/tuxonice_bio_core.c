@@ -305,7 +305,6 @@ static int toi_finish_all_io(void)
 /**
  * toi_end_bio - bio completion function.
  * @bio: bio that has completed.
- * @err: Error value. Yes, like end_swap_bio_read, we ignore it.
  *
  * Function called by the block driver from interrupt context when I/O is
  * completed. If we were writing the page, we want to free it and will have
@@ -314,11 +313,11 @@ static int toi_finish_all_io(void)
  * reading the page, it will be in the singly linked list made from
  * page->private pointers.
  **/
-static void toi_end_bio(struct bio *bio, int err)
+static void toi_end_bio(struct bio *bio)
 {
         struct page *page = bio->bi_io_vec[0].bv_page;
 
-        BUG_ON(!test_bit(BIO_UPTODATE, &bio->bi_flags));
+        BUG_ON(&bio->bi_error);
 
         unlock_page(page);
         bio_put(bio);
@@ -408,8 +407,8 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
         /* Still read the header! */
         if (unlikely(test_action_state(TOI_TEST_BIO) && writing)) {
                 /* Fake having done the hard work */
-                set_bit(BIO_UPTODATE, &bio->bi_flags);
-                toi_end_bio(bio, 0);
+                bio->bi_error = 0;
+                toi_end_bio(bio);
         } else
                 submit_bio(writing | REQ_SYNC, bio);
 
