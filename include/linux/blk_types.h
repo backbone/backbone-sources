@@ -121,13 +121,14 @@ struct bio {
 #define BIO_SNAP_STABLE	7	/* bio data must be snapshotted during write */
 #define BIO_CHAIN	8	/* chained bio, ->bi_remaining in effect */
 #define BIO_REFFED	9	/* bio has elevated ->bi_cnt */
+#define BIO_TOI		10	/* bio is TuxOnIce submitted */	
 
 /*
  * Flags starting here get preserved by bio_reset() - this includes
  * BIO_POOL_IDX()
  */
-#define BIO_RESET_BITS	13
-#define BIO_OWNS_VEC	13	/* bio_free() should free bvec */
+#define BIO_RESET_BITS	14
+#define BIO_OWNS_VEC	14	/* bio_free() should free bvec */
 
 #define bio_flagged(bio, flag)	((bio)->bi_flags & (1 << (flag)))
 
