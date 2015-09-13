@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 2
 SUBLEVEL = 0
-EXTRAVERSION = -zen
-NAME = Inflammable Inglenook
+EXTRAVERSION = -backbone
+NAME = Hurr durr I'ma sheep
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
