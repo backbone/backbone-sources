@@ -317,7 +317,7 @@ static void toi_end_bio(struct bio *bio)
 {
         struct page *page = bio->bi_io_vec[0].bv_page;
 
-        BUG_ON(&bio->bi_error);
+        BUG_ON(bio->bi_error);
 
         unlock_page(page);
         bio_put(bio);
@@ -384,7 +384,7 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
         bio->bi_iter.bi_sector = first_block;
         bio->bi_private = (void *) ((unsigned long) free_group);
         bio->bi_end_io = toi_end_bio;
-        bio->bi_flags |= (1 << BIO_TOI);
+        bio_set_flag(bio, BIO_TOI);
 
         if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
                 printk(KERN_DEBUG "ERROR: adding page to bio at %lld\n",
