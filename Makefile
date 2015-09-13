@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 2
 SUBLEVEL = 0
-EXTRAVERSION =
-NAME = Hurr durr I'ma sheep
+EXTRAVERSION = -zen
+NAME = Inflammable Inglenook
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -1346,6 +1346,7 @@ $(help-board-dirs): help-%:
 %docs: scripts_basic FORCE
 	$(Q)$(MAKE) $(build)=scripts build_docproc
 	$(Q)$(MAKE) $(build)=Documentation/DocBook $@
+	$(Q)$(MAKE) $(build)=Documentation/kdbus $@
 
 else # KBUILD_EXTMOD
 
