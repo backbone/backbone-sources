@@ -115,6 +115,10 @@ enum pageflags {
 	PG_toi_cbw,		/* Copy the page before it is written to */
 	PG_toi_dirty,		/* Page has been modified */
 #endif
+#if defined(CONFIG_IDLE_PAGE_TRACKING) && defined(CONFIG_64BIT)
+	PG_young,
+	PG_idle,
+#endif
 	__NR_PAGEFLAGS,
 
 	/* Filesystems */
@@ -304,6 +308,13 @@ PAGEFLAG_FALSE(TOI_RO)
 PAGEFLAG_FALSE(TOI_Dirty)
 PAGEFLAG_FALSE(TOI_Untracked)
 PAGEFLAG_FALSE(TOI_CBW)
+#endif
+
+#if defined(CONFIG_IDLE_PAGE_TRACKING) && defined(CONFIG_64BIT)
+TESTPAGEFLAG(Young, young)
+SETPAGEFLAG(Young, young)
+TESTCLEARFLAG(Young, young)
+PAGEFLAG(Idle, idle)
 #endif
 
 /*

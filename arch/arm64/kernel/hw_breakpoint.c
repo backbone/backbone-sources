@@ -48,18 +48,6 @@ static DEFINE_PER_CPU(int, stepping_kernel_bp);
 static int core_num_brps;
 static int core_num_wrps;
 
-/* Determine number of BRP registers available. */
-static int get_num_brps(void)
-{
-	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
-}
-
-/* Determine number of WRP registers available. */
-static int get_num_wrps(void)
-{
-	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
-}
-
 int hw_breakpoint_slots(int type)
 {
 	/*
@@ -884,7 +872,7 @@ static int hw_breakpoint_reset_notify(struct notifier_block *self,
 						void *hcpu)
 {
 	int cpu = (long)hcpu;
-	if (action == CPU_ONLINE)
+	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE)
 		smp_call_function_single(cpu, hw_breakpoint_reset, NULL, 1);
 	return NOTIFY_OK;
 }
