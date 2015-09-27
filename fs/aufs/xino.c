@@ -1,18 +1,5 @@
 /*
  * Copyright (C) 2005-2015 Junjiro R. Okajima
- *
- * This program, aufs is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /*
@@ -1282,10 +1269,9 @@ int au_xino_path(struct seq_file *seq, struct file *file)
 	int err;
 
 	err = au_seq_path(seq, &file->f_path);
-	if (unlikely(err < 0))
+	if (unlikely(err))
 		goto out;
 
-	err = 0;
 #define Deleted "\\040(deleted)"
 	seq->count -= sizeof(Deleted) - 1;
 	AuDebugOn(memcmp(seq->buf + seq->count, Deleted,

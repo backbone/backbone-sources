@@ -1,19 +1,11 @@
 
-include ${src}/magic.mk
-ifeq (${CONFIG_AUFS_FS},m)
-include ${src}/conf.mk
-endif
--include ${src}/priv_def.mk
+include ${srctree}/${src}/magic.mk
 
 # cf. include/linux/kernel.h
 # enable pr_debug
 ccflags-y += -DDEBUG
 # sparse requires the full pathname
-ifdef M
-ccflags-y += -include ${M}/../../include/uapi/linux/aufs_type.h
-else
 ccflags-y += -include ${srctree}/include/uapi/linux/aufs_type.h
-endif
 
 obj-$(CONFIG_AUFS_FS) += aufs.o
 aufs-y := module.o sbinfo.o super.o branch.o xino.o sysaufs.o opts.o \
