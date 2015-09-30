@@ -1,9 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 2
 SUBLEVEL = 2
-EXTRAVERSION = -backbone
+EXTRAVERSION = -backbone-r1
 NAME = Hurr durr I'ma sheep
->>>>>>> zen-kernel/4.2/master
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
