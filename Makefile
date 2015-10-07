@@ -1,7 +1,7 @@
 VERSION = 4
 PATCHLEVEL = 2
 SUBLEVEL = 3
-EXTRAVERSION = -backbone
+EXTRAVERSION = -backbone-r1
 NAME = Hurr durr I'ma sheep
 
 # *DOCUMENTATION*
