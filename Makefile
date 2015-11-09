@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 3
 SUBLEVEL = 0
-EXTRAVERSION = -zen
-NAME = Trapped in a Satis Factory
+EXTRAVERSION = -backbone
+NAME = Blurry Fish Butt
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
