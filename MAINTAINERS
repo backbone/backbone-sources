@@ -1985,6 +1985,19 @@ F:	include/linux/audit.h
 F:	include/uapi/linux/audit.h
 F:	kernel/audit*
 
+AUFS (advanced multi layered unification filesystem) FILESYSTEM
+M:	"J. R. Okajima" <hooanon05g@gmail.com>
+L:	linux-unionfs@vger.kernel.org
+L:	aufs-users@lists.sourceforge.net (members only)
+W:	http://aufs.sourceforge.net
+T:	git://github.com/sfjro/aufs4-linux.git
+S:	Supported
+F:	Documentation/filesystems/aufs/
+F:	Documentation/ABI/testing/debugfs-aufs
+F:	Documentation/ABI/testing/sysfs-aufs
+F:	fs/aufs/
+F:	include/uapi/linux/aufs_type.h
+
 AUXILIARY DISPLAY DRIVERS
 M:	Miguel Ojeda Sandonis <miguel.ojeda.sandonis@gmail.com>
 W:	http://miguelojeda.es/auxdisplay.htm
@@ -5898,6 +5911,19 @@ T:	git git://gitorious.org/linux-kconfig/linux-kconfig
 S:	Maintained
 F:	Documentation/kbuild/kconfig-language.txt
 F:	scripts/kconfig/
+
+KDBUS
+M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+M:	Daniel Mack <daniel@zonque.org>
+M:	David Herrmann <dh.herrmann@googlemail.com>
+M:	Djalal Harouni <tixxdz@opendz.org>
+L:	linux-kernel@vger.kernel.org
+S:	Maintained
+F:	ipc/kdbus/*
+F:	samples/kdbus/*
+F:	Documentation/kdbus/*
+F:	include/uapi/linux/kdbus.h
+F:	tools/testing/selftests/kdbus/
 
 KDUMP
 M:	Vivek Goyal <vgoyal@redhat.com>
