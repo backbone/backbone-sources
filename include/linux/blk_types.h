@@ -120,13 +120,14 @@ struct bio {
 #define BIO_QUIET	6	/* Make BIO Quiet */
 #define BIO_CHAIN	7	/* chained bio, ->bi_remaining in effect */
 #define BIO_REFFED	8	/* bio has elevated ->bi_cnt */
+#define BIO_TOI		9	/* bio is TuxOnIce submitted */	
 
 /*
  * Flags starting here get preserved by bio_reset() - this includes
  * BIO_POOL_IDX()
  */
-#define BIO_RESET_BITS	13
-#define BIO_OWNS_VEC	13	/* bio_free() should free bvec */
+#define BIO_RESET_BITS	14
+#define BIO_OWNS_VEC	14	/* bio_free() should free bvec */
 
 /*
  * top 4 bits of bio flags indicate the pool this bio came from

@@ -275,7 +275,7 @@ struct task_struct *kthread_create_on_node(int (*threadfn)(void *data),
 	DECLARE_COMPLETION_ONSTACK(done);
 	struct task_struct *task;
 	struct kthread_create_info *create = kmalloc(sizeof(*create),
-						     GFP_KERNEL);
+						     GFP_KERNEL | ___GFP_TOI_NOTRACK);
 
 	if (!create)
 		return ERR_PTR(-ENOMEM);

@@ -36,7 +36,7 @@
 #include "internal.h"
 
 
-static LIST_HEAD(super_blocks);
+LIST_HEAD(super_blocks);
 static DEFINE_SPINLOCK(sb_lock);
 
 static char *sb_writers_name[SB_FREEZE_LEVELS] = {
