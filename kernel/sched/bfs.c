@@ -2680,11 +2680,11 @@ void account_idle_time(cputime_t cputime)
 {
 }
 
+#ifdef CONFIG_NO_HZ_COMMON
 void update_cpu_load_nohz(void)
 {
 }
 
-#ifdef CONFIG_NO_HZ_COMMON
 void calc_load_enter_idle(void)
 {
 }
