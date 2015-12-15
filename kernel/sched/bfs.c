@@ -135,7 +135,7 @@
 
 void print_scheduler_version(void)
 {
-	printk(KERN_INFO "BFS CPU scheduler v0.466 by Con Kolivas.\n");
+	printk(KERN_INFO "BFS CPU scheduler v0.467 by Con Kolivas.\n");
 }
 
 /*
@@ -148,6 +148,11 @@ int rr_interval __read_mostly = 3;
 #else
 int rr_interval __read_mostly = 6;
 #endif
+
+/* Tunable to choose whether to prioritise latency or throughput, simple
+ * binary yes or no */
+
+int sched_interactive __read_mostly = 1;
 
 /*
  * sched_iso_cpu - sysctl which determines the cpu percentage SCHED_ISO tasks
@@ -3196,7 +3201,6 @@ task_struct *earliest_deadline_task(struct rq *rq, int cpu, struct task_struct *
 		 */
 		earliest_deadline = ~0ULL;
 		list_for_each_entry(p, queue, run_list) {
-			int tcpu;
 			u64 dl;
 
 			/* Make sure cpu affinity is ok */
@@ -3214,10 +3218,15 @@ task_struct *earliest_deadline_task(struct rq *rq, int cpu, struct task_struct *
 			 * against its deadline when not, based on cpu cache
 			 * locality.
 			 */
-			tcpu = task_cpu(p);
-			if (tcpu != cpu && task_sticky(p) && scaling_rq(rq))
-				continue;
-			dl = p->deadline << locality_diff(tcpu, rq);
+			if (sched_interactive)
+				dl = p->deadline;
+			else {
+				int tcpu = task_cpu(p);
+
+				if (tcpu != cpu && task_sticky(p) && scaling_rq(rq))
+					continue;
+				dl = p->deadline << locality_diff(tcpu, rq);
+			}
 
 			if (deadline_before(dl, earliest_deadline)) {
 				earliest_deadline = dl;
