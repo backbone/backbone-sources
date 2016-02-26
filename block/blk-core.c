@@ -48,6 +48,8 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(block_unplug);
 
 DEFINE_IDA(blk_queue_ida);
 
+int trap_non_toi_io;
+
 /*
  * For the allocated request tables
  */
@@ -2094,6 +2096,9 @@ EXPORT_SYMBOL(generic_make_request);
 blk_qc_t submit_bio(int rw, struct bio *bio)
 {
 	bio->bi_rw |= rw;
+
+	if (unlikely(trap_non_toi_io))
+		BUG_ON(!bio_flagged(bio, BIO_TOI));
 
 	/*
 	 * If it's a regular read/write or a barrier with data attached,

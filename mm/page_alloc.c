@@ -61,6 +61,7 @@
 #include <linux/hugetlb.h>
 #include <linux/sched/rt.h>
 #include <linux/page_owner.h>
+#include <linux/tuxonice.h>
 #include <linux/kthread.h>
 
 #include <asm/sections.h>
@@ -753,6 +754,12 @@ static inline int free_pages_check(struct page *page)
 	if (unlikely(page->mem_cgroup))
 		bad_reason = "page still charged to cgroup";
 #endif
+        if (unlikely(PageTOI_Untracked(page))) {
+            // Make it writable and included in image if allocated.
+            ClearPageTOI_Untracked(page);
+            // If it gets allocated, it will be dirty from TOI's POV.
+            SetPageTOI_Dirty(page);
+        }
 	if (unlikely(bad_reason)) {
 		bad_page(page, bad_reason, bad_flags);
 		return 1;
@@ -1370,6 +1377,11 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
 		struct page *p = page + i;
 		if (unlikely(check_new_page(p)))
 			return 1;
+                if (unlikely(toi_incremental_support() && gfp_flags & ___GFP_TOI_NOTRACK)) {
+                    // Make the page writable if it's protected, and set it to be untracked.
+                    SetPageTOI_Untracked(p);
+                    toi_make_writable(init_mm.pgd, (unsigned long) page_address(p));
+                }
 	}
 
 	set_page_private(page, 0);

@@ -8,6 +8,7 @@
 #include <linux/writeback.h>
 #include <linux/sysctl.h>
 #include <linux/gfp.h>
+#include <linux/export.h>
 #include "internal.h"
 
 /* A global variable is a bit ugly, but it keeps the code simple */
@@ -37,6 +38,12 @@ static void drop_pagecache_sb(struct super_block *sb, void *unused)
 	}
 	spin_unlock(&sb->s_inode_list_lock);
 	iput(toput_inode);
+}
+
+/* For TuxOnIce */
+void drop_pagecache(void)
+{
+	iterate_supers(drop_pagecache_sb, NULL);
 }
 
 int drop_caches_sysctl_handler(struct ctl_table *table, int write,

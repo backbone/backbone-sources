@@ -104,6 +104,12 @@ enum pageflags {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	PG_compound_lock,
 #endif
+#ifdef CONFIG_TOI_INCREMENTAL
+	PG_toi_untracked,	/* Don't track dirtiness of this page - assume always dirty */
+	PG_toi_ro,		/* Page was made RO by TOI */
+	PG_toi_cbw,		/* Copy the page before it is written to */
+	PG_toi_dirty,		/* Page has been modified */
+#endif
 #if defined(CONFIG_IDLE_PAGE_TRACKING) && defined(CONFIG_64BIT)
 	PG_young,
 	PG_idle,
@@ -286,6 +292,17 @@ TESTSCFLAG(HWPoison, hwpoison)
 #else
 PAGEFLAG_FALSE(HWPoison)
 #define __PG_HWPOISON 0
+#endif
+#ifdef CONFIG_TOI_INCREMENTAL
+PAGEFLAG(TOI_RO, toi_ro)
+PAGEFLAG(TOI_Dirty, toi_dirty)
+PAGEFLAG(TOI_Untracked, toi_untracked)
+PAGEFLAG(TOI_CBW, toi_cbw)
+#else
+PAGEFLAG_FALSE(TOI_RO)
+PAGEFLAG_FALSE(TOI_Dirty)
+PAGEFLAG_FALSE(TOI_Untracked)
+PAGEFLAG_FALSE(TOI_CBW)
 #endif
 
 #if defined(CONFIG_IDLE_PAGE_TRACKING) && defined(CONFIG_64BIT)
@@ -609,8 +626,12 @@ static inline void ClearPageSlabPfmemalloc(struct page *page)
  * __PG_HWPOISON is exceptional because it needs to be kept beyond page's
  * alloc-free cycle to prevent from reusing the page.
  */
-#define PAGE_FLAGS_CHECK_AT_PREP	\
-	(((1 << NR_PAGEFLAGS) - 1) & ~__PG_HWPOISON)
+#ifdef CONFIG_TOI_INCREMENTAL
+#define PAGE_FLAGS_CHECK_AT_PREP	(((1 << NR_PAGEFLAGS) - 1) & \
+        ~((1 << PG_toi_dirty) | (1 << PG_toi_ro) | ~__PG_HWPOISON))
+#else
+#define PAGE_FLAGS_CHECK_AT_PREP	(((1 << NR_PAGEFLAGS) - 1) & ~__PG_HWPOISON)
+#endif
 
 #define PAGE_FLAGS_PRIVATE				\
 	(1 << PG_private | 1 << PG_private_2)
