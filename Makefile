@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 4
 SUBLEVEL = 3
-EXTRAVERSION = -zen
-NAME = Bloat Rage
+EXTRAVERSION = -backbone
+NAME = Blurry Fish Butt
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
