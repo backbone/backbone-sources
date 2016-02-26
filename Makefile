@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 4
 SUBLEVEL = 3
-EXTRAVERSION =
-NAME = Blurry Fish Butt
+EXTRAVERSION = -zen
+NAME = Bloat Rage
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -609,6 +609,8 @@ KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
+else ifdef CONFIG_CC_OPTIMIZE_HARDER
+KBUILD_CFLAGS	+= -O3 $(call cc-disable-warning,maybe-uninitialized,)
 else
 KBUILD_CFLAGS	+= -O2
 endif
