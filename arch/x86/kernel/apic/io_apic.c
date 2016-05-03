@@ -3543,6 +3543,7 @@ void __init setup_ioapic_dest(void)
 {
 	int pin, ioapic, irq, irq_entry;
 	const struct cpumask *mask;
+	struct irq_desc *desc;
 	struct irq_data *idata;
 
 	if (skip_ioapic_setup == 1)
@@ -3558,7 +3559,9 @@ void __init setup_ioapic_dest(void)
 		if ((ioapic > 0) && (irq > 16))
 			continue;
 
-		idata = irq_get_irq_data(irq);
+		desc = irq_to_desc(irq);
+		raw_spin_lock_irq(&desc->lock);
+		idata = irq_desc_get_irq_data(desc);
 
 		/*
 		 * Honour affinities which have been set in early boot
@@ -3569,6 +3572,7 @@ void __init setup_ioapic_dest(void)
 			mask = apic->target_cpus();
 
 		x86_io_apic_ops.set_affinity(idata, mask, false);
+		raw_spin_unlock_irq(&desc->lock);
 	}
 
 }

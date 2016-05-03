@@ -1,7 +1,7 @@
 VERSION = 3
 PATCHLEVEL = 16
-SUBLEVEL = 7
-EXTRAVERSION = -backbone-r1
+SUBLEVEL = 35
+EXTRAVERSION = -backbone
 NAME = Museum of Fishiegoodies
 
 # *DOCUMENTATION*
@@ -303,7 +303,7 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 
 HOSTCC       = gcc
 HOSTCXX      = g++
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer
+HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89
 HOSTCXXFLAGS = -O2
 
 ifeq ($(shell $(HOSTCC) -v 2>&1 | grep -c "clang version"), 1)
@@ -406,7 +406,8 @@ KBUILD_CPPFLAGS := -D__KERNEL__
 KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
-		   -Wno-format-security
+		   -Wno-format-security \
+		   -std=gnu89
 
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
@@ -754,10 +755,11 @@ endif
 
 include $(srctree)/scripts/Makefile.extrawarn
 
-# Add user supplied CPPFLAGS, AFLAGS and CFLAGS as the last assignments
-KBUILD_CPPFLAGS += $(KCPPFLAGS)
-KBUILD_AFLAGS += $(KAFLAGS)
-KBUILD_CFLAGS += $(KCFLAGS)
+# Add any arch overrides and user supplied CPPFLAGS, AFLAGS and CFLAGS as the
+# last assignments
+KBUILD_CPPFLAGS += $(ARCH_CPPFLAGS) $(KCPPFLAGS)
+KBUILD_AFLAGS   += $(ARCH_AFLAGS)   $(KAFLAGS)
+KBUILD_CFLAGS   += $(ARCH_CFLAGS)   $(KCFLAGS)
 
 # Use --build-id when available.
 LDFLAGS_BUILD_ID = $(patsubst -Wl$(comma)%,%,\
