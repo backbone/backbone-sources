@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 6
 SUBLEVEL = 0
-EXTRAVERSION =
-NAME = Charred Weasel
+EXTRAVERSION = -zen
+NAME = Colonel Panic
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
