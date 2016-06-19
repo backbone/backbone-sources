@@ -124,8 +124,7 @@ static void early_efi_write_char(u32 *dst, unsigned char c, unsigned int h)
 }
 
 static void
-early_efi_write(struct console *con, const char *str, unsigned int num,
-		unsigned int loglevel)
+early_efi_write(struct console *con, const char *str, unsigned int num)
 {
 	struct screen_info *si;
 	unsigned int len;
