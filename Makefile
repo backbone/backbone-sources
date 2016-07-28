@@ -1,6 +1,6 @@
 VERSION = 4
 PATCHLEVEL = 6
-SUBLEVEL = 4
+SUBLEVEL = 5
 EXTRAVERSION = -zen
 NAME = Colonel Panic
 
