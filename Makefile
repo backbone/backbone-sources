@@ -1,7 +1,7 @@
 VERSION = 4
 PATCHLEVEL = 6
 SUBLEVEL = 7
-EXTRAVERSION =
+EXTRAVERSION = -backbone
 NAME = Charred Weasel
 
 # *DOCUMENTATION*
@@ -616,6 +616,8 @@ KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
+else ifdef CONFIG_CC_OPTIMIZE_HARDER
+KBUILD_CFLAGS	+= -O3 $(call cc-disable-warning,maybe-uninitialized,)
 else
 KBUILD_CFLAGS	+= -O2
 endif
