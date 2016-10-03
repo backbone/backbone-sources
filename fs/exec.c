@@ -57,6 +57,8 @@
 #include <linux/oom.h>
 #include <linux/compat.h>
 
+#include <trace/events/fs.h>
+
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
 #include <asm/tlb.h>
@@ -103,6 +105,7 @@ bool path_noexec(const struct path *path)
 	return (path->mnt->mnt_flags & MNT_NOEXEC) ||
 	       (path->mnt->mnt_sb->s_iflags & SB_I_NOEXEC);
 }
+EXPORT_SYMBOL_GPL(path_noexec);
 
 #ifdef CONFIG_USELIB
 /*
@@ -790,8 +793,10 @@ static struct file *do_open_execat(int fd, struct filename *name, int flags)
 	if (err)
 		goto exit;
 
-	if (name->name[0] != '\0')
+	if (name->name[0] != '\0') {
 		fsnotify_open(file);
+		trace_open_exec(name->name);
+	}
 
 out:
 	return file;
