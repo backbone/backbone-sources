@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 7
 SUBLEVEL = 6
-EXTRAVERSION = -zen
-NAME = Hairy Boy Scout
+EXTRAVERSION = -backbone
+NAME = Psychotic Stoned Sheep
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
