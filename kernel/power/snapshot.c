@@ -812,20 +812,20 @@ static bool memory_bm_pfn_present(struct memory_bitmap *bm, int index, unsigned 
  */
 static bool rtree_next_node(struct memory_bitmap *bm, int index)
 {
-	bm->cur[index].node = list_entry(bm->cur[index].node->list.next,
-				  struct rtree_node, list);
-	if (&bm->cur[index].node->list != &bm->cur[index].zone->leaves) {
-		bm->cur[index].node_pfn += BM_BITS_PER_BLOCK;
-		bm->cur[index].node_bit  = 0;
+	if (!list_is_last(&bm->cur.node->list, &bm->cur.zone->leaves)) {
+		bm->cur.node = list_entry(bm->cur.node->list.next,
+					  struct rtree_node, list);
+		bm->cur.node_pfn += BM_BITS_PER_BLOCK;
+		bm->cur.node_bit  = 0;
 		touch_softlockup_watchdog();
 		return true;
 	}
 
 	/* No more nodes, goto next zone */
-	bm->cur[index].zone = list_entry(bm->cur[index].zone->list.next,
+	if (!list_is_last(&bm->cur.zone->list, &bm->zones)) {
+		bm->cur.zone = list_entry(bm->cur.zone->list.next,
 				  struct mem_zone_bm_rtree, list);
-	if (&bm->cur[index].zone->list != &bm->zones) {
-		bm->cur[index].node = list_entry(bm->cur[index].zone->leaves.next,
+		bm->cur.node = list_entry(bm->cur.zone->leaves.next,
 					  struct rtree_node, list);
 		bm->cur[index].node_pfn = 0;
 		bm->cur[index].node_bit = 0;
