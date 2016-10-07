@@ -1,7 +1,7 @@
 VERSION = 4
 PATCHLEVEL = 4
-SUBLEVEL = 23
-EXTRAVERSION = -backbone-r2
+SUBLEVEL = 24
+EXTRAVERSION = -backbone
 NAME = Blurry Fish Butt
 
 # *DOCUMENTATION*
