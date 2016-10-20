@@ -1,7 +1,7 @@
 VERSION = 4
 PATCHLEVEL = 8
-SUBLEVEL = 2
-EXTRAVERSION = -backbone-r1
+SUBLEVEL = 3
+EXTRAVERSION = -backbone
 NAME = Psychotic Stoned Sheep
 
 # *DOCUMENTATION*
