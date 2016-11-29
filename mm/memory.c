@@ -137,6 +137,8 @@ static int __init setup_uksm_zero_page(void)
 core_initcall(setup_uksm_zero_page);
 #endif
 
+EXPORT_SYMBOL(zero_pfn);
+
 /*
  * CONFIG_MMU architectures set up ZERO_PAGE in their paging_init()
  */
