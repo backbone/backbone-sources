@@ -137,12 +137,12 @@
 
 void print_scheduler_version(void)
 {
-	printk(KERN_INFO "MuQSS CPU scheduler v0.144 by Con Kolivas.\n");
+	printk(KERN_INFO "MuQSS CPU scheduler v0.150 by Con Kolivas.\n");
 }
 
 /*
  * This is the time all tasks within the same priority round robin.
- * Value is in ms and set to a minimum of 6ms. Scales with number of cpus.
+ * Value is in ms and set to a minimum of 6ms.
  * Tunable via /proc interface.
  */
 #ifdef CONFIG_ZEN_INTERACTIVE
@@ -151,9 +151,10 @@ int rr_interval __read_mostly = 3;
 int rr_interval __read_mostly = 6;
 #endif
 
-/* Tunable to choose whether to prioritise latency or throughput, simple
- * binary yes or no */
-
+/*
+ * Tunable to choose whether to prioritise latency or throughput, simple
+ * binary yes or no
+ */
 int sched_interactive __read_mostly = 1;
 
 /*
@@ -166,6 +167,14 @@ int sched_iso_cpu __read_mostly = 25;
 #else
 int sched_iso_cpu __read_mostly = 70;
 #endif
+
+/*
+ * sched_yield_type - Choose what sort of yield sched_yield will perform.
+ * 0: No yield.
+ * 1: Yield only to better priority/deadline tasks. (default)
+ * 2: Expire timeslice and recalculate deadline.
+ */
+int sched_yield_type __read_mostly = 1;
 
 /*
  * The relative length of deadline for each priority(nice) level.
@@ -5053,9 +5062,12 @@ SYSCALL_DEFINE0(sched_yield)
 	struct task_struct *p;
 	struct rq *rq;
 
+	if (!sched_yield_type)
+		goto out;
 	p = current;
 	rq = this_rq_lock();
-	time_slice_expired(p, rq);
+	if (sched_yield_type > 1)
+		time_slice_expired(p, rq);
 	schedstat_inc(task_rq(p), yld_count);
 
 	/*
@@ -5068,7 +5080,7 @@ SYSCALL_DEFINE0(sched_yield)
 	sched_preempt_enable_no_resched();
 
 	schedule();
-
+out:
 	return 0;
 }
 
