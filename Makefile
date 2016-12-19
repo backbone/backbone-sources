@@ -2,7 +2,7 @@
 VERSION = 4
 PATCHLEVEL = 15
 SUBLEVEL = 0
-EXTRAVERSION = -bfq-rc7
+EXTRAVERSION = -bfq-mq-rc7
 NAME = Fearless Coyote
 
 # *DOCUMENTATION*
