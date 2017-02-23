@@ -1,7 +1,7 @@
 VERSION = 4
 PATCHLEVEL = 9
-SUBLEVEL = 11
-EXTRAVERSION = -backbone-r1
+SUBLEVEL = 12
+EXTRAVERSION = -backbone
 NAME = Roaring Lionus
 
 # *DOCUMENTATION*
