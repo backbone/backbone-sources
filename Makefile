@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 10
 SUBLEVEL = 2
-EXTRAVERSION = -zen
-NAME = TTY Velocity
+EXTRAVERSION = -backbone
+NAME = Fearless Coyote
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
