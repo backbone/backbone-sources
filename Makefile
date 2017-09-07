@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 13
 SUBLEVEL = 0
-EXTRAVERSION = -zen
-NAME = Mediated Meditation
+EXTRAVERSION = -backbone
+NAME = Fearless Coyote
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
