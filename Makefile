@@ -2,7 +2,7 @@
 VERSION = 4
 PATCHLEVEL = 14
 SUBLEVEL = 6
-EXTRAVERSION = -backbone
+EXTRAVERSION = -backbone-r1
 NAME = Petit Gorille
 
 # *DOCUMENTATION*
