@@ -2,8 +2,8 @@
 VERSION = 4
 PATCHLEVEL = 15
 SUBLEVEL = 18
-EXTRAVERSION =
-NAME = Fearless Coyote
+EXTRAVERSION = -zen
+NAME = Supercritical Solace
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
