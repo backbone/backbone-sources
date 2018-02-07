@@ -669,12 +669,16 @@ int rdma_resolve_ip(struct rdma_addr_client *client,
 			goto err;
 		}
 
-		memcpy(src_in, src_addr, rdma_addr_size(src_addr));
+		memcpy((struct sockaddr_storage *) src_in,
+			(struct sockaddr_storage *) src_addr,
+			rdma_addr_size(src_addr));
 	} else {
 		src_in->sa_family = dst_addr->sa_family;
 	}
 
-	memcpy(dst_in, dst_addr, rdma_addr_size(dst_addr));
+	memcpy((struct sockaddr_storage *) dst_in,
+		(struct sockaddr_storage *) dst_addr,
+		rdma_addr_size(dst_addr));
 	req->addr = addr;
 	req->callback = callback;
 	req->context = context;
