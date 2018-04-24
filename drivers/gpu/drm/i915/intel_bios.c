@@ -1222,6 +1222,12 @@ static void parse_ddi_port(struct drm_i915_private *dev_priv, enum port port,
 	if (is_dvi) {
 		info->alternate_ddc_pin = map_ddc_pin(dev_priv, ddc_pin);
 
+                if (!intel_gmbus_is_valid_pin(dev_priv, info->alternate_ddc_pin)) {
+                        DRM_ERROR("pin %d is invalid for port %c, ignore it\n",
+                            info->alternate_ddc_pin, port_name(port));
+                        info->alternate_ddc_pin = 0;
+                }
+
 		sanitize_ddc_pin(dev_priv, port);
 	}
 
