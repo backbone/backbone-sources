@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0
 VERSION = 4
 PATCHLEVEL = 16
-SUBLEVEL = 12
-EXTRAVERSION = -backbone-r1
+SUBLEVEL = 13
+EXTRAVERSION = -backbone
 NAME = Fearless Coyote
 
 # *DOCUMENTATION*
