@@ -2,7 +2,7 @@
 VERSION = 4
 PATCHLEVEL = 16
 SUBLEVEL = 13
-EXTRAVERSION = -backbone
+EXTRAVERSION = -backbone-r1
 NAME = Fearless Coyote
 
 # *DOCUMENTATION*
