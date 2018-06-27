@@ -992,17 +992,7 @@ emit_cond_jmp:		/* convert BPF opcode to x86 */
 			break;
 
 		case BPF_JMP | BPF_JA:
-			if (insn->off == -1)
-				/* -1 jmp instructions will always jump
-				 * backwards two bytes. Explicitly handling
-				 * this case avoids wasting too many passes
-				 * when there are long sequences of replaced
-				 * dead code.
-				 */
-				jmp_offset = -2;
-			else
-				jmp_offset = addrs[i + insn->off] - addrs[i];
-
+			jmp_offset = addrs[i + insn->off] - addrs[i];
 			if (!jmp_offset)
 				/* optimize out nop jumps */
 				break;
@@ -1201,7 +1191,6 @@ skip_init_addrs:
 	for (pass = 0; pass < 20 || image; pass++) {
 		proglen = do_jit(prog, addrs, image, oldproglen, &ctx);
 		if (proglen <= 0) {
-out_image:
 			image = NULL;
 			if (header)
 				bpf_jit_binary_free(header);
@@ -1212,7 +1201,8 @@ out_image:
 			if (proglen != oldproglen) {
 				pr_err("bpf_jit: proglen=%d != oldproglen=%d\n",
 				       proglen, oldproglen);
-				goto out_image;
+				prog = orig_prog;
+				goto out_addrs;
 			}
 			break;
 		}
@@ -1249,7 +1239,7 @@ out_image:
 		prog = orig_prog;
 	}
 
-	if (!image || !prog->is_func || extra_pass) {
+	if (!prog->is_func || extra_pass) {
 out_addrs:
 		kfree(addrs);
 		kfree(jit_data);

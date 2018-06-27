@@ -88,9 +88,9 @@
  * pio buffers per ctxt, etc.)  Zero means use one user context per CPU.
  */
 int num_user_contexts = -1;
-module_param_named(num_user_contexts, num_user_contexts, int, 0444);
+module_param_named(num_user_contexts, num_user_contexts, uint, S_IRUGO);
 MODULE_PARM_DESC(
-	num_user_contexts, "Set max number of user contexts to use (default: -1 will use the real (non-HT) CPU count)");
+	num_user_contexts, "Set max number of user contexts to use");
 
 uint krcvqs[RXE_NUM_DATA_VL];
 int krcvqsset;
@@ -1209,47 +1209,28 @@ static void finalize_asic_data(struct hfi1_devdata *dd,
 	kfree(ad);
 }
 
-/**
- * hfi1_clean_devdata - cleans up per-unit data structure
- * @dd: pointer to a valid devdata structure
- *
- * It cleans up all data structures set up by
- * by hfi1_alloc_devdata().
- */
-static void hfi1_clean_devdata(struct hfi1_devdata *dd)
+static void __hfi1_free_devdata(struct kobject *kobj)
 {
+	struct hfi1_devdata *dd =
+		container_of(kobj, struct hfi1_devdata, kobj);
 	struct hfi1_asic_data *ad;
 	unsigned long flags;
 
 	spin_lock_irqsave(&hfi1_devs_lock, flags);
-	if (!list_empty(&dd->list)) {
-		idr_remove(&hfi1_unit_table, dd->unit);
-		list_del_init(&dd->list);
-	}
+	idr_remove(&hfi1_unit_table, dd->unit);
+	list_del(&dd->list);
 	ad = release_asic_data(dd);
 	spin_unlock_irqrestore(&hfi1_devs_lock, flags);
-
-	finalize_asic_data(dd, ad);
+	if (ad)
+		finalize_asic_data(dd, ad);
 	free_platform_config(dd);
 	rcu_barrier(); /* wait for rcu callbacks to complete */
 	free_percpu(dd->int_counter);
 	free_percpu(dd->rcv_limit);
 	free_percpu(dd->send_schedule);
 	free_percpu(dd->tx_opstats);
-	dd->int_counter   = NULL;
-	dd->rcv_limit     = NULL;
-	dd->send_schedule = NULL;
-	dd->tx_opstats    = NULL;
 	sdma_clean(dd, dd->num_sdma);
 	rvt_dealloc_device(&dd->verbs_dev.rdi);
-}
-
-static void __hfi1_free_devdata(struct kobject *kobj)
-{
-	struct hfi1_devdata *dd =
-		container_of(kobj, struct hfi1_devdata, kobj);
-
-	hfi1_clean_devdata(dd);
 }
 
 static struct kobj_type hfi1_devdata_type = {
@@ -1352,7 +1333,9 @@ struct hfi1_devdata *hfi1_alloc_devdata(struct pci_dev *pdev, size_t extra)
 	return dd;
 
 bail:
-	hfi1_clean_devdata(dd);
+	if (!list_empty(&dd->list))
+		list_del_init(&dd->list);
+	rvt_dealloc_device(&dd->verbs_dev.rdi);
 	return ERR_PTR(ret);
 }
 

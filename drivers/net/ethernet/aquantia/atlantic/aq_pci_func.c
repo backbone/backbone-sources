@@ -267,15 +267,16 @@ static int aq_pci_probe(struct pci_dev *pdev,
 	numvecs = min(numvecs, num_online_cpus());
 	/*enable interrupts */
 #if !AQ_CFG_FORCE_LEGACY_INT
-	err = pci_alloc_irq_vectors(self->pdev, 1, numvecs,
-				    PCI_IRQ_MSIX | PCI_IRQ_MSI |
-				    PCI_IRQ_LEGACY);
+	err = pci_alloc_irq_vectors(self->pdev, numvecs, numvecs,
+				    PCI_IRQ_MSIX);
 
-	if (err < 0)
-		goto err_hwinit;
-	numvecs = err;
+	if (err < 0) {
+		err = pci_alloc_irq_vectors(self->pdev, 1, 1,
+					    PCI_IRQ_MSI | PCI_IRQ_LEGACY);
+		if (err < 0)
+			goto err_hwinit;
+	}
 #endif
-	self->irqvecs = numvecs;
 
 	/* net device init */
 	aq_nic_cfg_start(self);
@@ -297,9 +298,9 @@ err_free_aq_hw:
 	kfree(self->aq_hw);
 err_ioremap:
 	free_netdev(ndev);
-err_ndev:
-	pci_release_regions(pdev);
 err_pci_func:
+	pci_release_regions(pdev);
+err_ndev:
 	pci_disable_device(pdev);
 	return err;
 }

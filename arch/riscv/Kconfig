@@ -11,7 +11,6 @@ config RISCV
 	select ARCH_WANT_FRAME_POINTERS
 	select CLONE_BACKWARDS
 	select COMMON_CLK
-	select DMA_DIRECT_OPS
 	select GENERIC_CLOCKEVENTS
 	select GENERIC_CPU_DEVICES
 	select GENERIC_IRQ_SHOW
@@ -88,6 +87,9 @@ config PGTABLE_LEVELS
 
 config HAVE_KPROBES
 	def_bool n
+
+config DMA_DIRECT_OPS
+	def_bool y
 
 menu "Platform type"
 

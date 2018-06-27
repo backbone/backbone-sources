@@ -281,7 +281,8 @@ nfp_nsp_wait_reg(struct nfp_cpp *cpp, u64 *reg, u32 nsp_cpp, u64 addr,
 		if ((*reg & mask) == val)
 			return 0;
 
-		msleep(25);
+		if (msleep_interruptible(25))
+			return -ERESTARTSYS;
 
 		if (time_after(start_time, wait_until))
 			return -ETIMEDOUT;

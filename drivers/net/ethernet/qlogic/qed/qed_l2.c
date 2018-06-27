@@ -115,7 +115,8 @@ int qed_l2_alloc(struct qed_hwfn *p_hwfn)
 
 void qed_l2_setup(struct qed_hwfn *p_hwfn)
 {
-	if (!QED_IS_L2_PERSONALITY(p_hwfn))
+	if (p_hwfn->hw_info.personality != QED_PCI_ETH &&
+	    p_hwfn->hw_info.personality != QED_PCI_ETH_ROCE)
 		return;
 
 	mutex_init(&p_hwfn->p_l2_info->lock);
@@ -125,7 +126,8 @@ void qed_l2_free(struct qed_hwfn *p_hwfn)
 {
 	u32 i;
 
-	if (!QED_IS_L2_PERSONALITY(p_hwfn))
+	if (p_hwfn->hw_info.personality != QED_PCI_ETH &&
+	    p_hwfn->hw_info.personality != QED_PCI_ETH_ROCE)
 		return;
 
 	if (!p_hwfn->p_l2_info)
