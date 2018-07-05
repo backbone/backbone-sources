@@ -538,10 +538,7 @@ static int sockfs_setattr(struct dentry *dentry, struct iattr *iattr)
 	if (!err && (iattr->ia_valid & ATTR_UID)) {
 		struct socket *sock = SOCKET_I(d_inode(dentry));
 
-		if (sock->sk)
-			sock->sk->sk_uid = iattr->ia_uid;
-		else
-			err = -ENOENT;
+		sock->sk->sk_uid = iattr->ia_uid;
 	}
 
 	return err;
@@ -590,16 +587,12 @@ EXPORT_SYMBOL(sock_alloc);
  *	an inode not a file.
  */
 
-static void __sock_release(struct socket *sock, struct inode *inode)
+void sock_release(struct socket *sock)
 {
 	if (sock->ops) {
 		struct module *owner = sock->ops->owner;
 
-		if (inode)
-			inode_lock(inode);
 		sock->ops->release(sock);
-		if (inode)
-			inode_unlock(inode);
 		sock->ops = NULL;
 		module_put(owner);
 	}
@@ -612,11 +605,6 @@ static void __sock_release(struct socket *sock, struct inode *inode)
 		return;
 	}
 	sock->file = NULL;
-}
-
-void sock_release(struct socket *sock)
-{
-	__sock_release(sock, NULL);
 }
 EXPORT_SYMBOL(sock_release);
 
@@ -1158,7 +1146,7 @@ static int sock_mmap(struct file *file, struct vm_area_struct *vma)
 
 static int sock_close(struct inode *inode, struct file *filp)
 {
-	__sock_release(SOCKET_I(inode), inode);
+	sock_release(SOCKET_I(inode));
 	return 0;
 }
 

@@ -399,7 +399,6 @@ struct afs_server_list {
 	unsigned short		index;		/* Server currently in use */
 	unsigned short		vnovol_mask;	/* Servers to be skipped due to VNOVOL */
 	unsigned int		seq;		/* Set to ->servers_seq when installed */
-	rwlock_t		lock;
 	struct afs_server_entry	servers[];
 };
 
@@ -606,15 +605,13 @@ extern void afs_init_callback_state(struct afs_server *);
 extern void afs_break_callback(struct afs_vnode *);
 extern void afs_break_callbacks(struct afs_server *, size_t,struct afs_callback[]);
 
-extern int afs_register_server_cb_interest(struct afs_vnode *,
-					   struct afs_server_list *, unsigned int);
+extern int afs_register_server_cb_interest(struct afs_vnode *, struct afs_server_entry *);
 extern void afs_put_cb_interest(struct afs_net *, struct afs_cb_interest *);
 extern void afs_clear_callback_interests(struct afs_net *, struct afs_server_list *);
 
 static inline struct afs_cb_interest *afs_get_cb_interest(struct afs_cb_interest *cbi)
 {
-	if (cbi)
-		refcount_inc(&cbi->usage);
+	refcount_inc(&cbi->usage);
 	return cbi;
 }
 

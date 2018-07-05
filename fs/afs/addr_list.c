@@ -121,7 +121,7 @@ struct afs_addr_list *afs_parse_text_addrs(const char *text, size_t len,
 	p = text;
 	do {
 		struct sockaddr_rxrpc *srx = &alist->addrs[alist->nr_addrs];
-		const char *q, *stop;
+		char tdelim = delim;
 
 		if (*p == delim) {
 			p++;
@@ -130,33 +130,28 @@ struct afs_addr_list *afs_parse_text_addrs(const char *text, size_t len,
 
 		if (*p == '[') {
 			p++;
-			q = memchr(p, ']', end - p);
-		} else {
-			for (q = p; q < end; q++)
-				if (*q == '+' || *q == delim)
-					break;
+			tdelim = ']';
 		}
 
-		if (in4_pton(p, q - p,
+		if (in4_pton(p, end - p,
 			     (u8 *)&srx->transport.sin6.sin6_addr.s6_addr32[3],
-			     -1, &stop)) {
+			     tdelim, &p)) {
 			srx->transport.sin6.sin6_addr.s6_addr32[0] = 0;
 			srx->transport.sin6.sin6_addr.s6_addr32[1] = 0;
 			srx->transport.sin6.sin6_addr.s6_addr32[2] = htonl(0xffff);
-		} else if (in6_pton(p, q - p,
+		} else if (in6_pton(p, end - p,
 				    srx->transport.sin6.sin6_addr.s6_addr,
-				    -1, &stop)) {
+				    tdelim, &p)) {
 			/* Nothing to do */
 		} else {
 			goto bad_address;
 		}
 
-		if (stop != q)
-			goto bad_address;
-
-		p = q;
-		if (q < end && *q == ']')
+		if (tdelim == ']') {
+			if (p == end || *p != ']')
+				goto bad_address;
 			p++;
+		}
 
 		if (p < end) {
 			if (*p == '+') {

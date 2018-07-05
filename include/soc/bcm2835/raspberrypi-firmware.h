@@ -125,13 +125,13 @@ struct rpi_firmware *rpi_firmware_get(struct device_node *firmware_node);
 static inline int rpi_firmware_property(struct rpi_firmware *fw, u32 tag,
 					void *data, size_t len)
 {
-	return -ENOSYS;
+	return 0;
 }
 
 static inline int rpi_firmware_property_list(struct rpi_firmware *fw,
 					     void *data, size_t tag_size)
 {
-	return -ENOSYS;
+	return 0;
 }
 
 static inline struct rpi_firmware *rpi_firmware_get(struct device_node *firmware_node)

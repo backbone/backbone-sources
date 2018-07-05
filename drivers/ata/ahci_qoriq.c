@@ -96,7 +96,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
 
 	DPRINTK("ENTER\n");
 
-	hpriv->stop_engine(ap);
+	ahci_stop_engine(ap);
 
 	/*
 	 * There is a errata on ls1021a Rev1.0 and Rev2.0 which is:

@@ -377,21 +377,31 @@ static int omap2_onenand_read_bufferram(struct mtd_info *mtd, int area,
 {
 	struct omap2_onenand *c = container_of(mtd, struct omap2_onenand, mtd);
 	struct onenand_chip *this = mtd->priv;
-	struct device *dev = &c->pdev->dev;
-	void *buf = (void *)buffer;
 	dma_addr_t dma_src, dma_dst;
-	int bram_offset, err;
+	int bram_offset;
+	void *buf = (void *)buffer;
 	size_t xtra;
+	int ret;
 
 	bram_offset = omap2_onenand_bufferram_offset(mtd, area) + area + offset;
-	/*
-	 * If the buffer address is not DMA-able, len is not long enough to make
-	 * DMA transfers profitable or panic_write() may be in an interrupt
-	 * context fallback to PIO mode.
-	 */
-	if (!virt_addr_valid(buf) || bram_offset & 3 || (size_t)buf & 3 ||
-	    count < 384 || in_interrupt() || oops_in_progress )
+	if (bram_offset & 3 || (size_t)buf & 3 || count < 384)
 		goto out_copy;
+
+	/* panic_write() may be in an interrupt context */
+	if (in_interrupt() || oops_in_progress)
+		goto out_copy;
+
+	if (buf >= high_memory) {
+		struct page *p1;
+
+		if (((size_t)buf & PAGE_MASK) !=
+		    ((size_t)(buf + count - 1) & PAGE_MASK))
+			goto out_copy;
+		p1 = vmalloc_to_page(buf);
+		if (!p1)
+			goto out_copy;
+		buf = page_address(p1) + ((size_t)buf & ~PAGE_MASK);
+	}
 
 	xtra = count & 3;
 	if (xtra) {
@@ -399,20 +409,24 @@ static int omap2_onenand_read_bufferram(struct mtd_info *mtd, int area,
 		memcpy(buf + count, this->base + bram_offset + count, xtra);
 	}
 
-	dma_dst = dma_map_single(dev, buf, count, DMA_FROM_DEVICE);
 	dma_src = c->phys_base + bram_offset;
-
-	if (dma_mapping_error(dev, dma_dst)) {
-		dev_err(dev, "Couldn't DMA map a %d byte buffer\n", count);
+	dma_dst = dma_map_single(&c->pdev->dev, buf, count, DMA_FROM_DEVICE);
+	if (dma_mapping_error(&c->pdev->dev, dma_dst)) {
+		dev_err(&c->pdev->dev,
+			"Couldn't DMA map a %d byte buffer\n",
+			count);
 		goto out_copy;
 	}
 
-	err = omap2_onenand_dma_transfer(c, dma_src, dma_dst, count);
-	dma_unmap_single(dev, dma_dst, count, DMA_FROM_DEVICE);
-	if (!err)
-		return 0;
+	ret = omap2_onenand_dma_transfer(c, dma_src, dma_dst, count);
+	dma_unmap_single(&c->pdev->dev, dma_dst, count, DMA_FROM_DEVICE);
 
-	dev_err(dev, "timeout waiting for DMA\n");
+	if (ret) {
+		dev_err(&c->pdev->dev, "timeout waiting for DMA\n");
+		goto out_copy;
+	}
+
+	return 0;
 
 out_copy:
 	memcpy(buf, this->base + bram_offset, count);
@@ -425,34 +439,49 @@ static int omap2_onenand_write_bufferram(struct mtd_info *mtd, int area,
 {
 	struct omap2_onenand *c = container_of(mtd, struct omap2_onenand, mtd);
 	struct onenand_chip *this = mtd->priv;
-	struct device *dev = &c->pdev->dev;
-	void *buf = (void *)buffer;
 	dma_addr_t dma_src, dma_dst;
-	int bram_offset, err;
+	int bram_offset;
+	void *buf = (void *)buffer;
+	int ret;
 
 	bram_offset = omap2_onenand_bufferram_offset(mtd, area) + area + offset;
-	/*
-	 * If the buffer address is not DMA-able, len is not long enough to make
-	 * DMA transfers profitable or panic_write() may be in an interrupt
-	 * context fallback to PIO mode.
-	 */
-	if (!virt_addr_valid(buf) || bram_offset & 3 || (size_t)buf & 3 ||
-	    count < 384 || in_interrupt() || oops_in_progress )
+	if (bram_offset & 3 || (size_t)buf & 3 || count < 384)
 		goto out_copy;
 
-	dma_src = dma_map_single(dev, buf, count, DMA_TO_DEVICE);
+	/* panic_write() may be in an interrupt context */
+	if (in_interrupt() || oops_in_progress)
+		goto out_copy;
+
+	if (buf >= high_memory) {
+		struct page *p1;
+
+		if (((size_t)buf & PAGE_MASK) !=
+		    ((size_t)(buf + count - 1) & PAGE_MASK))
+			goto out_copy;
+		p1 = vmalloc_to_page(buf);
+		if (!p1)
+			goto out_copy;
+		buf = page_address(p1) + ((size_t)buf & ~PAGE_MASK);
+	}
+
+	dma_src = dma_map_single(&c->pdev->dev, buf, count, DMA_TO_DEVICE);
 	dma_dst = c->phys_base + bram_offset;
-	if (dma_mapping_error(dev, dma_src)) {
-		dev_err(dev, "Couldn't DMA map a %d byte buffer\n", count);
+	if (dma_mapping_error(&c->pdev->dev, dma_src)) {
+		dev_err(&c->pdev->dev,
+			"Couldn't DMA map a %d byte buffer\n",
+			count);
+		return -1;
+	}
+
+	ret = omap2_onenand_dma_transfer(c, dma_src, dma_dst, count);
+	dma_unmap_single(&c->pdev->dev, dma_src, count, DMA_TO_DEVICE);
+
+	if (ret) {
+		dev_err(&c->pdev->dev, "timeout waiting for DMA\n");
 		goto out_copy;
 	}
 
-	err = omap2_onenand_dma_transfer(c, dma_src, dma_dst, count);
-	dma_unmap_page(dev, dma_src, count, DMA_TO_DEVICE);
-	if (!err)
-		return 0;
-
-	dev_err(dev, "timeout waiting for DMA\n");
+	return 0;
 
 out_copy:
 	memcpy(this->base + bram_offset, buf, count);

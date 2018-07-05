@@ -341,6 +341,7 @@ static int afs_deliver_cb_init_call_back_state(struct afs_call *call)
  */
 static int afs_deliver_cb_init_call_back_state3(struct afs_call *call)
 {
+	struct sockaddr_rxrpc srx;
 	struct afs_server *server;
 	struct afs_uuid *r;
 	unsigned loop;
@@ -397,9 +398,8 @@ static int afs_deliver_cb_init_call_back_state3(struct afs_call *call)
 
 	/* we'll need the file server record as that tells us which set of
 	 * vnodes to operate upon */
-	rcu_read_lock();
-	server = afs_find_server_by_uuid(call->net, call->request);
-	rcu_read_unlock();
+	rxrpc_kernel_get_peer(call->net->socket, call->rxcall, &srx);
+	server = afs_find_server(call->net, &srx);
 	if (!server)
 		return -ENOTCONN;
 	call->cm_server = server;
