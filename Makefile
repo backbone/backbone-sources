@@ -2,7 +2,7 @@
 VERSION = 4
 PATCHLEVEL = 17
 SUBLEVEL = 17
-EXTRAVERSION = -zen1
+EXTRAVERSION = -zen
 NAME = Thermonuclear Telephone
 
 # *DOCUMENTATION*
