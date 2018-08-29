@@ -70,11 +70,11 @@ config ZEN_INTERACTIVE
 	    Bandwidth slice size...........:   5    ->   3    ms
 	    Ondemand fine upscaling limit..:  95 %  ->  85 %
 
-	  --- PDS CPU Scheduler ----------------------------------
+	  --- MuQSS CPU Scheduler --------------------------------
 
 	    Scheduling interval............:   6    ->   3    ms
 	    ISO task max realtime use......:  70 %  ->  25 %
-	    Ondemand coarse upscaling limit:  63 %  ->  45 %
+	    Ondemand coarse upscaling limit:  80 %  ->  45 %
 	    Ondemand fine upscaling limit..:  95 %  ->  45 %
 
 config BROKEN
