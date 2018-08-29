@@ -2,7 +2,7 @@
 VERSION = 4
 PATCHLEVEL = 17
 SUBLEVEL = 19
-EXTRAVERSION = -backbone
+EXTRAVERSION = -backbone-r1
 NAME = Merciless Moray
 
 # *DOCUMENTATION*
