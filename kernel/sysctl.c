@@ -129,16 +129,16 @@ static int __maybe_unused one = 1;
 static int __maybe_unused two = 2;
 static int __maybe_unused four = 4;
 static unsigned long one_ul = 1;
-static int __read_mostly one_hundred = 100;
-static int __read_mostly one_thousand = 1000;
+static int one_hundred = 100;
+static int one_thousand = 1000;
 #ifdef CONFIG_SCHED_MUQSS
 extern int rr_interval;
 extern int sched_interactive;
 extern int sched_iso_cpu;
 extern int sched_yield_type;
-#endif
 extern int hrtimer_granularity_us;
 extern int hrtimeout_min_us;
+#endif
 #if defined(CONFIG_PRINTK) || defined(CONFIG_SCHED_MUQSS)
 static int ten_thousand = 10000;
 #endif
@@ -1095,7 +1095,6 @@ static struct ctl_table kern_table[] = {
 		.extra1		= &zero,
 		.extra2		= &two,
 	},
-#endif
 	{
 		.procname	= "hrtimer_granularity_us",
 		.data		= &hrtimer_granularity_us,
@@ -1114,6 +1113,7 @@ static struct ctl_table kern_table[] = {
 		.extra1		= &one,
 		.extra2		= &ten_thousand,
 	},
+#endif
 #if defined(CONFIG_S390) && defined(CONFIG_SMP)
 	{
 		.procname	= "spin_retry",
