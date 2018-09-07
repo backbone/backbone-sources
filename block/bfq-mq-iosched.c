@@ -485,7 +485,6 @@ static void bfq_limit_depth(unsigned int op, struct blk_mq_alloc_data *data)
 	if (op_is_sync(op) && !op_is_write(op))
 		return;
 
-	bt = &tags->bitmap_tags;
 	data->shallow_depth =
 		bfqd->word_depths[!!bfqd->wr_busy_queues][op_is_sync(op)];
 
