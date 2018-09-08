@@ -55,11 +55,11 @@ extern struct cred init_cred;
 	.pid = &init_struct_pid,				\
 }
 
-#ifdef CONFIG_SCHED_PDS
-#define INIT_TASK_COMM "PDS"
+#ifdef CONFIG_SCHED_MUQSS
+#define INIT_TASK_COMM "MuQSS"
 #else
 #define INIT_TASK_COMM "swapper"
-#endif /* CONFIG_SCHED_PDS */
+#endif
 
 /* Attach to the init_task data structure for proper alignment */
 #ifdef CONFIG_ARCH_TASK_STRUCT_ON_STACK

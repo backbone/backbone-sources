@@ -290,6 +290,12 @@ static int klp_check_stack(struct task_struct *task, char *err_buf)
 	return 0;
 }
 
+#ifdef CONFIG_SCHED_MUQSS
+typedef unsigned long rq_flags_t;
+#else
+typedef struct rq_flags rq_flags_t;
+#endif
+
 /*
  * Try to safely switch a task to the target patch state.  If it's currently
  * running, or it's sleeping on a to-be-patched or to-be-unpatched function, or
@@ -298,12 +304,7 @@ static int klp_check_stack(struct task_struct *task, char *err_buf)
 static bool klp_try_switch_task(struct task_struct *task)
 {
 	struct rq *rq;
-#ifdef	CONFIG_SCHED_PDS
-	raw_spinlock_t *lock;
-	unsigned long flags;
-#else
-	struct rq_flags flags;
-#endif
+	rq_flags_t flags;
 	int ret;
 	bool success = false;
 	char err_buf[STACK_ERR_BUF_SIZE];
@@ -326,15 +327,9 @@ static bool klp_try_switch_task(struct task_struct *task)
 	 * functions.  If all goes well, switch the task to the target patch
 	 * state.
 	 */
-#ifdef	CONFIG_SCHED_PDS
-	rq = task_access_lock_irqsave(task, &lock, &flags);
-
-	if (task_running(task) && task != current) {
-#else
 	rq = task_rq_lock(task, &flags);
 
 	if (task_running(rq, task) && task != current) {
-#endif
 		snprintf(err_buf, STACK_ERR_BUF_SIZE,
 			 "%s: %s:%d is running\n", __func__, task->comm,
 			 task->pid);
@@ -351,11 +346,7 @@ static bool klp_try_switch_task(struct task_struct *task)
 	task->patch_state = klp_target_state;
 
 done:
-#ifdef	CONFIG_SCHED_PDS
-	task_access_unlock_irqrestore(task, lock, &flags);
-#else
 	task_rq_unlock(rq, task, &flags);
-#endif
 
 	/*
 	 * Due to console deadlock issues, pr_debug() can't be used while

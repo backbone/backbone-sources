@@ -28,7 +28,9 @@
 #include <linux/mm_types_task.h>
 #include <linux/task_io_accounting.h>
 #include <linux/rseq.h>
+#ifdef CONFIG_SCHED_MUQSS
 #include <linux/skip_list.h>
+#endif
 
 /* task_struct member predeclarations (sorted alphabetically): */
 struct audit_context;
@@ -216,6 +218,34 @@ extern long schedule_timeout_interruptible(long timeout);
 extern long schedule_timeout_killable(long timeout);
 extern long schedule_timeout_uninterruptible(long timeout);
 extern long schedule_timeout_idle(long timeout);
+
+#if defined(CONFIG_HIGH_RES_TIMERS) && defined(CONFIG_SCHED_MUQSS)
+extern long schedule_msec_hrtimeout(long timeout);
+extern long schedule_min_hrtimeout(void);
+extern long schedule_msec_hrtimeout_interruptible(long timeout);
+extern long schedule_msec_hrtimeout_uninterruptible(long timeout);
+#else
+static inline long schedule_msec_hrtimeout(long timeout)
+{
+	return schedule_timeout(msecs_to_jiffies(timeout));
+}
+
+static inline long schedule_min_hrtimeout(void)
+{
+	return schedule_timeout(1);
+}
+
+static inline long schedule_msec_hrtimeout_interruptible(long timeout)
+{
+	return schedule_timeout_interruptible(msecs_to_jiffies(timeout));
+}
+
+static inline long schedule_msec_hrtimeout_uninterruptible(long timeout)
+{
+	return schedule_timeout_uninterruptible(msecs_to_jiffies(timeout));
+}
+#endif
+
 asmlinkage void schedule(void);
 extern void schedule_preempt_disabled(void);
 
@@ -614,13 +644,11 @@ struct task_struct {
 	unsigned int			flags;
 	unsigned int			ptrace;
 
-#if defined(CONFIG_SMP) && !defined(CONFIG_SCHED_PDS)
-	struct llist_node		wake_entry;
-#endif
-#if defined(CONFIG_SMP) || defined(CONFIG_SCHED_PDS)
-	int				on_cpu;
+#if defined(CONFIG_SMP) || defined(CONFIG_SCHED_MUQSS)
+	int on_cpu;
 #endif
 #ifdef CONFIG_SMP
+	struct llist_node		wake_entry;
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 	/* Current CPU: */
 	unsigned int			cpu;
@@ -629,7 +657,6 @@ struct task_struct {
 	unsigned long			wakee_flip_decay_ts;
 	struct task_struct		*last_wakee;
 
-#ifndef CONFIG_SCHED_PDS
 	/*
 	 * recent_used_cpu is initially set as the last CPU used by a task
 	 * that wakes affine another task. Waker/wakee relationships can
@@ -638,7 +665,6 @@ struct task_struct {
 	 * used CPU that may be idle.
 	 */
 	int				recent_used_cpu;
-#endif /* CONFIG_SCHED_PDS */
 	int				wake_cpu;
 #endif
 	int				on_rq;
@@ -647,28 +673,29 @@ struct task_struct {
 	int				static_prio;
 	int				normal_prio;
 	unsigned int			rt_priority;
+#ifdef CONFIG_SCHED_MUQSS
+	int time_slice;
+	u64 deadline;
+	skiplist_node node; /* Skip list node */
+	u64 last_ran;
+	u64 sched_time; /* sched_clock time spent running */
+#ifdef CONFIG_SMT_NICE
+	int smt_bias; /* Policy/nice level bias across smt siblings */
+#endif
+#ifdef CONFIG_HOTPLUG_CPU
+	bool zerobound; /* Bound to CPU0 for hotplug */
+#endif
+	unsigned long rt_timeout;
+#else /* CONFIG_SCHED_MUQSS */
 
-#ifdef CONFIG_SCHED_PDS
-	int				time_slice;
-	u64				deadline;
-	/* skip list level */
-	int				sl_level;
-	/* skip list node */
-	struct skiplist_node		sl_node;
-	/* 8bits prio and 56bits deadline for quick processing */
-	u64				priodl;
-	u64				last_ran;
-	/* sched_clock time spent running */
-	u64				sched_time;
-#else /* CONFIG_SCHED_PDS */
 	const struct sched_class	*sched_class;
 	struct sched_entity		se;
 	struct sched_rt_entity		rt;
-	struct sched_dl_entity		dl;
 #endif
 #ifdef CONFIG_CGROUP_SCHED
 	struct task_group		*sched_task_group;
 #endif
+	struct sched_dl_entity		dl;
 
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	/* List of struct preempt_notifier: */
@@ -813,6 +840,10 @@ struct task_struct {
 #ifdef CONFIG_ARCH_HAS_SCALED_CPUTIME
 	u64				utimescaled;
 	u64				stimescaled;
+#endif
+#ifdef CONFIG_SCHED_MUQSS
+	/* Unbanked cpu time */
+	unsigned long utime_ns, stime_ns;
 #endif
 	u64				gtime;
 	struct prev_cputime		prev_cputime;
@@ -1218,33 +1249,39 @@ struct task_struct {
 	 */
 };
 
-#ifdef CONFIG_SCHED_PDS
-void cpu_scaling(int cpu);
-void cpu_nonscaling(int cpu);
+#ifdef CONFIG_SCHED_MUQSS
 #define tsk_seruntime(t)		((t)->sched_time)
-/* replace the uncertian rt_timeout with 0UL */
-#define tsk_rttimeout(t)		(0UL)
+#define tsk_rttimeout(t)		((t)->rt_timeout)
 
-#define is_idle_policy(policy)	((policy) == SCHED_IDLE)
-#define idleprio_task(p)	unlikely(is_idle_policy((p)->policy))
+static inline void tsk_cpus_current(struct task_struct *p)
+{
+}
 
-#define is_iso_policy(policy)	((policy) == SCHED_ISO)
-#define iso_task(p)		unlikely(is_iso_policy((p)->policy))
+void print_scheduler_version(void);
 
+static inline bool iso_task(struct task_struct *p)
+{
+	return (p->policy == SCHED_ISO);
+}
 #else /* CFS */
-extern int runqueue_is_locked(int cpu);
-static inline void cpu_scaling(int cpu)
-{
-}
-
-static inline void cpu_nonscaling(int cpu)
-{
-}
 #define tsk_seruntime(t)	((t)->se.sum_exec_runtime)
 #define tsk_rttimeout(t)	((t)->rt.timeout)
 
-#define iso_task(p)		(false)
-#endif /* CONFIG_SCHED_PDS */
+static inline void tsk_cpus_current(struct task_struct *p)
+{
+	p->nr_cpus_allowed = current->nr_cpus_allowed;
+}
+
+static inline void print_scheduler_version(void)
+{
+	printk(KERN_INFO "CFS CPU scheduler.\n");
+}
+
+static inline bool iso_task(struct task_struct *p)
+{
+	return false;
+}
+#endif /* CONFIG_SCHED_MUQSS */
 
 static inline struct pid *task_pid(struct task_struct *task)
 {

@@ -791,7 +791,6 @@ check_timers_list(struct list_head *timers,
 	return 0;
 }
 
-#ifndef CONFIG_SCHED_PDS
 static inline void check_dl_overrun(struct task_struct *tsk)
 {
 	if (tsk->dl.dl_overrun) {
@@ -799,7 +798,6 @@ static inline void check_dl_overrun(struct task_struct *tsk)
 		__group_send_sig_info(SIGXCPU, SEND_SIG_PRIV, tsk);
 	}
 }
-#endif
 
 /*
  * Check for any per-thread CPU timers that have fired and move them off
@@ -814,10 +812,8 @@ static void check_thread_timers(struct task_struct *tsk,
 	u64 expires;
 	unsigned long soft;
 
-#ifndef CONFIG_SCHED_PDS
 	if (dl_task(tsk))
 		check_dl_overrun(tsk);
-#endif
 
 	/*
 	 * If cputime_expires is zero, then there are no active
@@ -921,10 +917,8 @@ static void check_process_timers(struct task_struct *tsk,
 	struct task_cputime cputime;
 	unsigned long soft;
 
-#ifndef CONFIG_SCHED_PDS
 	if (dl_task(tsk))
 		check_dl_overrun(tsk);
-#endif
 
 	/*
 	 * If cputimer is not running, then there are no active
@@ -1130,10 +1124,8 @@ static inline int fastpath_timer_check(struct task_struct *tsk)
 			return 1;
 	}
 
-#ifndef CONFIG_SCHED_PDS
 	if (dl_task(tsk) && tsk->dl.dl_overrun)
 		return 1;
-#endif
 
 	return 0;
 }

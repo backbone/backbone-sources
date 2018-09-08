@@ -414,7 +414,7 @@ When kptr_restrict is set to (2), kernel pointers printed using
 
 ==============================================================
 
-iso_cpu: (BFS CPU scheduler only).
+iso_cpu: (MuQSS CPU scheduler only).
 
 This sets the percentage cpu that the unprivileged SCHED_ISO tasks can
 run effectively at realtime priority, averaged over a rolling five
@@ -850,7 +850,7 @@ rebooting. ???
 
 ==============================================================
 
-rr_interval: (BFS CPU scheduler only)
+rr_interval: (MuQSS CPU scheduler only)
 
 This is the smallest duration that any cpu process scheduling unit
 will run for. Increasing this value can increase throughput of cpu
@@ -1105,12 +1105,12 @@ tunable to zero will disable lockup detection altogether.
 
 ==============================================================
 
-yield_type: (MuQSS/VRQ CPU scheduler only)
+yield_type: (MuQSS CPU scheduler only)
 
 This determines what type of yield calls to sched_yield will perform.
 
-   0 - No yield.
-   1 - Yield only to better priority/deadline tasks. (default)
-   2 - Expire timeslice and recalculate deadline.
+ 0: No yield.
+ 1: Yield only to better priority/deadline tasks. (default)
+ 2: Expire timeslice and recalculate deadline.
 
 ==============================================================
