@@ -3369,6 +3369,13 @@ static unsigned long bfq_bfqq_softrt_next_start(struct bfq_data *bfqd,
 		    jiffies + nsecs_to_jiffies(bfqq->bfqd->bfq_slice_idle) + 4);
 }
 
+static bool bfq_bfqq_injectable(struct bfq_queue *bfqq)
+{
+	return BFQQ_SEEKY(bfqq) && bfqq->wr_coeff == 1 &&
+		blk_queue_nonrot(bfqq->bfqd->queue) &&
+		bfqq->bfqd->hw_tag;
+}
+
 /**
  * bfq_bfqq_expire - expire a queue.
  * @bfqd: device owning the queue.
@@ -3493,6 +3500,8 @@ static void bfq_bfqq_expire(struct bfq_data *bfqd,
 	BUG_ON(ref > 1 &&
 	       !bfq_bfqq_busy(bfqq) && reason == BFQ_BFQQ_BUDGET_EXHAUSTED &&
 		!bfq_class_idle(bfqq));
+
+	bfqq->injected_service = 0;
 
 	/* mark bfqq as waiting a request only if a bic still points to it */
 	if (!bfq_bfqq_busy(bfqq) &&
@@ -3777,7 +3786,12 @@ static bool bfq_better_to_idle(struct bfq_queue *bfqq)
 	 * whether bfqq is being weight-raised, because
 	 * bfq_symmetric_scenario() does not take into account also
 	 * weight-raised queues (see comments on
-	 * bfq_weights_tree_add()).
+	 * bfq_weights_tree_add()). In particular, if bfqq is being
+	 * weight-raised, it is important to idle only if there are
+	 * other, non-weight-raised queues that may steal throughput
+	 * to bfqq. Actually, we should be even more precise, and
+	 * differentiate between interactive weight raising and
+	 * soft real-time weight raising.
 	 *
 	 * As a side note, it is worth considering that the above
 	 * device-idling countermeasures may however fail in the
@@ -3789,8 +3803,16 @@ static bool bfq_better_to_idle(struct bfq_queue *bfqq)
 	 * to let requests be served in the desired order until all
 	 * the requests already queued in the device have been served.
 	 */
-	asymmetric_scenario = bfqq->wr_coeff > 1 ||
+	asymmetric_scenario = (bfqq->wr_coeff > 1 &&
+			       bfqd->wr_busy_queues < bfqd->busy_queues) ||
 		!bfq_symmetric_scenario(bfqd);
+
+	bfq_log_bfqq(bfqd, bfqq,
+		     "wr_coeff %d wr_busy %d busy %d asymmetric %d",
+		     bfqq->wr_coeff,
+		     bfqd->wr_busy_queues,
+		     bfqd->busy_queues,
+		     asymmetric_scenario);
 
 	/*
 	 * Finally, there is a case where maximizing throughput is the
@@ -3843,6 +3865,33 @@ static bool bfq_better_to_idle(struct bfq_queue *bfqq)
 static bool bfq_bfqq_must_idle(struct bfq_queue *bfqq)
 {
 	return RB_EMPTY_ROOT(&bfqq->sort_list) && bfq_better_to_idle(bfqq);
+}
+
+static struct bfq_queue *bfq_choose_bfqq_for_injection(struct bfq_data *bfqd)
+{
+	struct bfq_queue *bfqq;
+
+	/*
+	 * A linear search; but, with a high probability, very few
+	 * steps are needed to find a candidate queue, i.e., a queue
+	 * with enough budget left for its next request. In fact:
+	 * - BFQ dynamically updates the budget of every queue so as
+	 *   to accomodate the expected backlog of the queue;
+	 * - if a queue gets all its requests dispatched as injected
+	 *   service, then the queue is removed from the active list
+	 *   (and re-added only if it gets new requests, but with
+	 *   enough budget for its new backlog).
+	 */
+	list_for_each_entry(bfqq, &bfqd->active_list, bfqq_list)
+		if (!RB_EMPTY_ROOT(&bfqq->sort_list) &&
+		    bfq_serv_to_charge(bfqq->next_rq, bfqq) <=
+		    bfq_bfqq_budget_left(bfqq)) {
+			bfq_log_bfqq(bfqd, bfqq, "returned this queue");
+			return bfqq;
+		}
+
+	bfq_log(bfqd, "no queue found");
+	return NULL;
 }
 
 /*
@@ -3930,10 +3979,25 @@ check_queue:
 	 * No requests pending. However, if the in-service queue is idling
 	 * for a new request, or has requests waiting for a completion and
 	 * may idle after their completion, then keep it anyway.
+	 *
+	 * Yet, to boost throughput, inject service from other queues if
+	 * possible.
 	 */
 	if (hrtimer_active(&bfqd->idle_slice_timer) ||
 	    (bfqq->dispatched != 0 && bfq_better_to_idle(bfqq))) {
-		bfqq = NULL;
+		if (bfq_bfqq_injectable(bfqq) &&
+		    bfqq->injected_service * bfqq->inject_coeff <
+		    bfqq->entity.service * 10) {
+			bfq_log_bfqq(bfqd, bfqq, "looking for queue for injection");
+			bfqq = bfq_choose_bfqq_for_injection(bfqd);
+		} else {
+			if (BFQQ_SEEKY(bfqq))
+				bfq_log_bfqq(bfqd, bfqq,
+					"injection saturated %d * %d >= %d * 10",
+					bfqq->injected_service, bfqq->inject_coeff,
+					bfqq->entity.service);
+			bfqq = NULL;
+		}
 		goto keep_queue;
 	}
 
@@ -4044,6 +4108,26 @@ static int bfq_dispatch_request(struct bfq_data *bfqd,
 
 	bfq_dispatch_insert(bfqd->queue, rq);
 
+	bfq_log_bfqq(bfqd, bfqq,
+	     "dispatched %u sec req (%llu), budg left %d, new disp_nr %d",
+			blk_rq_sectors(rq),
+			(unsigned long long) blk_rq_pos(rq),
+		     bfq_bfqq_budget_left(bfqq),
+		     bfqq->dispatched);
+
+	dispatched++;
+
+	if (bfqq != bfqd->in_service_queue) {
+		if (likely(bfqd->in_service_queue)) {
+			bfqd->in_service_queue->injected_service +=
+				bfq_serv_to_charge(rq, bfqq);
+			bfq_log_bfqq(bfqd, bfqd->in_service_queue,
+				     "injected_service increased to %d",
+				     bfqd->in_service_queue->injected_service);
+		}
+		return dispatched;
+	}
+
 	/*
 	 * If weight raising has to terminate for bfqq, then next
 	 * function causes an immediate update of bfqq's weight,
@@ -4056,14 +4140,6 @@ static int bfq_dispatch_request(struct bfq_data *bfqd,
 	 * device immediately to possible other weight-raised queues.
 	 */
 	bfq_update_wr_data(bfqd, bfqq);
-
-	bfq_log_bfqq(bfqd, bfqq,
-			"dispatched %u sec req (%llu), budg left %d",
-			blk_rq_sectors(rq),
-			(unsigned long long) blk_rq_pos(rq),
-			bfq_bfqq_budget_left(bfqq));
-
-	dispatched++;
 
 	if (!bfqd->in_service_bic) {
 		atomic_long_inc(&RQ_BIC(rq)->icq.ioc->refcount);
@@ -4159,9 +4235,11 @@ static int bfq_dispatch_requests(struct request_queue *q, int force)
 	if (!bfqq)
 		return 0;
 
-	BUG_ON(bfqq->entity.budget < bfqq->entity.service);
+	BUG_ON(bfqq == bfqd->in_service_queue &&
+	       bfqq->entity.budget < bfqq->entity.service);
 
-	BUG_ON(bfq_bfqq_wait_request(bfqq));
+	BUG_ON(bfqq == bfqd->in_service_queue &&
+	       bfq_bfqq_wait_request(bfqq));
 
 	if (!bfq_dispatch_request(bfqd, bfqq))
 		return 0;
@@ -4406,6 +4484,13 @@ static void bfq_init_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 			bfq_mark_bfqq_has_short_ttime(bfqq);
 		bfq_mark_bfqq_sync(bfqq);
 		bfq_mark_bfqq_just_created(bfqq);
+		/*
+		 * Aggressively inject a lot of service: up to 90%.
+		 * This coefficient remains constant during bfqq life,
+		 * but this behavior might be changed, after enough
+		 * testing and tuning.
+		 */
+		bfqq->inject_coeff = 1;
 	} else
 		bfq_clear_bfqq_sync(bfqq);
 	bfq_mark_bfqq_IO_bound(bfqq);
@@ -5705,7 +5790,7 @@ static struct blkcg_policy blkcg_policy_bfq = {
 static int __init bfq_init(void)
 {
 	int ret;
-	char msg[60] = "BFQ I/O-scheduler: v8r12";
+	char msg[60] = "BFQ I/O-scheduler: v9";
 
 #ifdef BFQ_GROUP_IOSCHED_ENABLED
 	ret = blkcg_policy_register(&blkcg_policy_bfq);
