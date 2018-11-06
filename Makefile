@@ -2,8 +2,8 @@
 VERSION = 4
 PATCHLEVEL = 19
 SUBLEVEL = 1
-EXTRAVERSION = -zen
-NAME = Neo Mir
+EXTRAVERSION = -backbone
+NAME = "People's Front"
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
