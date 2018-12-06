@@ -440,10 +440,6 @@ config RETPOLINE
 	  branches. Requires a compiler with -mindirect-branch=thunk-extern
 	  support for full protection. The kernel may run slower.
 
-	  Without compiler support, at least indirect branches in assembler
-	  code are eliminated. Since this includes the syscall entry path,
-	  it is not entirely pointless.
-
 config INTEL_RDT
 	bool "Intel Resource Director Technology support"
 	default n
@@ -966,6 +962,7 @@ config SCHED_SMT
 	  when dealing with Intel P4/Core 2 chips with HyperThreading at a
 	  cost of slightly increased overhead in some places. If unsure say
 	  N here.
+	def_bool y if SMP
 
 config SMT_NICE
 	bool "SMT (Hyperthreading) aware nice priority and policy support"
