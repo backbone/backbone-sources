@@ -2,8 +2,8 @@
 VERSION = 4
 PATCHLEVEL = 20
 SUBLEVEL = 1
-EXTRAVERSION = -zen
-NAME = Sparky Falcon
+EXTRAVERSION = -backbone
+NAME = Shy Crocodile
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
