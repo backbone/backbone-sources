@@ -1110,10 +1110,6 @@ ssize_t elv_iosched_store(struct request_queue *q, const char *name,
 {
 	int ret;
 
-#ifdef CONFIG_ZEN_INTERACTIVE
-	return count;
-#endif
-
 	if (!(q->mq_ops || q->request_fn) || !elv_support_iosched(q))
 		return count;
 
