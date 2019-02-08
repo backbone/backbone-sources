@@ -2,7 +2,7 @@
 VERSION = 4
 PATCHLEVEL = 19
 SUBLEVEL = 20
-EXTRAVERSION = -backbone
+EXTRAVERSION = -backbone-r1
 NAME = "People's Front"
 
 # *DOCUMENTATION*
