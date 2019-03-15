@@ -1,5 +1,5 @@
 /*
- * BFQ v9: data structures and common functions prototypes.
+ * BFQ v10: data structures and common functions prototypes.
  *
  * Based on ideas and code from CFQ:
  * Copyright (C) 2003 Jens Axboe <axboe@kernel.dk>
@@ -42,6 +42,8 @@
 #define BFQ_WEIGHT_LEGACY_DFL	100
 #define BFQ_DEFAULT_GRP_IOPRIO	0
 #define BFQ_DEFAULT_GRP_CLASS	IOPRIO_CLASS_BE
+
+#define MAX_PID_STR_LENGTH 12
 
 /*
  * Soft real-time applications are extremely more latency sensitive
@@ -419,6 +421,15 @@ struct bfq_io_cq {
 	bool was_in_burst_list;
 
 	/*
+	 * Save the weight when a merge occurs, to be able
+	 * to restore it in case of split. If the weight is not
+	 * correctly resumed when the queue is recycled,
+	 * then the weight of the recycled queue could differ
+	 * from the weight of the original queue.
+	 */
+	unsigned int saved_weight;
+
+	/*
 	 * Similar to previous fields: save wr information.
 	 */
 	unsigned long saved_wr_coeff;
@@ -447,7 +458,7 @@ struct bfq_data {
 	 * weight-raised @bfq_queue (see the comments to the functions
 	 * bfq_weights_tree_[add|remove] for further details).
 	 */
-	struct rb_root queue_weights_tree;
+	struct rb_root_cached queue_weights_tree;
 
 	/*
 	 * Number of groups with at least one descendant process that
@@ -509,6 +520,9 @@ struct bfq_data {
 	int queued;
 	/* number of requests dispatched and waiting for completion */
 	int rq_in_driver;
+
+	/* true if the device is non rotational and performs queueing */
+	bool nonrot_with_queueing;
 
 	/*
 	 * Maximum number of requests in driver in the last
@@ -748,6 +762,14 @@ BFQ_BFQQ_FNS(softrt_update);
 #undef BFQ_BFQQ_FNS
 
 /* Logging facilities. */
+static inline void bfq_pid_to_str(int pid, char *str, int len)
+{
+	if (pid != -1)
+		snprintf(str, len, "%d", pid);
+	else
+		snprintf(str, len, "SHARED-");
+}
+
 #ifdef CONFIG_BFQ_REDIRECT_TO_CONSOLE
 
 static const char *checked_dev_name(const struct device *dev)
@@ -766,12 +788,14 @@ static struct blkcg_gq *bfqg_to_blkg(struct bfq_group *bfqg);
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)	do {			\
 	char __pbuf[128];						\
+	char pid_str[MAX_PID_STR_LENGTH];	\
 									\
 	assert_spin_locked((bfqd)->queue->queue_lock);			\
+	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH);	\
 	blkg_path(bfqg_to_blkg(bfqq_group(bfqq)), __pbuf, sizeof(__pbuf)); \
-	pr_crit("%s bfq%d%c %s [%s] " fmt "\n",				\
+	pr_crit("%s bfq%s%c %s [%s] " fmt "\n",				\
 		checked_dev_name((bfqd)->queue->backing_dev_info->dev),	\
-		(bfqq)->pid,						\
+		pid_str,						\
 		bfq_bfqq_sync((bfqq)) ? 'S' : 'A',			\
 		__pbuf, __func__, ##args);				\
 } while (0)
@@ -788,9 +812,11 @@ static struct blkcg_gq *bfqg_to_blkg(struct bfq_group *bfqg);
 #else /* BFQ_GROUP_IOSCHED_ENABLED */
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)				\
-	pr_crit("%s bfq%d%c [%s] " fmt "\n",				\
+	char pid_str[MAX_PID_STR_LENGTH];	\
+	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH);	\
+	pr_crit("%s bfq%s%c [%s] " fmt "\n",				\
 		checked_dev_name((bfqd)->queue->backing_dev_info->dev),	\
-		(bfqq)->pid, bfq_bfqq_sync((bfqq)) ? 'S' : 'A',		\
+		pid_str, bfq_bfqq_sync((bfqq)) ? 'S' : 'A',		\
 		__func__, ##args)
 #define bfq_log_bfqg(bfqd, bfqg, fmt, args...)		do {} while (0)
 
@@ -803,7 +829,7 @@ static struct blkcg_gq *bfqg_to_blkg(struct bfq_group *bfqg);
 
 #else /* CONFIG_BFQ_REDIRECT_TO_CONSOLE */
 
-#if !defined(CONFIG_BLK_DEV_IO_TRACE)
+#if defined(CONFIG_BFQ_MQ_NOLOG_BUG_ON) || !defined(CONFIG_BLK_DEV_IO_TRACE)
 
 /* Avoid possible "unused-variable" warning. See commit message. */
 
@@ -823,11 +849,13 @@ static struct blkcg_gq *bfqg_to_blkg(struct bfq_group *bfqg);
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)	do {			\
 	char __pbuf[128];						\
+	char pid_str[MAX_PID_STR_LENGTH];	\
 									\
 	assert_spin_locked((bfqd)->queue->queue_lock);			\
+	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH);	\
 	blkg_path(bfqg_to_blkg(bfqq_group(bfqq)), __pbuf, sizeof(__pbuf)); \
-	blk_add_trace_msg((bfqd)->queue, "bfq%d%c %s [%s] " fmt, \
-			  (bfqq)->pid,			  \
+	blk_add_trace_msg((bfqd)->queue, "bfq%s%c %s [%s] " fmt, \
+			  pid_str,			  \
 			  bfq_bfqq_sync((bfqq)) ? 'S' : 'A',	\
 			  __pbuf, __func__, ##args);			\
 } while (0)
@@ -843,7 +871,9 @@ static struct blkcg_gq *bfqg_to_blkg(struct bfq_group *bfqg);
 #else /* BFQ_GROUP_IOSCHED_ENABLED */
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)	\
-	blk_add_trace_msg((bfqd)->queue, "bfq%d%c [%s] " fmt, (bfqq)->pid, \
+	char pid_str[MAX_PID_STR_LENGTH];	\
+	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH);	\
+	blk_add_trace_msg((bfqd)->queue, "bfq%s%c [%s] " fmt, pid_str, \
 			bfq_bfqq_sync((bfqq)) ? 'S' : 'A',		\
 				__func__, ##args)
 #define bfq_log_bfqg(bfqd, bfqg, fmt, args...)		do {} while (0)
@@ -855,6 +885,13 @@ static struct blkcg_gq *bfqg_to_blkg(struct bfq_group *bfqg);
 
 #endif /* CONFIG_BLK_DEV_IO_TRACE */
 #endif /* CONFIG_BFQ_REDIRECT_TO_CONSOLE */
+
+#if defined(CONFIG_BFQ_MQ_NOLOG_BUG_ON)
+/* Avoid possible "unused-variable" warning. */
+#define BFQ_BUG_ON(cond)	((void) (cond))
+#else
+#define BFQ_BUG_ON(cond)	BUG_ON(cond)
+#endif
 
 /* Expiration reasons. */
 enum bfqq_expiration {
@@ -1001,8 +1038,8 @@ bfq_entity_service_tree(struct bfq_entity *entity)
 	struct bfq_queue *bfqq = bfq_entity_to_bfqq(entity);
 	unsigned int idx = bfq_class_idx(entity);
 
-	BUG_ON(idx >= BFQ_IOPRIO_CLASSES);
-	BUG_ON(sched_data == NULL);
+	BFQ_BUG_ON(idx >= BFQ_IOPRIO_CLASSES);
+	BFQ_BUG_ON(sched_data == NULL);
 
 	if (bfqq)
 		bfq_log_bfqq(bfqq->bfqd, bfqq,
