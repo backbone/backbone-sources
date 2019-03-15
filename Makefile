@@ -2,8 +2,8 @@
 VERSION = 5
 PATCHLEVEL = 0
 SUBLEVEL = 2
-EXTRAVERSION = -zen
-NAME = High Five
+EXTRAVERSION = -backbone
+NAME = Shy Crocodile
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
