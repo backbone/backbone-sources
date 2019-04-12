@@ -133,6 +133,7 @@ extern int sched_interactive;
 extern int sched_iso_cpu;
 extern int sched_yield_type;
 #endif
+static unsigned long long_max = LONG_MAX;
 #ifdef CONFIG_PRINTK
 static int ten_thousand = 10000;
 #endif
@@ -1728,6 +1729,8 @@ static struct ctl_table fs_table[] = {
 		.maxlen		= sizeof(files_stat.max_files),
 		.mode		= 0644,
 		.proc_handler	= proc_doulongvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &long_max,
 	},
 	{
 		.procname	= "nr_open",
