@@ -124,6 +124,7 @@ static int zero;
 static int __maybe_unused one = 1;
 static int __maybe_unused two = 2;
 static int __maybe_unused four = 4;
+static unsigned long zero_ul;
 static unsigned long one_ul = 1;
 static int __maybe_unused one_hundred = 100;
 #ifdef CONFIG_SCHED_BFS
@@ -131,6 +132,7 @@ extern int rr_interval;
 extern int sched_iso_cpu;
 static int __read_mostly one_thousand = 1000;
 #endif
+static unsigned long long_max = LONG_MAX;
 #ifdef CONFIG_PRINTK
 static int ten_thousand = 10000;
 #endif
@@ -1548,6 +1550,8 @@ static struct ctl_table fs_table[] = {
 		.maxlen		= sizeof(files_stat.max_files),
 		.mode		= 0644,
 		.proc_handler	= proc_doulongvec_minmax,
+		.extra1		= &zero_ul,
+		.extra2		= &long_max,
 	},
 	{
 		.procname	= "nr_open",
