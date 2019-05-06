@@ -2,8 +2,8 @@
 VERSION = 5
 PATCHLEVEL = 1
 SUBLEVEL = 0
-EXTRAVERSION =
-NAME = Shy Crocodile
+EXTRAVERSION = -zen
+NAME = Chainsaw Slalom
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
